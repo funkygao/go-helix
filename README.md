@@ -1,7 +1,7 @@
 # go-helix
 A apache-helix implemented in golang
 
-### Abstraction
+### Common problems
 
 - leader election
 - replicas
@@ -10,5 +10,17 @@ A apache-helix implemented in golang
 - dynamic configs
 - zone awareness
 - partitioning & repartitioning
-- resource
+- resource assignment & load balance
 - scheduled tasks
+- rebalancer
+
+### Concepts
+
+- Cluster
+- Resource
+- Partition
+- Replica
+- StateMachine
+- Participant
+- Spectator
+- Controller
