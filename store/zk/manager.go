@@ -18,6 +18,7 @@ type Manager struct {
 	connected bool
 }
 
+// NewZKHelixManager creates a HelixManager implementation with zk as storage.
 func NewZKHelixManager(zkSvr string, options ...zkConnOption) helix.HelixManager {
 	mgr := &Manager{
 		zkSvr: zkSvr,

@@ -44,4 +44,6 @@ var (
 
 	// ErrNotConnected is returned when call a function without calling Connect() beforehand.
 	ErrNotConnected = errors.New("Not connected yet")
+
+	ErrPartialSuccess = errors.New("Partial success")
 )

@@ -1,8 +1,6 @@
 package zk
 
 import (
-	"bytes"
-	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +17,7 @@ type Admin struct {
 	connected bool
 }
 
+// NewZKHelixAdmin creates a HelixAdmin implementation with zk as storage.
 func NewZKHelixAdmin(zkSvr string, options ...zkConnOption) helix.HelixAdmin {
 	admin := &Admin{
 		zkSvr:      zkSvr,
@@ -105,10 +104,20 @@ func (adm Admin) AddCluster(cluster string) error {
 	adm.CreateEmptyNode(kb.controllerMessages())
 	adm.CreateEmptyNode(kb.controllerStatusUpdates())
 
+	ok, err := adm.IsClusterSetup(cluster)
+	if err != nil {
+		return err
+	} else if !ok {
+		return helix.ErrPartialSuccess
+	}
 	return nil
 }
 
-// Clusters shows all Helix managed clusters in the admected zookeeper cluster
+func (adm Admin) DropCluster(cluster string) error {
+	kb := keyBuilder{clusterID: cluster}
+	return adm.DeleteTree(kb.cluster())
+}
+
 func (adm Admin) Clusters() ([]string, error) {
 	children, err := adm.Children("/")
 	if err != nil {
@@ -125,46 +134,22 @@ func (adm Admin) Clusters() ([]string, error) {
 	return clusters, nil
 }
 
-// DropCluster removes a helix cluster from zookeeper. This will remove the
-// znode named after the cluster name from the zookeeper root.
-func (adm Admin) DropCluster(cluster string) error {
-	kb := keyBuilder{clusterID: cluster}
-	return adm.DeleteTree(kb.cluster())
-}
-
-// ListClusterInfo shows the existing resources and instances in the cluster
-func (adm Admin) ListClusterInfo(cluster string) (string, error) {
-	// make sure the cluster is already setup
-	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
-		return "", helix.ErrClusterNotSetup
+func (adm Admin) ClusterInfo(cluster string) (instances []string, resources []string, err error) {
+	if ok, e := adm.IsClusterSetup(cluster); !ok || e != nil {
+		err = helix.ErrClusterNotSetup
+		return
 	}
 
 	kb := keyBuilder{clusterID: cluster}
-	resources, err := adm.Children(kb.idealStates())
+	resources, err = adm.Children(kb.idealStates())
 	if err != nil {
-		return "", err
+		return
 	}
 
-	instances, err := adm.Children(kb.instances())
-	if err != nil {
-		return "", err
-	}
-
-	var buffer bytes.Buffer
-	buffer.WriteString("Existing resources in cluster " + cluster + ":\n")
-
-	for _, r := range resources {
-		buffer.WriteString("  " + r + "\n")
-	}
-
-	buffer.WriteString("\nInstances in cluster " + cluster + ":\n")
-	for _, i := range instances {
-		buffer.WriteString("  " + i + "\n")
-	}
-	return buffer.String(), nil
+	instances, err = adm.Children(kb.instances())
+	return
 }
 
-// SetConfig set the configuration values for the cluster, defined by the config scope
 func (adm Admin) SetConfig(cluster string, scope helix.HelixConfigScope, properties map[string]string) error {
 	switch scope {
 	case helix.ConfigScopeCluster:
@@ -184,7 +169,6 @@ func (adm Admin) SetConfig(cluster string, scope helix.HelixConfigScope, propert
 	return nil
 }
 
-// GetConfig obtains the configuration value of a property, defined by a config scope
 func (adm Admin) GetConfig(cluster string, scope helix.HelixConfigScope, keys []string) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 	switch scope {
@@ -271,12 +255,12 @@ func (adm Admin) DropNode(cluster string, node string) error {
 	}
 
 	// delete /<cluster>/CONFIGS/PARTICIPANT/<node>
-	adm.DeleteTree(kb.participantConfig(node))
+	if err := adm.DeleteTree(kb.participantConfig(node)); err != nil {
+		return err
+	}
 
 	// delete /<cluster>/INSTANCES/<node>
-	adm.DeleteTree(kb.instance(node))
-
-	return nil
+	return adm.DeleteTree(kb.instance(node))
 }
 
 func (adm Admin) AddResource(cluster string, resource string, option helix.AddResourceOption) error {
@@ -306,7 +290,7 @@ func (adm Admin) AddResource(cluster string, resource string, option helix.AddRe
 	is := helix.NewRecord(resource)
 	is.SetSimpleField("NUM_PARTITIONS", strconv.Itoa(option.Partitions))
 	is.SetSimpleField("REPLICAS", "0")
-	is.SetSimpleField("REBALANCE_MODE", option.RebalancerMode) // TODO
+	is.SetSimpleField("REBALANCE_MODE", option.RebalancerMode)
 	is.SetSimpleField("STATE_MODEL_DEF_REF", option.StateModel)
 	is.SetSimpleField("STATE_MODEL_FACTORY_NAME", "DEFAULT")
 	if option.MaxPartitionsPerInstance > 0 {
@@ -319,7 +303,6 @@ func (adm Admin) AddResource(cluster string, resource string, option helix.AddRe
 	return adm.CreateRecordWithPath(kb.idealStateForResource(resource), is)
 }
 
-// DropResource removes the specified resource from the cluster.
 func (adm Admin) DropResource(cluster string, resource string) error {
 	// make sure the cluster is already setup
 	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
@@ -328,15 +311,22 @@ func (adm Admin) DropResource(cluster string, resource string) error {
 
 	// make sure the path for the ideal state does not exit
 	kb := keyBuilder{clusterID: cluster}
-	adm.DeleteTree(kb.idealStateForResource(resource))
-	adm.DeleteTree(kb.resourceConfig(resource))
-
-	return nil
+	if err := adm.DeleteTree(kb.idealStateForResource(resource)); err != nil {
+		return err
+	}
+	return adm.DeleteTree(kb.resourceConfig(resource))
 }
 
-// EnableResource enables the specified resource in the cluster.
 func (adm Admin) EnableResource(cluster string, resource string) error {
-	// make sure the cluster is already setup
+	return adm.setResourceEnabled(cluster, resource, true)
+}
+
+// DisableResource disables the specified resource in the cluster.
+func (adm Admin) DisableResource(cluster string, resource string) error {
+	return adm.setResourceEnabled(cluster, resource, false)
+}
+
+func (adm Admin) setResourceEnabled(cluster string, resource string, enabled bool) error {
 	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
 		return helix.ErrClusterNotSetup
 	}
@@ -351,106 +341,44 @@ func (adm Admin) EnableResource(cluster string, resource string) error {
 	}
 
 	// TODO: set the value at leaf node instead of the record level
-	return adm.UpdateSimpleField(isPath, "HELIX_ENABLED", "true")
-}
-
-// DisableResource disables the specified resource in the cluster.
-func (adm Admin) DisableResource(cluster string, resource string) error {
-	// make sure the cluster is already setup
-	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
-		return helix.ErrClusterNotSetup
+	if enabled {
+		return adm.UpdateSimpleField(isPath, "HELIX_ENABLED", "true")
 	}
-
-	kb := keyBuilder{clusterID: cluster}
-	isPath := kb.idealStateForResource(resource)
-	if exists, err := adm.Exists(isPath); !exists || err != nil {
-		if !exists {
-			return helix.ErrResourceNotExists
-		}
-
-		return err
-	}
-
 	return adm.UpdateSimpleField(isPath, "HELIX_ENABLED", "false")
 }
 
-// ListResources shows a list of resources managed by the helix cluster
-func (adm Admin) ListResources(cluster string) (string, error) {
-	// make sure the cluster is already setup
+func (adm Admin) Resources(cluster string) ([]string, error) {
 	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
-		return "", helix.ErrClusterNotSetup
+		return nil, helix.ErrClusterNotSetup
 	}
 
 	kb := keyBuilder{clusterID: cluster}
-	resources, err := adm.Children(kb.idealStates())
-	if err != nil {
-		return "", err
-	}
-
-	var buffer bytes.Buffer
-	buffer.WriteString("Existing resources in cluster " + cluster + ":\n")
-
-	for _, r := range resources {
-		buffer.WriteString("  " + r + "\n")
-	}
-
-	return buffer.String(), nil
-}
-
-// ListInstances shows a list of instances participating the cluster.
-func (adm Admin) ListInstances(cluster string) (string, error) {
-	// make sure the cluster is already setup
-	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
-		return "", helix.ErrClusterNotSetup
-	}
-
-	kb := keyBuilder{clusterID: cluster}
-	instances, err := adm.Children(kb.instances())
-	if err != nil {
-		return "", err
-	}
-
-	var buffer bytes.Buffer
-	buffer.WriteString(fmt.Sprintf("Existing instances in cluster %s:\n", cluster))
-
-	for _, r := range instances {
-		buffer.WriteString("  " + r + "\n")
-	}
-
-	return buffer.String(), nil
+	return adm.Children(kb.idealStates())
 }
 
 // ListInstanceInfo shows detailed information of an inspace in the helix cluster
-func (adm Admin) ListInstanceInfo(cluster string, instance string) (string, error) {
-	if !adm.connected {
-		return "", helix.ErrNotConnected
-	}
-
-	// make sure the cluster is already setup
+func (adm Admin) InstanceInfo(cluster string, ic helix.InstanceConfig) (*helix.Record, error) {
 	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
-		return "", helix.ErrClusterNotSetup
+		return nil, helix.ErrClusterNotSetup
 	}
 
 	kb := keyBuilder{clusterID: cluster}
-	instanceCfg := kb.participantConfig(instance)
+	instanceCfg := kb.participantConfig(ic.Node())
 	if exists, err := adm.Exists(instanceCfg); !exists || err != nil {
 		if !exists {
-			return "", helix.ErrNodeNotExist
+			return nil, helix.ErrNodeNotExist
 		}
-		return "", err
+		return nil, err
 	}
 
-	r, err := adm.GetRecordFromPath(instanceCfg)
-	if err != nil {
-		return "", err
-	}
-	return r.String(), nil
+	return adm.GetRecordFromPath(instanceCfg)
 }
 
 // Instances returns lists of instances.
 func (adm Admin) Instances(cluster string) ([]string, error) {
-	if !adm.connected {
-		return nil, helix.ErrNotConnected
+	// make sure the cluster is already setup
+	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
+		return nil, helix.ErrClusterNotSetup
 	}
 
 	kb := keyBuilder{clusterID: cluster}

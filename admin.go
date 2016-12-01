@@ -15,6 +15,9 @@ type HelixAdmin interface {
 	// Clusters return all Helix managed clusters.
 	Clusters() ([]string, error)
 
+	// ClusterInfo returns the existing resources and instances in the cluster.
+	ClusterInfo(cluster string) (instances []string, resources []string, err error)
+
 	// DropCluster removes a Helix managed cluster.
 	DropCluster(cluster string) error
 
@@ -22,10 +25,10 @@ type HelixAdmin interface {
 	// By default this feature is off.
 	AllowParticipantAutoJoin(cluster string, yes bool) error
 
-	//
+	// SetConfig set the configuration values for the cluster, defined by the config scope.
 	SetConfig(cluster string, scope HelixConfigScope, properties map[string]string) error
 
-	//
+	// GetConfig obtains the configuration value of a property, defined by a config scope.
 	GetConfig(cluster string, scope HelixConfigScope, keys []string) (map[string]interface{}, error)
 
 	// Add an instance to a cluster.
@@ -34,14 +37,19 @@ type HelixAdmin interface {
 	// Drop an instance from a cluster.
 	DropInstance(cluster string, ic InstanceConfig) error
 
-	// Get a list of instances under a cluster.
+	// Get a list of instances participating under a cluster.
 	Instances(cluster string) ([]string, error)
+
+	InstanceInfo(cluster string, ic InstanceConfig) (*Record, error)
 
 	// Add a resource to a cluster.
 	AddResource(cluster string, resource string, option AddResourceOption) error
 
-	// Drop a resource from a cluster.
+	// DropResource removes the specified resource from the cluster.
 	DropResource(cluster string, resource string) error
+
+	// Resources shows a list of resources managed by the helix cluster.
+	Resources(cluster string) ([]string, error)
 
 	// EnableResource enables the specified resource in the cluster.
 	EnableResource(cluster string, resource string) error
@@ -59,7 +67,6 @@ type HelixAdmin interface {
 	Rebalance(cluster string, resource string, replica int) error
 
 	// TODO
-	//Resources(cluster string) ([]string, error)
 	//setConstraint(String clusterName, ConstraintType constraintType, String constraintId, ConstraintItem constraintItem)
 	// getInstanceConfig(String clusterName, String instanceName)
 	// getResourceIdealState(String clusterName, String resourceName)
