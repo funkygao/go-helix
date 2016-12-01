@@ -26,9 +26,10 @@ var (
 type connection struct {
 	sync.RWMutex
 
-	servers     []string
-	chroot      string
-	isConnected bool
+	sessionTimeout time.Duration
+	servers        []string
+	chroot         string
+	isConnected    bool
 
 	zkConn *zk.Conn
 	stat   *zk.Stat
@@ -42,15 +43,16 @@ func newConnection(zkSvr string) *connection {
 	}
 
 	conn := connection{
-		servers: servers,
-		chroot:  chroot,
+		servers:        servers,
+		chroot:         chroot,
+		sessionTimeout: time.Second * 30,
 	}
 
 	return &conn
 }
 
 func (conn *connection) Connect() error {
-	zkConn, _, err := zk.Connect(conn.servers, time.Second*30)
+	zkConn, _, err := zk.Connect(conn.servers, conn.sessionTimeout)
 	if err != nil {
 		return err
 	}

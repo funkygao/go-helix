@@ -3,3 +3,10 @@ A apache-helix implemented in golang
 
 Originally based on https://github.com/yichen/gohelix
 
+### TODO
+
+- [ ] curator
+- [ ] controller
+- [ ] rebalance
+- [ ] super cluster
+- [ ] tag

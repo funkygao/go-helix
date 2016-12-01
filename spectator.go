@@ -4,10 +4,10 @@ package helix
 // but only read cluster data, or listen to cluster updates.
 type HelixSpectator interface {
 
-	// Connect enables the spectator to listen to Helix cluster changes and handle listener updates.
-	Connect() error
+	//
+	Start() error
 
-	// Close will disconnect the spectator from storage, and also stop all listeners.
+	//
 	Close()
 
 	// AddExternalViewChangeListener add a listener to external view changes.

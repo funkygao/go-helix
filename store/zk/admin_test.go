@@ -7,12 +7,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/funkygao/go-helix"
 	"github.com/yichen/go-zookeeper/zk"
 )
 
 var (
 	testZkSvr = "localhost:2181"
 )
+
+func TestNewZKHelixAdminWithOptions(t *testing.T) {
+
+}
 
 func TestAddAndDropCluster(t *testing.T) {
 	t.Parallel()
@@ -29,12 +34,12 @@ func TestAddAndDropCluster(t *testing.T) {
 
 	// if cluster is already added, add it again and it should return ErrNodeAlreadyExists
 	err = a.AddCluster(cluster)
-	if err != ErrNodeAlreadyExists {
+	if err != helix.ErrNodeAlreadyExists {
 		t.Error(err)
 	}
 
 	// listClusters
-	clusters, err := a.ListClusters()
+	clusters, err := a.Clusters()
 	t.Logf("%+v%+v", clusters, err)
 	if err != nil {
 		t.Error("Expect OK")
@@ -44,7 +49,7 @@ func TestAddAndDropCluster(t *testing.T) {
 	}
 
 	a.DropCluster(cluster)
-	clusters, err = a.ListClusters()
+	clusters, err = a.Clusters()
 	if err != nil || strSliceContains(clusters, cluster) {
 		t.Error("Expect dropped")
 	}
@@ -110,7 +115,7 @@ func TestSetConfig(t *testing.T) {
 
 	a.SetConfig(cluster, "CLUSTER", property)
 
-	prop := a.GetConfig(cluster, "CLUSTER", []string{"allowParticipantAutoJoin"})
+	prop, _ := a.GetConfig(cluster, "CLUSTER", []string{"allowParticipantAutoJoin"})
 
 	if prop["allowParticipantAutoJoin"] != "true" {
 		t.Error("allowParticipantAutoJoin config set/get failed")
@@ -128,7 +133,7 @@ func TestAddDropNode(t *testing.T) {
 	node := "localhost_19932"
 
 	// add node before adding cluster, expect fail
-	if err := a.AddNode(cluster, node); err != ErrClusterNotSetup {
+	if err := a.AddNode(cluster, node); err != helix.ErrClusterNotSetup {
 		t.Error("Must error out for AddNode if cluster not setup")
 	}
 
@@ -141,7 +146,7 @@ func TestAddDropNode(t *testing.T) {
 	}
 
 	// add the same node again, should expect error ErrNodeAlreadyExists
-	if err := a.AddNode(cluster, node); err != ErrNodeAlreadyExists {
+	if err := a.AddNode(cluster, node); err != helix.ErrNodeAlreadyExists {
 		t.Error("should not be able to add the same node")
 	}
 
@@ -155,12 +160,12 @@ func TestAddDropNode(t *testing.T) {
 		t.Error("failed to drop cluster node")
 	}
 	// listInstanceInfo
-	if _, err := a.ListInstanceInfo(cluster, node); err != ErrNodeNotExist {
+	if _, err := a.ListInstanceInfo(cluster, node); err != helix.ErrNodeNotExist {
 		t.Error("expect OK")
 	}
 
 	// drop node again and we should see an error ErrNodeNotExist
-	if err := a.DropNode(cluster, node); err != ErrNodeNotExist {
+	if err := a.DropNode(cluster, node); err != helix.ErrNodeNotExist {
 		t.Error("failed to see expected error ErrNodeNotExist")
 	}
 
@@ -179,13 +184,13 @@ func TestAddDropResource(t *testing.T) {
 	a := Admin{zkSvr: testZkSvr}
 
 	// expect error if cluster not setup
-	if err := a.AddResource(cluster, resource, 32, "MasterSlave"); err != ErrClusterNotSetup {
+	if err := a.AddResource(cluster, resource, helix.DefaultAddResourceOption(32, "MasterSlave")); err != helix.ErrClusterNotSetup {
 		t.Error("must setup cluster before addResource")
 	}
-	if err := a.DropResource(cluster, resource); err != ErrClusterNotSetup {
+	if err := a.DropResource(cluster, resource); err != helix.ErrClusterNotSetup {
 		t.Error("must setup cluster before addResource")
 	}
-	if _, err := a.ListResources(cluster); err != ErrClusterNotSetup {
+	if _, err := a.ListResources(cluster); err != helix.ErrClusterNotSetup {
 		t.Error("must setup cluster")
 	}
 
@@ -198,12 +203,12 @@ func TestAddDropResource(t *testing.T) {
 	}
 
 	// expect error if state model does not exist
-	if err := a.AddResource(cluster, resource, 32, "NotExistStateModel"); err != ErrStateModelDefNotExist {
+	if err := a.AddResource(cluster, resource, helix.DefaultAddResourceOption(32, "NotExistStateModel")); err != helix.ErrStateModelDefNotExist {
 		t.Error("must use valid state model")
 	}
 
 	// expect pass
-	if err := a.AddResource(cluster, resource, 32, "MasterSlave"); err != nil {
+	if err := a.AddResource(cluster, resource, helix.DefaultAddResourceOption(32, "MasterSlave")); err != nil {
 		t.Error("fail addResource")
 	}
 	if info, err := a.ListResources(cluster); err != nil || info == "" {
@@ -231,10 +236,10 @@ func TestEnableDisableResource(t *testing.T) {
 	a := Admin{zkSvr: testZkSvr}
 
 	// expect error if cluster not setup
-	if err := a.EnableResource(cluster, resource); err != ErrClusterNotSetup {
+	if err := a.EnableResource(cluster, resource); err != helix.ErrClusterNotSetup {
 		t.Error("must setup cluster before enableResource")
 	}
-	if err := a.DisableResource(cluster, resource); err != ErrClusterNotSetup {
+	if err := a.DisableResource(cluster, resource); err != helix.ErrClusterNotSetup {
 		t.Error("must setup cluster before enableResource")
 	}
 
@@ -242,13 +247,13 @@ func TestEnableDisableResource(t *testing.T) {
 	defer a.DropCluster(cluster)
 
 	// expect error if resource not exist
-	if err := a.EnableResource(cluster, resource); err != ErrResourceNotExists {
+	if err := a.EnableResource(cluster, resource); err != helix.ErrResourceNotExists {
 		t.Error("expect ErrResourceNotExists")
 	}
-	if err := a.DisableResource(cluster, resource); err != ErrResourceNotExists {
+	if err := a.DisableResource(cluster, resource); err != helix.ErrResourceNotExists {
 		t.Error("expect ErrResourceNotExists")
 	}
-	if err := a.AddResource(cluster, "resource", 32, "MasterSlave"); err != nil {
+	if err := a.AddResource(cluster, "resource", helix.DefaultAddResourceOption(32, "MasterSlave")); err != nil {
 		t.Error("fail addResource")
 	}
 	if err := a.EnableResource(cluster, resource); err != nil {
@@ -321,4 +326,14 @@ func verifyChildrenCount(t *testing.T, path string, count int32) {
 	if stat.NumChildren != count {
 		t.Errorf("Node %s should have %d children, but only have %d children", path, count, stat.NumChildren)
 	}
+}
+
+func strSliceContains(a []string, s string) bool {
+	for _, ele := range a {
+		if ele == s {
+			return true
+		}
+	}
+
+	return false
 }

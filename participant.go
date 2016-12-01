@@ -2,10 +2,10 @@ package helix
 
 type HelixParticipant interface {
 
-	// Connect the participant to storage and start housekeeping.
-	Connect() error
+	// Start will startup the participant.
+	Start() error
 
-	// Close will disconnect the participant from storage and Helix controller.
+	//
 	Close()
 
 	// RegisterStateModel associates state trasition functions with the participant.

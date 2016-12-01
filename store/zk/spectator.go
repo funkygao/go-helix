@@ -21,14 +21,12 @@ const (
 // Spectator is a Helix role that does not participate the cluster state transition
 // but only read cluster data, or listen to cluster updates
 type Spectator struct {
-	// HelixManager
+	sync.RWMutex
+
 	conn *connection
 
 	// The cluster this spectator is specatating
 	ClusterID string
-
-	// zookeeper connection string
-	zkSvr string
 
 	// external view change handler
 	externalViewListeners         []helix.ExternalViewChangeListener
@@ -42,7 +40,6 @@ type Spectator struct {
 	// stop the spectator
 	stop chan bool
 
-	// keybuilder
 	kb keyBuilder
 
 	// resources the external view is tracking. It is a map from the resource name to the
@@ -67,20 +64,12 @@ type Spectator struct {
 	context *helix.Context
 
 	state spectatorState
-
-	sync.RWMutex
 }
 
-// Connect the spectator. When connected, the spectator is able to listen to Helix cluster
-// changes and handle listener updates.
-func (s *Spectator) Connect() error {
-	if s.conn != nil && s.conn.IsConnected() {
-		return nil
-	}
-
-	s.conn = newConnection(s.zkSvr)
-	if err := s.conn.Connect(); err != nil {
-		return err
+func (s *Spectator) Start() error {
+	if s.conn == nil || !s.conn.IsConnected() {
+		// Manager is responsible for connection
+		return helix.ErrNotConnected
 	}
 
 	if ok, err := s.conn.IsClusterSetup(s.ClusterID); !ok || err != nil {

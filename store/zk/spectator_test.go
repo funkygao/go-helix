@@ -3,6 +3,8 @@ package zk
 import (
 	"testing"
 	"time"
+
+	"github.com/funkygao/go-helix"
 )
 
 func TestSpectatorConnect(t *testing.T) {
@@ -15,24 +17,24 @@ func TestSpectatorConnect(t *testing.T) {
 
 	listenerCalled := false
 
-	externalViewChangeListener := func(ev []*Record, c *Context) {
+	externalViewChangeListener := func(ev []*helix.Record, c *helix.Context) {
 		listenerCalled = true
 	}
 
-	manager := NewHelixManager(testZkSvr)
+	manager := NewZKHelixManager(testZkSvr)
 	// s := manager.NewSpectator(cluster, externalViewChangeListener, nil)
 	s := manager.NewSpectator(cluster)
 	s.AddExternalViewChangeListener(externalViewChangeListener)
-	s.Connect()
-	defer s.Disconnect()
+	s.Start()
+	defer s.Close()
 
 	// create a participant to trigger the external view change
 	p := manager.NewParticipant(cluster, "localhost", "12913")
 
-	sm1 := NewStateModel(nil)
+	sm1 := helix.NewStateModel(nil)
 	p.RegisterStateModel("dummy", sm1)
-	p.Connect()
-	defer p.Disconnect()
+	p.Start()
+	defer p.Close()
 
 	select {
 	case <-time.After(1 * time.Second):

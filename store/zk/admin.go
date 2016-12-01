@@ -12,18 +12,23 @@ import (
 
 type Admin struct {
 	sync.RWMutex
+	closeOnce sync.Once
 
 	zkSvr string
 	*connection
 	connected bool
-	closeOnce sync.Once
 }
 
-func NewZKHelixAdmin(zkSvr string) helix.HelixAdmin {
-	return &Admin{
-		zkSvr:     zkSvr,
-		connected: false,
+func NewZKHelixAdmin(zkSvr string, options ...zkConnOption) helix.HelixAdmin {
+	admin := &Admin{
+		zkSvr:      zkSvr,
+		connected:  false,
+		connection: newConnection(zkSvr),
 	}
+	for _, option := range options {
+		option(admin.connection)
+	}
+	return admin
 }
 
 func (adm *Admin) Connect() error {
@@ -40,7 +45,6 @@ func (adm *Admin) Connect() error {
 		return nil
 	}
 
-	adm.connection = newConnection(adm.zkSvr)
 	if err := adm.connection.Connect(); err != nil {
 		return err
 	}
@@ -51,10 +55,12 @@ func (adm *Admin) Connect() error {
 
 func (adm *Admin) Close() {
 	adm.closeOnce.Do(func() {
+		adm.Lock()
 		if adm.connected {
 			adm.Disconnect()
 			adm.connected = false
 		}
+		adm.Unlock()
 	})
 }
 

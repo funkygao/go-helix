@@ -25,10 +25,9 @@ var _ helix.HelixParticipant = &Participant{}
 
 // Participant is a Helix participant node
 type Participant struct {
-	conn *connection
+	sync.Mutex
 
-	// zookeeper connection string
-	zkSvr string
+	conn *connection
 
 	// The cluster this participant belongs to
 	ClusterID string
@@ -55,26 +54,17 @@ type Participant struct {
 	// status
 	state participantState
 
-	// keybuilder
 	kb keyBuilder
-
-	sync.Mutex
 }
 
-// Connect the participant. Before connecting we need to validate that
-// Zookeeper address are valid and also that the state models are registered.
-// after connecting Zookeeper, we also need to register this participant
-// with the cluster in Helix, and get ready to receive cluster messages.
-func (p *Participant) Connect() error {
+func (p *Participant) Start() error {
 	if len(p.stateModels) == 0 {
 		return helix.ErrEmptyStateModel
 	}
 
 	if p.conn == nil || !p.conn.IsConnected() {
-		p.conn = newConnection(p.zkSvr)
-		if err := p.conn.Connect(); err != nil {
-			return err
-		}
+		// Manager is responsible for connection
+		return helix.ErrNotConnected
 	}
 
 	if ok, err := p.conn.IsClusterSetup(p.ClusterID); !ok || err != nil {
