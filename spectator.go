@@ -34,6 +34,6 @@ type HelixSpectator interface {
 	// TODO
 	GetControllerMessages() []*Record
 	GetInstanceMessages(instance string) []*Record
-	GetLiveInstances() []*Record
+	GetLiveInstances() ([]*Record, error)
 	GetExternalView() []*Record
 }

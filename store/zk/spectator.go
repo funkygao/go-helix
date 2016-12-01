@@ -110,23 +110,20 @@ func (s *Spectator) IsConnected() bool {
 // SetContext set the context that can be used within the listeners.
 func (s *Spectator) SetContext(context *helix.Context) {
 	s.Lock()
-	defer s.Unlock()
-
 	s.context = context
+	s.Unlock()
 }
 
 func (s *Spectator) AddExternalViewChangeListener(listener helix.ExternalViewChangeListener) {
 	s.Lock()
-	defer s.Unlock()
-
 	s.externalViewListeners = append(s.externalViewListeners, listener)
+	s.Unlock()
 }
 
 func (s *Spectator) AddLiveInstanceChangeListener(listener helix.LiveInstanceChangeListener) {
 	s.Lock()
-	defer s.Unlock()
-
 	s.liveInstanceChangeListeners = append(s.liveInstanceChangeListeners, listener)
+	s.Unlock()
 }
 
 func (s *Spectator) AddCurrentStateChangeListener(instance string, listener helix.CurrentStateChangeListener) {
@@ -166,23 +163,20 @@ func (s *Spectator) AddMessageListener(instance string, listener helix.MessageLi
 
 func (s *Spectator) AddIdealStateChangeListener(listener helix.IdealStateChangeListener) {
 	s.Lock()
-	defer s.Unlock()
-
 	s.idealStateChangeListeners = append(s.idealStateChangeListeners, listener)
+	s.Unlock()
 }
 
 func (s *Spectator) AddInstanceConfigChangeListener(listener helix.InstanceConfigChangeListener) {
 	s.Lock()
-	defer s.Unlock()
-
 	s.instanceConfigChangeListeners = append(s.instanceConfigChangeListeners, listener)
+	s.Unlock()
 }
 
 func (s *Spectator) AddControllerMessageListener(listener helix.ControllerMessageListener) {
 	s.Lock()
-	defer s.Unlock()
-
 	s.controllerMessageListeners = append(s.controllerMessageListeners, listener)
+	s.Unlock()
 }
 
 func (s *Spectator) watchExternalViewResource(resource string) {
@@ -216,16 +210,18 @@ func (s *Spectator) watchIdealStateResource(resource string) {
 // GetControllerMessages retrieves controller messages from zookeeper
 func (s *Spectator) GetControllerMessages() []*helix.Record {
 	result := []*helix.Record{}
-	messages, err := s.conn.Children(s.kb.controllerMessages())
 
+	messages, err := s.conn.Children(s.kb.controllerMessages())
 	if err != nil {
 		return result
 	}
 
 	for _, m := range messages {
 		record, err := s.conn.GetRecordFromPath(s.kb.controllerMessage(m))
-		if err != nil {
+		if err == nil {
 			result = append(result, record)
+		} else {
+			// TODO handle the err
 		}
 	}
 
@@ -235,16 +231,18 @@ func (s *Spectator) GetControllerMessages() []*helix.Record {
 // GetInstanceMessages retrieves messages sent to an instance
 func (s *Spectator) GetInstanceMessages(instance string) []*helix.Record {
 	result := []*helix.Record{}
-	messages, err := s.conn.Children(s.kb.messages(instance))
 
+	messages, err := s.conn.Children(s.kb.messages(instance))
 	if err != nil {
 		return result
 	}
 
 	for _, m := range messages {
 		record, err := s.conn.GetRecordFromPath(s.kb.message(instance, m))
-		if err != nil {
+		if err == nil {
 			result = append(result, record)
+		} else {
+			// TODO
 		}
 	}
 
@@ -252,25 +250,24 @@ func (s *Spectator) GetInstanceMessages(instance string) []*helix.Record {
 }
 
 // GetLiveInstances retrieve a copy of the current live instances.
-func (s *Spectator) GetLiveInstances() []*helix.Record {
+func (s *Spectator) GetLiveInstances() ([]*helix.Record, error) {
 	liveInstances := []*helix.Record{}
+
 	instances, err := s.conn.Children(s.kb.liveInstances())
 	if err != nil {
-		fmt.Println("Error in GetLiveInstances: " + err.Error())
-		return nil
+		return nil, err
 	}
 
 	for _, participantID := range instances {
 		r, err := s.conn.GetRecordFromPath(s.kb.liveInstance(participantID))
 		if err != nil {
-			fmt.Println("Error in get live instance for " + participantID)
-			continue
+			return liveInstances, err
 		}
 
 		liveInstances = append(liveInstances, r)
 	}
 
-	return liveInstances
+	return liveInstances, nil
 }
 
 // GetExternalView retrieves a copy of the external views
@@ -681,7 +678,7 @@ func (s *Spectator) handleChangeNotification(chg helix.ChangeNotification) {
 		}
 
 	case helix.LiveInstanceChanged:
-		li := s.GetLiveInstances()
+		li, _ := s.GetLiveInstances()
 		for _, l := range s.liveInstanceChangeListeners {
 			go l(li, s.context)
 		}
