@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Generic Record Format to store data at a Node This can be used to store
+// Generic Record Format to store data at a storage Node.
 // simpleFields mapFields listFields.
 type Record struct {
 	ID string `json:"id"`

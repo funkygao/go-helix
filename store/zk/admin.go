@@ -5,30 +5,43 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/funkygao/go-helix"
 )
 
-// Admin handles the administration task for the Helix cluster. Many of the operations
-// are mirroring the implementions documented at
-// http://helix.apache.org/0.7.0-incubating-docs/Quickstart.html
-
-var _ helix.HelixAdmin = &Admin{}
-
 type Admin struct {
-	zkSvr string
+	sync.RWMutex
 
-	conn      *connection
+	zkSvr string
+	*connection
 	connected bool
+	closeOnce sync.Once
 }
 
-func NewZKHelixAdmin(zkSvr string) *Admin {
-	return &Admin{zkSvr: zkSvr}
+func NewZKHelixAdmin(zkSvr string) helix.HelixAdmin {
+	return &Admin{
+		zkSvr:     zkSvr,
+		connected: false,
+	}
 }
 
 func (adm *Admin) Connect() error {
-	adm.conn = newConnection(adm.zkSvr)
-	if err := adm.conn.Connect(); err != nil {
+	adm.RLock()
+	if adm.connected {
+		adm.RUnlock()
+		return nil
+	}
+	adm.RUnlock()
+
+	adm.Lock()
+	defer adm.Unlock()
+	if adm.connected {
+		return nil
+	}
+
+	adm.connection = newConnection(adm.zkSvr)
+	if err := adm.connection.Connect(); err != nil {
 		return err
 	}
 
@@ -36,27 +49,20 @@ func (adm *Admin) Connect() error {
 	return nil
 }
 
-func (adm *Admin) Disconnect() {
-	if adm.connected {
-		adm.conn.Disconnect()
-		adm.connected = false
-	}
+func (adm *Admin) Close() {
+	adm.closeOnce.Do(func() {
+		if adm.connected {
+			adm.Disconnect()
+			adm.connected = false
+		}
+	})
 }
 
-// AddCluster add a cluster to Helix. As a result, a znode will be created in zookeeper
-// root named after the cluster name, and corresponding data structures are populated
-// under this znode.
 func (adm Admin) AddCluster(cluster string) error {
-	conn := newConnection(adm.zkSvr)
-	if err := conn.Connect(); err != nil {
-		return err
-	}
-	defer conn.Disconnect()
-
 	kb := keyBuilder{clusterID: cluster}
 
 	// avoid dup cluster
-	exists, err := conn.Exists(kb.cluster())
+	exists, err := adm.Exists(kb.cluster())
 	if err != nil {
 		return err
 	}
@@ -64,82 +70,76 @@ func (adm Admin) AddCluster(cluster string) error {
 		return helix.ErrNodeAlreadyExists
 	}
 
-	conn.CreateEmptyNode(kb.cluster())
-	conn.CreateEmptyNode(kb.propertyStore())
-	conn.CreateEmptyNode(kb.instances())
-	conn.CreateEmptyNode(kb.idealStates())
-	conn.CreateEmptyNode(kb.externalView())
-	conn.CreateEmptyNode(kb.liveInstances())
+	adm.CreateEmptyNode(kb.cluster())
+	adm.CreateEmptyNode(kb.propertyStore())
+	adm.CreateEmptyNode(kb.instances())
+	adm.CreateEmptyNode(kb.idealStates())
+	adm.CreateEmptyNode(kb.externalView())
+	adm.CreateEmptyNode(kb.liveInstances())
 
-	conn.CreateEmptyNode(kb.stateModels())
-	conn.CreateRecordWithData(kb.stateModel(helix.StateModelLeaderStandby), helix.HelixDefaultNodes[helix.StateModelLeaderStandby])
-	conn.CreateRecordWithData(kb.stateModel(helix.StateModelMasterSlave), helix.HelixDefaultNodes[helix.StateModelMasterSlave])
-	conn.CreateRecordWithData(kb.stateModel(helix.StateModelOnlineOffline), helix.HelixDefaultNodes[helix.StateModelOnlineOffline])
-	conn.CreateRecordWithData(kb.stateModel("STORAGE_DEFAULT_SM_SCHEMATA"), helix.HelixDefaultNodes["STORAGE_DEFAULT_SM_SCHEMATA"])
-	conn.CreateRecordWithData(kb.stateModel(helix.StateModelSchedulerTaskQueue), helix.HelixDefaultNodes[helix.StateModelSchedulerTaskQueue])
-	conn.CreateRecordWithData(kb.stateModel(helix.StateModelTask), helix.HelixDefaultNodes[helix.StateModelTask])
+	adm.CreateEmptyNode(kb.stateModelDefs())
+	adm.CreateRecordWithData(kb.stateModelDef(helix.StateModelLeaderStandby), helix.HelixDefaultStateModels[helix.StateModelLeaderStandby])
+	adm.CreateRecordWithData(kb.stateModelDef(helix.StateModelMasterSlave), helix.HelixDefaultStateModels[helix.StateModelMasterSlave])
+	adm.CreateRecordWithData(kb.stateModelDef(helix.StateModelOnlineOffline), helix.HelixDefaultStateModels[helix.StateModelOnlineOffline])
+	adm.CreateRecordWithData(kb.stateModelDef(helix.StateModelDefaultSchemata), helix.HelixDefaultStateModels[helix.StateModelDefaultSchemata])
+	adm.CreateRecordWithData(kb.stateModelDef(helix.StateModelSchedulerTaskQueue), helix.HelixDefaultStateModels[helix.StateModelSchedulerTaskQueue])
+	adm.CreateRecordWithData(kb.stateModelDef(helix.StateModelTask), helix.HelixDefaultStateModels[helix.StateModelTask])
 
-	conn.CreateEmptyNode(kb.configs())
-	conn.CreateEmptyNode(kb.participantConfigs())
-	conn.CreateEmptyNode(kb.resourceConfigs())
-	conn.CreateEmptyNode(kb.clusterConfigs())
+	adm.CreateEmptyNode(kb.configs())
+	adm.CreateEmptyNode(kb.participantConfigs())
+	adm.CreateEmptyNode(kb.resourceConfigs())
+	adm.CreateEmptyNode(kb.clusterConfigs())
 
 	clusterNode := helix.NewRecord(cluster)
-	conn.CreateRecordWithPath(kb.clusterConfig(), clusterNode)
+	adm.CreateRecordWithPath(kb.clusterConfig(), clusterNode)
 
-	conn.CreateEmptyNode(kb.controller())
-	conn.CreateEmptyNode(kb.controllerErrors())
-	conn.CreateEmptyNode(kb.controllerHistory())
-	conn.CreateEmptyNode(kb.controllerMessages())
-	conn.CreateEmptyNode(kb.controllerStatusUpdates())
+	adm.CreateEmptyNode(kb.controller())
+	adm.CreateEmptyNode(kb.controllerErrors())
+	adm.CreateEmptyNode(kb.controllerHistory())
+	adm.CreateEmptyNode(kb.controllerMessages())
+	adm.CreateEmptyNode(kb.controllerStatusUpdates())
 
 	return nil
+}
+
+// Clusters shows all Helix managed clusters in the admected zookeeper cluster
+func (adm Admin) Clusters() ([]string, error) {
+	children, err := adm.Children("/")
+	if err != nil {
+		return nil, err
+	}
+
+	var clusters []string
+	for _, cluster := range children {
+		if ok, err := adm.IsClusterSetup(cluster); ok && err == nil {
+			clusters = append(clusters, cluster)
+		}
+	}
+
+	return clusters, nil
 }
 
 // DropCluster removes a helix cluster from zookeeper. This will remove the
 // znode named after the cluster name from the zookeeper root.
 func (adm Admin) DropCluster(cluster string) error {
-	conn := newConnection(adm.zkSvr)
-	if err := conn.Connect(); err != nil {
-		return err
-	}
-	defer conn.Disconnect()
-
 	kb := keyBuilder{clusterID: cluster}
-	return conn.DeleteTree(kb.cluster())
-}
-
-func (adm Admin) AllowParticipantAutoJoin(cluster string, yes bool) error {
-	var properties = map[string]string{
-		"allowParticipantAutoJoin": "false",
-	}
-	if yes {
-		properties["allowParticipantAutoJoin"] = "true"
-	}
-	return adm.SetConfig(cluster, "CLUSTER", properties)
+	return adm.DeleteTree(kb.cluster())
 }
 
 // ListClusterInfo shows the existing resources and instances in the cluster
 func (adm Admin) ListClusterInfo(cluster string) (string, error) {
-	conn := newConnection(adm.zkSvr)
-	err := conn.Connect()
-	if err != nil {
-		return "", err
-	}
-	defer conn.Disconnect()
-
 	// make sure the cluster is already setup
-	if ok, err := conn.IsClusterSetup(cluster); !ok || err != nil {
+	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
 		return "", helix.ErrClusterNotSetup
 	}
 
 	kb := keyBuilder{clusterID: cluster}
-	resources, err := conn.Children(kb.idealStates())
+	resources, err := adm.Children(kb.idealStates())
 	if err != nil {
 		return "", err
 	}
 
-	instances, err := conn.Children(kb.instances())
+	instances, err := adm.Children(kb.instances())
 	if err != nil {
 		return "", err
 	}
@@ -158,45 +158,15 @@ func (adm Admin) ListClusterInfo(cluster string) (string, error) {
 	return buffer.String(), nil
 }
 
-// ListClusters shows all Helix managed clusters in the connected zookeeper cluster
-func (adm Admin) ListClusters() ([]string, error) {
-	conn := newConnection(adm.zkSvr)
-	if err := conn.Connect(); err != nil {
-		return nil, err
-	}
-	defer conn.Disconnect()
-
-	children, err := conn.Children("/")
-	if err != nil {
-		return nil, err
-	}
-
-	var clusters []string
-	for _, cluster := range children {
-		if ok, err := conn.IsClusterSetup(cluster); ok && err == nil {
-			clusters = append(clusters, cluster)
-		}
-	}
-
-	return clusters, nil
-}
-
 // SetConfig set the configuration values for the cluster, defined by the config scope
 func (adm Admin) SetConfig(cluster string, scope helix.HelixConfigScope, properties map[string]string) error {
-	conn := newConnection(adm.zkSvr)
-	err := conn.Connect()
-	if err != nil {
-		return err
-	}
-	defer conn.Disconnect()
-
 	switch scope {
 	case helix.ConfigScopeCluster:
 		if allow, ok := properties["allowParticipantAutoJoin"]; ok {
 			kb := keyBuilder{clusterID: cluster}
 			if strings.ToLower(allow) == "true" {
 				// false by default
-				conn.UpdateSimpleField(kb.clusterConfig(), "allowParticipantAutoJoin", "true")
+				adm.UpdateSimpleField(kb.clusterConfig(), "allowParticipantAutoJoin", "true")
 			}
 		}
 	case helix.ConfigScopeConstraint:
@@ -209,21 +179,13 @@ func (adm Admin) SetConfig(cluster string, scope helix.HelixConfigScope, propert
 }
 
 // GetConfig obtains the configuration value of a property, defined by a config scope
-func (adm Admin) GetConfig(cluster string, scope helix.HelixConfigScope, keys []string) map[string]interface{} {
-	conn := newConnection(adm.zkSvr)
-	err := conn.Connect()
-	if err != nil {
-		return nil
-	}
-	defer conn.Disconnect()
-
+func (adm Admin) GetConfig(cluster string, scope helix.HelixConfigScope, keys []string) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
-
 	switch scope {
 	case helix.ConfigScopeCluster:
 		kb := keyBuilder{clusterID: cluster}
 		for _, k := range keys {
-			result[k] = conn.GetSimpleFieldValueByKey(kb.clusterConfig(), k)
+			result[k] = adm.GetSimpleFieldValueByKey(kb.clusterConfig(), k)
 		}
 
 	case helix.ConfigScopeConstraint:
@@ -232,7 +194,17 @@ func (adm Admin) GetConfig(cluster string, scope helix.HelixConfigScope, keys []
 	case helix.ConfigScopeResource:
 	}
 
-	return result
+	return result, nil
+}
+
+func (adm Admin) AllowParticipantAutoJoin(cluster string, yes bool) error {
+	var properties = map[string]string{
+		"allowParticipantAutoJoin": "false",
+	}
+	if yes {
+		properties["allowParticipantAutoJoin"] = "true"
+	}
+	return adm.SetConfig(cluster, "CLUSTER", properties)
 }
 
 func (adm Admin) AddInstance(cluster string, config helix.InstanceConfig) error {
@@ -243,21 +215,14 @@ func (adm Admin) AddInstance(cluster string, config helix.InstanceConfig) error 
 // ./helix-admin.sh --zkSvr <ZookeeperServerAddress> --addNode <clusterName instanceId>
 // node is in the form of host_port
 func (adm Admin) AddNode(cluster string, node string) error {
-	conn := newConnection(adm.zkSvr)
-	err := conn.Connect()
-	if err != nil {
-		return err
-	}
-	defer conn.Disconnect()
-
-	if ok, err := conn.IsClusterSetup(cluster); ok == false || err != nil {
+	if ok, err := adm.IsClusterSetup(cluster); ok == false || err != nil {
 		return helix.ErrClusterNotSetup
 	}
 
 	// check if node already exists under /<cluster>/CONFIGS/PARTICIPANT/<NODE>
 	kb := keyBuilder{clusterID: cluster}
 	path := kb.participantConfig(node)
-	exists, err := conn.Exists(path)
+	exists, err := adm.Exists(path)
 	if err != nil {
 		return err
 	}
@@ -271,12 +236,12 @@ func (adm Admin) AddNode(cluster string, node string) error {
 	n.SetSimpleField("HELIX_HOST", parts[0])
 	n.SetSimpleField("HELIX_PORT", parts[1])
 
-	conn.CreateRecordWithPath(path, n)
-	conn.CreateEmptyNode(kb.instance(node))
-	conn.CreateEmptyNode(kb.messages(node))
-	conn.CreateEmptyNode(kb.currentStates(node))
-	conn.CreateEmptyNode(kb.errorsR(node))
-	conn.CreateEmptyNode(kb.statusUpdates(node))
+	adm.CreateRecordWithPath(path, n)
+	adm.CreateEmptyNode(kb.instance(node))
+	adm.CreateEmptyNode(kb.messages(node))
+	adm.CreateEmptyNode(kb.currentStates(node))
+	adm.CreateEmptyNode(kb.errorsR(node))
+	adm.CreateEmptyNode(kb.statusUpdates(node))
 
 	return nil
 }
@@ -288,58 +253,44 @@ func (adm Admin) DropInstance(cluster string, ic helix.InstanceConfig) error {
 // DropNode removes a node from a cluster. The corresponding znodes
 // in zookeeper will be removed.
 func (adm Admin) DropNode(cluster string, node string) error {
-	conn := newConnection(adm.zkSvr)
-	err := conn.Connect()
-	if err != nil {
-		return err
-	}
-	defer conn.Disconnect()
-
 	// check if node already exists under /<cluster>/CONFIGS/PARTICIPANT/<node>
 	kb := keyBuilder{clusterID: cluster}
-	if exists, err := conn.Exists(kb.participantConfig(node)); !exists || err != nil {
+	if exists, err := adm.Exists(kb.participantConfig(node)); !exists || err != nil {
 		return helix.ErrNodeNotExist
 	}
 
 	// check if node exist under instance: /<cluster>/INSTANCES/<node>
-	if exists, err := conn.Exists(kb.instance(node)); !exists || err != nil {
+	if exists, err := adm.Exists(kb.instance(node)); !exists || err != nil {
 		return helix.ErrInstanceNotExist
 	}
 
 	// delete /<cluster>/CONFIGS/PARTICIPANT/<node>
-	conn.DeleteTree(kb.participantConfig(node))
+	adm.DeleteTree(kb.participantConfig(node))
 
 	// delete /<cluster>/INSTANCES/<node>
-	conn.DeleteTree(kb.instance(node))
+	adm.DeleteTree(kb.instance(node))
 
 	return nil
 }
 
-func (adm Admin) AddResourceWithOption(cluster string, resource string, option helix.AddResourceOption) error {
+func (adm Admin) AddResource(cluster string, resource string, option helix.AddResourceOption) error {
 	if err := option.Validate(); err != nil {
 		return err
 	}
 
-	conn := newConnection(adm.zkSvr)
-	err := conn.Connect()
-	if err != nil {
-		return err
-	}
-	defer conn.Disconnect()
-
-	if ok, err := conn.IsClusterSetup(cluster); !ok || err != nil {
+	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
 		return helix.ErrClusterNotSetup
 	}
 
 	kb := keyBuilder{clusterID: cluster}
 
 	// make sure the state model def exists
-	if exists, err := conn.Exists(kb.stateModel(option.StateModel)); !exists || err != nil {
+	if exists, err := adm.Exists(kb.stateModelDef(option.StateModel)); !exists || err != nil {
 		return helix.ErrStateModelDefNotExist
 	}
 
 	// make sure the path for the ideal state does not exit
-	if exists, err := conn.Exists(kb.idealStateForResource(resource)); exists || err != nil {
+	if exists, err := adm.Exists(kb.idealStateForResource(resource)); exists || err != nil {
 		if exists {
 			return helix.ErrResourceExists
 		}
@@ -359,56 +310,34 @@ func (adm Admin) AddResourceWithOption(cluster string, resource string, option h
 		is.SetSimpleField("BUCKET_SIZE", strconv.Itoa(option.BucketSize))
 	}
 
-	return conn.CreateRecordWithPath(kb.idealStateForResource(resource), is)
-}
-
-// AddResource implements the helix-admin.sh --addResource
-// # helix-admin.sh --zkSvr <zk_address> --addResource <clustername> <resourceName> <numPartitions> <StateModelName>
-// ./helix-admin.sh --zkSvr localhost:2199 --addResource MYCLUSTER myDB 6 MasterSlave
-func (adm Admin) AddResource(cluster string, resource string, partitions int, stateModel string) error {
-	option := helix.DefaultAddResourceOption(partitions, stateModel)
-	return adm.AddResourceWithOption(cluster, resource, option)
+	return adm.CreateRecordWithPath(kb.idealStateForResource(resource), is)
 }
 
 // DropResource removes the specified resource from the cluster.
 func (adm Admin) DropResource(cluster string, resource string) error {
-	conn := newConnection(adm.zkSvr)
-	err := conn.Connect()
-	if err != nil {
-		return err
-	}
-	defer conn.Disconnect()
-
 	// make sure the cluster is already setup
-	if ok, err := conn.IsClusterSetup(cluster); !ok || err != nil {
+	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
 		return helix.ErrClusterNotSetup
 	}
 
 	// make sure the path for the ideal state does not exit
 	kb := keyBuilder{clusterID: cluster}
-	conn.DeleteTree(kb.idealStateForResource(resource))
-	conn.DeleteTree(kb.resourceConfig(resource))
+	adm.DeleteTree(kb.idealStateForResource(resource))
+	adm.DeleteTree(kb.resourceConfig(resource))
 
 	return nil
 }
 
-// EnableResource enables the specified resource in the cluster
+// EnableResource enables the specified resource in the cluster.
 func (adm Admin) EnableResource(cluster string, resource string) error {
-	conn := newConnection(adm.zkSvr)
-	err := conn.Connect()
-	if err != nil {
-		return err
-	}
-	defer conn.Disconnect()
-
 	// make sure the cluster is already setup
-	if ok, err := conn.IsClusterSetup(cluster); !ok || err != nil {
+	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
 		return helix.ErrClusterNotSetup
 	}
 
 	kb := keyBuilder{clusterID: cluster}
 	isPath := kb.idealStateForResource(resource)
-	if exists, err := conn.Exists(isPath); !exists || err != nil {
+	if exists, err := adm.Exists(isPath); !exists || err != nil {
 		if !exists {
 			return helix.ErrResourceNotExists
 		}
@@ -416,26 +345,19 @@ func (adm Admin) EnableResource(cluster string, resource string) error {
 	}
 
 	// TODO: set the value at leaf node instead of the record level
-	return conn.UpdateSimpleField(isPath, "HELIX_ENABLED", "true")
+	return adm.UpdateSimpleField(isPath, "HELIX_ENABLED", "true")
 }
 
 // DisableResource disables the specified resource in the cluster.
 func (adm Admin) DisableResource(cluster string, resource string) error {
-	conn := newConnection(adm.zkSvr)
-	err := conn.Connect()
-	if err != nil {
-		return err
-	}
-	defer conn.Disconnect()
-
 	// make sure the cluster is already setup
-	if ok, err := conn.IsClusterSetup(cluster); !ok || err != nil {
+	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
 		return helix.ErrClusterNotSetup
 	}
 
 	kb := keyBuilder{clusterID: cluster}
 	isPath := kb.idealStateForResource(resource)
-	if exists, err := conn.Exists(isPath); !exists || err != nil {
+	if exists, err := adm.Exists(isPath); !exists || err != nil {
 		if !exists {
 			return helix.ErrResourceNotExists
 		}
@@ -443,25 +365,18 @@ func (adm Admin) DisableResource(cluster string, resource string) error {
 		return err
 	}
 
-	return conn.UpdateSimpleField(isPath, "HELIX_ENABLED", "false")
+	return adm.UpdateSimpleField(isPath, "HELIX_ENABLED", "false")
 }
 
 // ListResources shows a list of resources managed by the helix cluster
 func (adm Admin) ListResources(cluster string) (string, error) {
-	conn := newConnection(adm.zkSvr)
-	err := conn.Connect()
-	if err != nil {
-		return "", err
-	}
-	defer conn.Disconnect()
-
 	// make sure the cluster is already setup
-	if ok, err := conn.IsClusterSetup(cluster); !ok || err != nil {
+	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
 		return "", helix.ErrClusterNotSetup
 	}
 
 	kb := keyBuilder{clusterID: cluster}
-	resources, err := conn.Children(kb.idealStates())
+	resources, err := adm.Children(kb.idealStates())
 	if err != nil {
 		return "", err
 	}
@@ -478,20 +393,13 @@ func (adm Admin) ListResources(cluster string) (string, error) {
 
 // ListInstances shows a list of instances participating the cluster.
 func (adm Admin) ListInstances(cluster string) (string, error) {
-	conn := newConnection(adm.zkSvr)
-	err := conn.Connect()
-	if err != nil {
-		return "", err
-	}
-	defer conn.Disconnect()
-
 	// make sure the cluster is already setup
-	if ok, err := conn.IsClusterSetup(cluster); !ok || err != nil {
+	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
 		return "", helix.ErrClusterNotSetup
 	}
 
 	kb := keyBuilder{clusterID: cluster}
-	instances, err := conn.Children(kb.instances())
+	instances, err := adm.Children(kb.instances())
 	if err != nil {
 		return "", err
 	}
@@ -508,56 +416,56 @@ func (adm Admin) ListInstances(cluster string) (string, error) {
 
 // ListInstanceInfo shows detailed information of an inspace in the helix cluster
 func (adm Admin) ListInstanceInfo(cluster string, instance string) (string, error) {
-	conn := newConnection(adm.zkSvr)
-	err := conn.Connect()
-	if err != nil {
-		return "", err
+	if !adm.connected {
+		return "", helix.ErrNotConnected
 	}
-	defer conn.Disconnect()
 
 	// make sure the cluster is already setup
-	if ok, err := conn.IsClusterSetup(cluster); !ok || err != nil {
+	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
 		return "", helix.ErrClusterNotSetup
 	}
 
 	kb := keyBuilder{clusterID: cluster}
 	instanceCfg := kb.participantConfig(instance)
-	if exists, err := conn.Exists(instanceCfg); !exists || err != nil {
+	if exists, err := adm.Exists(instanceCfg); !exists || err != nil {
 		if !exists {
 			return "", helix.ErrNodeNotExist
 		}
 		return "", err
 	}
 
-	r, err := conn.GetRecordFromPath(instanceCfg)
+	r, err := adm.GetRecordFromPath(instanceCfg)
 	if err != nil {
 		return "", err
 	}
 	return r.String(), nil
 }
 
-// GetInstances returns lists of instances
-func (adm Admin) GetInstances(cluster string) ([]string, error) {
-	conn := newConnection(adm.zkSvr)
-	err := conn.Connect()
-	if err != nil {
-		return nil, err
+// Instances returns lists of instances.
+func (adm Admin) Instances(cluster string) ([]string, error) {
+	if !adm.connected {
+		return nil, helix.ErrNotConnected
 	}
-	defer conn.Disconnect()
 
 	kb := keyBuilder{clusterID: cluster}
-	return conn.Children(kb.instances())
+	return adm.Children(kb.instances())
+}
+
+func (adm Admin) AddStateModelDef(cluster string, stateModel string, definition *helix.Record) error {
+	kb := keyBuilder{clusterID: cluster}
+	return adm.CreateRecordWithPath(kb.stateModelDef(stateModel), definition)
+}
+
+func (adm Admin) StateModelDefs(cluster string) ([]string, error) {
+	kb := keyBuilder{clusterID: cluster}
+	return adm.Children(kb.stateModelDefs())
 }
 
 // Rebalance not implemented yet TODO
-func (adm Admin) Rebalance(cluster string, resource string, replica int) {
-	conn := newConnection(adm.zkSvr)
-	err := conn.Connect()
-	if err != nil {
-		fmt.Println("Failed to connect to zookeeper.")
-		return
+func (adm Admin) Rebalance(cluster string, resource string, replica int) error {
+	if !adm.connected {
+		return helix.ErrNotConnected
 	}
-	defer conn.Disconnect()
 
-	fmt.Println("Not implemented")
+	return helix.ErrNotImplemented
 }

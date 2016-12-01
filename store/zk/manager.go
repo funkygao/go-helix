@@ -14,8 +14,8 @@ type Manager struct {
 	conn  *connection
 }
 
-// NewManager creates a new instance of Manager from a zookeeper connection string
-func NewManager(zkSvr string) helix.HelixManager {
+// NewZKHelixManager creates a new instance of Manager from a zookeeper connection string.
+func NewZKHelixManager(zkSvr string) helix.HelixManager {
 	return &Manager{
 		zkSvr: zkSvr,
 	}

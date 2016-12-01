@@ -1,13 +1,6 @@
 package helix
 
 const (
-	PsConnected    ParticipantState = 0
-	PsStarted      ParticipantState = 1
-	PsStopped      ParticipantState = 2
-	PsDisconnected ParticipantState = 3
-)
-
-const (
 	ExternalViewChanged       ChangeNotificationType = 0
 	LiveInstanceChanged       ChangeNotificationType = 1
 	IdealStateChanged         ChangeNotificationType = 2
@@ -29,12 +22,20 @@ const (
 	StateModelLeaderStandby      = "LeaderStandby"
 	StateModelMasterSlave        = "MasterSlave"
 	StateModelOnlineOffline      = "OnlineOffline"
+	StateModelDefaultSchemata    = "STORAGE_DEFAULT_SM_SCHEMATA"
 	StateModelSchedulerTaskQueue = "SchedulerTaskQueue"
 	StateModelTask               = "Task"
 )
 
-// HelixDefaultNodes
-var HelixDefaultNodes = map[string]string{
+const (
+	RebalancerModeFullAuto    = "FULL_AUTO"
+	RebalancerModeSemiAuto    = "SEMI_AUTO"
+	RebalancerModeCustomized  = "CUSTOMIZED"
+	RebalancerModeUserDefined = "USER_DEFINED"
+	RebalancerModeTask        = "TASK"
+)
+
+var HelixDefaultStateModels = map[string]string{
 	StateModelLeaderStandby: `
 {
   "id" : "LeaderStandby",
@@ -76,6 +77,7 @@ var HelixDefaultNodes = map[string]string{
   }
 }
 `,
+
 	StateModelMasterSlave: `
 {
   "id" : "MasterSlave",
@@ -124,6 +126,7 @@ var HelixDefaultNodes = map[string]string{
   }
 }
 `,
+
 	StateModelOnlineOffline: `
 {
   "id" : "OnlineOffline",
@@ -155,7 +158,8 @@ var HelixDefaultNodes = map[string]string{
   }
 }	
 `,
-	"STORAGE_DEFAULT_SM_SCHEMATA": `
+
+	StateModelDefaultSchemata: `
 {
   "id" : "STORAGE_DEFAULT_SM_SCHEMATA",
   "mapFields" : {

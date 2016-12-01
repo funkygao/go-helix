@@ -125,6 +125,10 @@ func (conn *connection) CreateRecordWithPath(p string, r *helix.Record) error {
 }
 
 func (conn *connection) Exists(path string) (bool, error) {
+	if !conn.IsConnected() {
+		return false, helix.ErrNotConnected
+	}
+
 	var result bool
 	var stat *zk.Stat
 
@@ -153,6 +157,10 @@ func (conn *connection) ExistsAll(paths ...string) (bool, error) {
 }
 
 func (conn *connection) Get(path string) ([]byte, error) {
+	if !conn.IsConnected() {
+		return nil, helix.ErrNotConnected
+	}
+
 	var data []byte
 
 	err := retry.RetryWithBackoff(zkRetryOptions, func() (retry.RetryStatus, error) {
@@ -169,6 +177,10 @@ func (conn *connection) Get(path string) ([]byte, error) {
 }
 
 func (conn *connection) GetW(path string) ([]byte, <-chan zk.Event, error) {
+	if !conn.IsConnected() {
+		return nil, nil, helix.ErrNotConnected
+	}
+
 	var data []byte
 	var events <-chan zk.Event
 
@@ -187,15 +199,27 @@ func (conn *connection) GetW(path string) ([]byte, <-chan zk.Event, error) {
 }
 
 func (conn *connection) Set(path string, data []byte) error {
+	if !conn.IsConnected() {
+		return helix.ErrNotConnected
+	}
+
 	_, err := conn.zkConn.Set(conn.realPath(path), data, conn.stat.Version)
 	return err
 }
 
 func (conn *connection) Create(path string, data []byte, flags int32, acl []zk.ACL) (string, error) {
+	if !conn.IsConnected() {
+		return "", helix.ErrNotConnected
+	}
+
 	return conn.zkConn.Create(conn.realPath(path), data, flags, acl)
 }
 
 func (conn *connection) Children(path string) ([]string, error) {
+	if !conn.IsConnected() {
+		return nil, helix.ErrNotConnected
+	}
+
 	var children []string
 
 	err := retry.RetryWithBackoff(zkRetryOptions, func() (retry.RetryStatus, error) {
@@ -212,6 +236,10 @@ func (conn *connection) Children(path string) ([]string, error) {
 }
 
 func (conn *connection) ChildrenW(path string) ([]string, <-chan zk.Event, error) {
+	if !conn.IsConnected() {
+		return nil, nil, helix.ErrNotConnected
+	}
+
 	var children []string
 	var eventChan <-chan zk.Event
 
@@ -315,10 +343,18 @@ func (conn *connection) GetSimpleFieldBool(path string, key string) bool {
 }
 
 func (conn *connection) Delete(path string) error {
+	if !conn.IsConnected() {
+		return helix.ErrNotConnected
+	}
+
 	return conn.zkConn.Delete(conn.realPath(path), -1)
 }
 
 func (conn *connection) DeleteTree(path string) error {
+	if !conn.IsConnected() {
+		return helix.ErrNotConnected
+	}
+
 	return conn.deleteTreeRealPath(conn.realPath(path))
 }
 
@@ -373,9 +409,7 @@ func (conn *connection) RemoveMapFieldKey(path string, key string) error {
 
 func (conn *connection) IsClusterSetup(cluster string) (bool, error) {
 	if !conn.IsConnected() {
-		if err := conn.Connect(); err != nil {
-			return false, err
-		}
+		return false, helix.ErrNotConnected
 	}
 
 	kb := keyBuilder{clusterID: cluster}
@@ -387,7 +421,7 @@ func (conn *connection) IsClusterSetup(cluster string) (bool, error) {
 		kb.liveInstances(),
 		kb.instances(),
 		kb.externalView(),
-		kb.stateModels(),
+		kb.stateModelDefs(),
 		kb.controller(),
 		kb.controllerErrors(),
 		kb.controllerHistory(),
@@ -405,7 +439,12 @@ func (conn *connection) GetRecordFromPath(path string) (*helix.Record, error) {
 }
 
 func (conn *connection) SetRecordForPath(path string, r *helix.Record) error {
-	if exists, _ := conn.Exists(path); !exists {
+	exists, err := conn.Exists(path)
+	if err != nil {
+		return err
+	}
+
+	if !exists {
 		conn.ensurePathExists(path)
 	}
 

@@ -94,8 +94,8 @@ func (s *Spectator) Connect() error {
 	return nil
 }
 
-// Disconnect will disconnect the spectator from zookeeper, and also stop all listeners
-func (s *Spectator) Disconnect() {
+// Disconnect the spectator from zookeeper, and also stop all listeners.
+func (s *Spectator) Close() {
 	if s.state == spectatorDisConnected {
 		return
 	}
@@ -118,7 +118,7 @@ func (s *Spectator) IsConnected() bool {
 	return s.state == spectatorConnected
 }
 
-// SetContext set the context that can be used within the listeners
+// SetContext set the context that can be used within the listeners.
 func (s *Spectator) SetContext(context *helix.Context) {
 	s.Lock()
 	defer s.Unlock()
@@ -126,7 +126,6 @@ func (s *Spectator) SetContext(context *helix.Context) {
 	s.context = context
 }
 
-// AddExternalViewChangeListener add a listener to external view changes.
 func (s *Spectator) AddExternalViewChangeListener(listener helix.ExternalViewChangeListener) {
 	s.Lock()
 	defer s.Unlock()
@@ -134,7 +133,6 @@ func (s *Spectator) AddExternalViewChangeListener(listener helix.ExternalViewCha
 	s.externalViewListeners = append(s.externalViewListeners, listener)
 }
 
-// AddLiveInstanceChangeListener add a listener to live instance changes.
 func (s *Spectator) AddLiveInstanceChangeListener(listener helix.LiveInstanceChangeListener) {
 	s.Lock()
 	defer s.Unlock()
@@ -142,7 +140,6 @@ func (s *Spectator) AddLiveInstanceChangeListener(listener helix.LiveInstanceCha
 	s.liveInstanceChangeListeners = append(s.liveInstanceChangeListeners, listener)
 }
 
-// AddCurrentStateChangeListener add a listener to current state changes of the specified instance.
 func (s *Spectator) AddCurrentStateChangeListener(instance string, listener helix.CurrentStateChangeListener) {
 	s.Lock()
 	defer s.Unlock()
@@ -160,7 +157,6 @@ func (s *Spectator) AddCurrentStateChangeListener(instance string, listener heli
 	}
 }
 
-// AddMessageListener adds a listener to the messages of an instance
 func (s *Spectator) AddMessageListener(instance string, listener helix.MessageListener) {
 	s.Lock()
 	defer s.Unlock()
@@ -179,7 +175,6 @@ func (s *Spectator) AddMessageListener(instance string, listener helix.MessageLi
 	}
 }
 
-// AddIdealStateChangeListener add a listener to the cluster ideal state changes
 func (s *Spectator) AddIdealStateChangeListener(listener helix.IdealStateChangeListener) {
 	s.Lock()
 	defer s.Unlock()
@@ -187,7 +182,6 @@ func (s *Spectator) AddIdealStateChangeListener(listener helix.IdealStateChangeL
 	s.idealStateChangeListeners = append(s.idealStateChangeListeners, listener)
 }
 
-// AddInstanceConfigChangeListener add a listener to instance config changes
 func (s *Spectator) AddInstanceConfigChangeListener(listener helix.InstanceConfigChangeListener) {
 	s.Lock()
 	defer s.Unlock()
@@ -195,7 +189,6 @@ func (s *Spectator) AddInstanceConfigChangeListener(listener helix.InstanceConfi
 	s.instanceConfigChangeListeners = append(s.instanceConfigChangeListeners, listener)
 }
 
-// AddControllerMessageListener add a listener to controller messages
 func (s *Spectator) AddControllerMessageListener(listener helix.ControllerMessageListener) {
 	s.Lock()
 	defer s.Unlock()

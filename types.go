@@ -2,8 +2,6 @@ package helix
 
 type HelixConfigScope string
 
-type ParticipantState uint8
-
 type ChangeNotificationType uint8
 
 type ChangeNotification struct {
@@ -33,28 +31,3 @@ type (
 	// MessageListener is triggered when the instance received new messages
 	MessageListener func(instance string, messages []*Record, context *Context)
 )
-
-type AddResourceOption struct {
-	Partitions               int
-	StateModel               string
-	RebalancerMode           string
-	RebalanceStrategy        string
-	BucketSize               int
-	MaxPartitionsPerInstance int
-}
-
-func DefaultAddResourceOption(partitions int, stateModel string) AddResourceOption {
-	return AddResourceOption{
-		Partitions:        partitions,
-		StateModel:        stateModel,
-		RebalancerMode:    "SEMI_AUTO",
-		RebalanceStrategy: "DEFAULT",
-	}
-}
-
-func (opt AddResourceOption) Validate() error {
-	if opt.Partitions < 1 || opt.StateModel == "" || opt.RebalancerMode == "" {
-		return ErrInvalidAddResourceOption
-	}
-	return nil
-}

@@ -5,6 +5,10 @@ import (
 )
 
 var (
+	ErrNotImplemented = errors.New("Not implemented")
+)
+
+var (
 	// ErrClusterNotSetup means the helix data structure in zookeeper /{CLUSTER_NAME}
 	// is not correct or does not exist
 	ErrClusterNotSetup = errors.New("cluster not setup")
@@ -33,7 +37,11 @@ var (
 	// created in zookeeper
 	ErrEnsureParticipantConfig = errors.New("Participant configuration could not be added")
 
+	// ErrInvalidAddResourceOption is returned when user provides a invalid resource to add.
 	ErrInvalidAddResourceOption = errors.New("Invalid AddResourceOption")
 
 	ErrEmptyStateModel = errors.New("Register at least one valid state model before connecting.")
+
+	// ErrNotConnected is returned when call a function without calling Connect() beforehand.
+	ErrNotConnected = errors.New("Not connected yet")
 )

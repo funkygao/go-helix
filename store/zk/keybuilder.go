@@ -152,12 +152,12 @@ func (k *keyBuilder) statusUpdates(participantID string) string {
 	return fmt.Sprintf("/%s/INSTANCES/%s/STATUSUPDATES", k.clusterID, participantID)
 }
 
-func (k *keyBuilder) stateModels() string {
+func (k *keyBuilder) stateModelDefs() string {
 	return fmt.Sprintf("/%s/STATEMODELDEFS", k.clusterID)
 }
 
-func (k *keyBuilder) stateModel(resourceID string) string {
-	return fmt.Sprintf("/%s/STATEMODELDEFS/%s", k.clusterID, resourceID)
+func (k *keyBuilder) stateModelDef(stateModel string) string {
+	return fmt.Sprintf("/%s/STATEMODELDEFS/%s", k.clusterID, stateModel)
 }
 
 func (k *keyBuilder) messages(participantID string) string {

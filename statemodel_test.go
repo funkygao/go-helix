@@ -9,7 +9,7 @@ func TestNewStateModel(t *testing.T) {
 
 	sm1 := NewStateModel(nil)
 
-	if sm1.Size() != 0 {
+	if len(sm1.transitions) != 0 {
 		t.Error("The Statemodel should be empty")
 	}
 
@@ -20,12 +20,12 @@ func TestNewStateModel(t *testing.T) {
 		{"OFFLINE", "ONLINE", fromOfflineToOnline},
 	})
 
-	if sm2.Size() != 1 {
+	if len(sm2.transitions) != 1 {
 		t.Error("The StateModel.Size() should reeturn 1")
 	}
 
 	sm2.AddTransition("ONLINE", "OFFLINE", fromOnlineToOffline)
-	if sm2.Size() != 2 {
+	if len(sm2.transitions) != 2 {
 		t.Error("The StateModel.Size() should reeturn 2")
 	}
 }

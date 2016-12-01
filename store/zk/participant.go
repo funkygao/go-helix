@@ -12,6 +12,15 @@ import (
 	"github.com/yichen/go-zookeeper/zk"
 )
 
+type participantState uint8
+
+const (
+	psConnected    participantState = 0
+	psStarted      participantState = 1
+	psStopped      participantState = 2
+	psDisconnected participantState = 3
+)
+
 var _ helix.HelixParticipant = &Participant{}
 
 // Participant is a Helix participant node
@@ -44,13 +53,10 @@ type Participant struct {
 	stopWatch chan bool
 
 	// status
-	state helix.ParticipantState
+	state participantState
 
 	// keybuilder
 	kb keyBuilder
-
-	// pre-connect callbacks
-	preConnectCallbacks []func()
 
 	sync.Mutex
 }
@@ -59,16 +65,9 @@ type Participant struct {
 // Zookeeper address are valid and also that the state models are registered.
 // after connecting Zookeeper, we also need to register this participant
 // with the cluster in Helix, and get ready to receive cluster messages.
-// Also invoke pre-connect callbacks, and create an ephemeral node
-// it will first connect to the Zoo
 func (p *Participant) Connect() error {
 	if len(p.stateModels) == 0 {
 		return helix.ErrEmptyStateModel
-	}
-
-	// call the preconnect callbacks
-	for _, cb := range p.preConnectCallbacks {
-		cb()
 	}
 
 	if p.conn == nil || !p.conn.IsConnected() {
@@ -85,7 +84,7 @@ func (p *Participant) Connect() error {
 	// register the participant with the cluster
 	allowed := p.ensureParticipantConfig()
 	if !allowed {
-		p.Disconnect()
+		p.Close()
 		return helix.ErrEnsureParticipantConfig
 	}
 
@@ -121,10 +120,10 @@ func (p *Participant) cleanUp() error {
 	return nil
 }
 
-// Disconnect the participant from Zookeeper and Helix controller
-func (p *Participant) Disconnect() {
+// Disconnect the participant from Zookeeper and Helix controller.
+func (p *Participant) Close() {
 	// do i need lock here?
-	if p.state == helix.PsDisconnected {
+	if p.state == psDisconnected {
 		return
 	}
 
@@ -133,10 +132,10 @@ func (p *Participant) Disconnect() {
 	// the stop message
 	// if the status is started, it means the event loop is running
 	// wait for it to stop
-	if p.state == helix.PsStarted {
+	if p.state == psStarted {
 		p.stop <- true
 		close(p.stop)
-		for p.state != helix.PsStopped {
+		for p.state != psStopped {
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
@@ -145,7 +144,7 @@ func (p *Participant) Disconnect() {
 		p.conn.Disconnect()
 	}
 
-	p.state = helix.PsDisconnected
+	p.state = psDisconnected
 }
 
 // RegisterStateModel associates state trasition functions with the participant
@@ -154,11 +153,6 @@ func (p *Participant) RegisterStateModel(name string, sm helix.StateModel) {
 		p.stateModels = make(map[string]*helix.StateModel)
 	}
 	p.stateModels[name] = &sm
-}
-
-// AddPreConnectCallback adds a pre-connect callback
-func (p *Participant) AddPreConnectCallback(callback func()) {
-	p.preConnectCallbacks = append(p.preConnectCallbacks, callback)
 }
 
 func (p *Participant) autoJoinAllowed() bool {
@@ -252,7 +246,7 @@ func (p *Participant) startEventLoop() {
 	go func() {
 		// psStarted means the message loop is running, and
 		// it can process p.stop message
-		p.state = helix.PsStarted
+		p.state = psStarted
 
 		for {
 			select {
@@ -269,7 +263,7 @@ func (p *Participant) startEventLoop() {
 			case err := <-errChan:
 				fmt.Println(err.Error())
 			case <-p.stop:
-				p.state = helix.PsStopped
+				p.state = psStopped
 				return
 			}
 		}
