@@ -63,8 +63,11 @@ func (conn *connection) Connect() error {
 		return err
 	}
 
-	conn.isConnected = true
+	if conn.chroot != "" {
+		conn.ensurePathExists(conn.chroot)
+	}
 
+	conn.isConnected = true
 	return nil
 }
 
@@ -73,7 +76,7 @@ func (conn connection) realPath(path string) string {
 		return path
 	}
 
-	return conn.chroot + path
+	return strings.TrimRight(conn.chroot+path, "/")
 }
 
 func (conn *connection) waitUntilConnected() error {
@@ -107,13 +110,13 @@ func (conn *connection) CreateRecordWithData(path string, data string) error {
 	flags := int32(0)
 	acl := zk.WorldACL(zk.PermAll)
 
-	_, err := conn.Create(conn.realPath(path), []byte(data), flags, acl)
+	_, err := conn.Create(path, []byte(data), flags, acl)
 	return err
 }
 
 func (conn *connection) CreateRecordWithPath(p string, r *helix.Record) error {
 	parent := path.Dir(p)
-	conn.ensurePathExists(parent)
+	conn.ensurePathExists(conn.realPath(parent))
 
 	data, err := r.Marshal()
 	if err != nil {
@@ -122,7 +125,7 @@ func (conn *connection) CreateRecordWithPath(p string, r *helix.Record) error {
 
 	flags := int32(0)
 	acl := zk.WorldACL(zk.PermAll)
-	_, err = conn.Create(conn.realPath(p), data, flags, acl)
+	_, err = conn.Create(p, data, flags, acl)
 	return err
 }
 
@@ -137,7 +140,7 @@ func (conn *connection) Exists(path string) (bool, error) {
 	err := retry.RetryWithBackoff(zkRetryOptions, func() (retry.RetryStatus, error) {
 		r, s, err := conn.zkConn.Exists(conn.realPath(path))
 		if err != nil {
-			return retry.RetryContinue, nil
+			return retry.RetryContinue, err
 		}
 		result = r
 		stat = s
@@ -168,7 +171,7 @@ func (conn *connection) Get(path string) ([]byte, error) {
 	err := retry.RetryWithBackoff(zkRetryOptions, func() (retry.RetryStatus, error) {
 		d, s, err := conn.zkConn.Get(conn.realPath(path))
 		if err != nil {
-			return retry.RetryContinue, nil
+			return retry.RetryContinue, err
 		}
 		data = d
 		conn.stat = s
@@ -189,7 +192,7 @@ func (conn *connection) GetW(path string) ([]byte, <-chan zk.Event, error) {
 	err := retry.RetryWithBackoff(zkRetryOptions, func() (retry.RetryStatus, error) {
 		d, s, evts, err := conn.zkConn.GetW(conn.realPath(path))
 		if err != nil {
-			return retry.RetryContinue, nil
+			return retry.RetryContinue, err
 		}
 		data = d
 		conn.stat = s
@@ -223,11 +226,10 @@ func (conn *connection) Children(path string) ([]string, error) {
 	}
 
 	var children []string
-
 	err := retry.RetryWithBackoff(zkRetryOptions, func() (retry.RetryStatus, error) {
 		c, s, err := conn.zkConn.Children(conn.realPath(path))
 		if err != nil {
-			return retry.RetryContinue, nil
+			return retry.RetryContinue, err
 		}
 		children = c
 		conn.stat = s
@@ -248,7 +250,7 @@ func (conn *connection) ChildrenW(path string) ([]string, <-chan zk.Event, error
 	err := retry.RetryWithBackoff(zkRetryOptions, func() (retry.RetryStatus, error) {
 		c, s, evts, err := conn.zkConn.ChildrenW(conn.realPath(path))
 		if err != nil {
-			return retry.RetryContinue, nil
+			return retry.RetryContinue, err
 		}
 		children = c
 		conn.stat = s
@@ -361,11 +363,11 @@ func (conn *connection) DeleteTree(path string) error {
 }
 
 func (conn *connection) deleteTreeRealPath(path string) error {
-	if exists, err := conn.Exists(path); !exists || err != nil {
+	if exists, _, err := conn.zkConn.Exists(path); !exists || err != nil {
 		return err
 	}
 
-	children, err := conn.Children(path)
+	children, _, err := conn.zkConn.Children(path)
 	if err != nil {
 		return err
 	}
@@ -377,13 +379,13 @@ func (conn *connection) deleteTreeRealPath(path string) error {
 
 	for _, c := range children {
 		p := path + "/" + c
-		e := conn.DeleteTree(p)
+		e := conn.deleteTreeRealPath(p)
 		if e != nil {
 			return e
 		}
 	}
 
-	return conn.Delete(path)
+	return conn.zkConn.Delete(path, -1)
 }
 
 func (conn *connection) RemoveMapFieldKey(path string, key string) error {
@@ -447,7 +449,7 @@ func (conn *connection) SetRecordForPath(path string, r *helix.Record) error {
 	}
 
 	if !exists {
-		conn.ensurePathExists(path)
+		conn.ensurePathExists(conn.realPath(path))
 	}
 
 	data, err := r.Marshal()
@@ -473,18 +475,18 @@ func (conn *connection) SetRecordForPath(path string, r *helix.Record) error {
 
 }
 
-// EnsurePath makes sure the specified path exists.
-// If not, create it
 func (conn *connection) ensurePathExists(p string) error {
-	if exists, _ := conn.Exists(p); exists {
+	if exists, _, _ := conn.zkConn.Exists(p); exists {
 		return nil
 	}
 
 	parent := path.Dir(p)
-	if exists, _ := conn.Exists(parent); !exists {
-		conn.ensurePathExists(parent)
+	if exists, _, _ := conn.zkConn.Exists(parent); !exists {
+		if err := conn.ensurePathExists(parent); err != nil {
+			return err
+		}
 	}
 
-	conn.CreateEmptyNode(p)
+	conn.zkConn.Create(p, []byte{}, 0, zk.WorldACL(zk.PermAll))
 	return nil
 }

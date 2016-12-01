@@ -5,6 +5,7 @@ Originally based on https://github.com/yichen/gohelix
 
 ### TODO
 
+- [ ] chroot bug
 - [ ] curator
 - [ ] controller
 - [ ] rebalance
