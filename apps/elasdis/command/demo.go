@@ -46,7 +46,11 @@ func (this *Demo) Run(args []string) (exitCode int) {
 
 	// create the cluster
 	must(admin.AddCluster(cluster))
-	defer admin.DropCluster(cluster)
+	defer func() {
+		log.Info("drop cluster %s", cluster)
+		admin.DropCluster(cluster)
+		log.Close()
+	}()
 	log.Info("added cluster: %s", cluster)
 
 	must(admin.AllowParticipantAutoJoin(cluster, false))
@@ -82,11 +86,13 @@ func (this *Demo) Run(args []string) (exitCode int) {
 	instances, _ := admin.Instances(cluster)
 	log.Info("instances: %+v", instances)
 
+	log.Info("start rebalancing...")
+	helix.Rebalance(zkSvr, cluster, resource, replicas)
+	log.Info("rebalanced done")
+
 	log.Info("waiting Ctrl-C...")
 
-	log.Info("NOW, start another terminal and run")
 	log.Info("%s/bin/run-helix-controller.sh --zkSvr %s --cluster %s", helixInstallBase, zkSvr, cluster)
-	log.Info("%s/bin/helix-admin.sh --zkSvr %s --rebalance %s %s %s", helixInstallBase, zkSvr, cluster, resource, replicas)
 
 	// block until SIGINT and SIGTERM
 	c := make(chan os.Signal, 2)

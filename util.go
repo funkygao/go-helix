@@ -17,10 +17,10 @@ func AddResource(cluster string, resource string, replica string) error {
 }
 
 // Rebalance /opt/helix/bin/helix-admin.sh --zkSvr localhost:2181 --rebalance
-func Rebalance(cluster string, resource string, replica string) error {
+func Rebalance(zkSvr string, cluster string, resource string, replica string) error {
 	cmd := "/opt/helix/bin/helix-admin.sh"
 	if _, err := execCommand(cmd,
-		"--zkSvr", "localhost:2181", "--rebalance", cluster, resource, replica); err != nil {
+		"--zkSvr", zkSvr, "--rebalance", cluster, resource, replica); err != nil {
 		return err
 	}
 	return nil
