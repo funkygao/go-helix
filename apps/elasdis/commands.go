@@ -24,8 +24,22 @@ func init() {
 	cmd := os.Args[0]
 
 	commands = map[string]cli.CommandFactory{
-		"demo": func() (cli.Command, error) {
-			return &command.Demo{
+		"init": func() (cli.Command, error) {
+			return &command.Init{
+				Ui:  ui,
+				Cmd: cmd,
+			}, nil
+		},
+
+		"scale": func() (cli.Command, error) {
+			return &command.Scale{
+				Ui:  ui,
+				Cmd: cmd,
+			}, nil
+		},
+
+		"redis": func() (cli.Command, error) {
+			return &command.Redis{
 				Ui:  ui,
 				Cmd: cmd,
 			}, nil
