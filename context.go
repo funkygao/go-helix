@@ -6,6 +6,8 @@ import "sync"
 type Context struct {
 	sync.RWMutex
 	data map[string]interface{}
+
+	Manager HelixManager
 }
 
 // NewContext creates a new Context instance.

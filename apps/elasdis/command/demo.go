@@ -72,14 +72,22 @@ func (this *Demo) Run(args []string) (exitCode int) {
 
 	// the actual task executor
 	participant := manager.NewParticipant(cluster, "localhost", "10925")
-	participant.RegisterStateModel(stateModel, helix.NewStateModel([]helix.Transition{
-		{"ONLINE", "OFFLINE", func(partition string) {
-			log.Info(color.Green("partition[%s] ONLINE-->OFFLINE", partition))
+	sm := helix.NewStateModel()
+	sm.AddTransitions([]helix.Transition{
+		{"ONLINE", "OFFLINE", func(message *helix.Message, context *helix.Context) {
+			log.Info(color.Green("resource[%s] partition[%s] ONLINE-->OFFLINE",
+				message.Resource(),
+				message.PartitionName()))
 		}},
-		{"OFFLINE", "ONLINE", func(partition string) {
-			log.Info(color.Cyan("partition[%s] OFFLINE-->ONLINE", partition))
+
+		{"OFFLINE", "ONLINE", func(message *helix.Message, context *helix.Context) {
+			log.Info(color.Cyan("resource[%s] partition[%s] OFFLINE-->ONLINE",
+				message.Resource(),
+				message.PartitionName()))
 		}},
-	}))
+	})
+	participant.RegisterStateModel(stateModel, sm)
+
 	must(participant.Start())
 	log.Info("participant started")
 
@@ -91,6 +99,9 @@ func (this *Demo) Run(args []string) (exitCode int) {
 	log.Info("rebalanced done")
 
 	log.Info("waiting Ctrl-C...")
+
+	time.Sleep(time.Second * 5)
+	participant.Close()
 
 	log.Info("%s/bin/run-helix-controller.sh --zkSvr %s --cluster %s", helixInstallBase, zkSvr, cluster)
 

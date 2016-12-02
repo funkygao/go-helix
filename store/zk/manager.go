@@ -68,9 +68,9 @@ func (m *Manager) Close() {
 func (m *Manager) NewSpectator(clusterID string) helix.HelixSpectator {
 	return &Spectator{
 		ClusterID: clusterID,
+		manager:   m,
 		conn:      m.conn,
-
-		kb: keyBuilder{clusterID: clusterID},
+		kb:        keyBuilder{clusterID: clusterID},
 
 		// listeners
 		externalViewListeners:       []helix.ExternalViewChangeListener{},
@@ -98,11 +98,10 @@ func (m *Manager) NewSpectator(clusterID string) helix.HelixSpectator {
 // of the Helix cluster when connected, and will participate the state model transition.
 func (m *Manager) NewParticipant(clusterID string, host string, port string) helix.HelixParticipant {
 	return &Participant{
-		ClusterID: clusterID,
-		conn:      m.conn,
-
-		kb: keyBuilder{clusterID: clusterID},
-
+		ClusterID:     clusterID,
+		manger:        m,
+		conn:          m.conn,
+		kb:            keyBuilder{clusterID: clusterID},
 		Host:          host,
 		Port:          port,
 		ParticipantID: fmt.Sprintf("%s_%s", host, port), // node id

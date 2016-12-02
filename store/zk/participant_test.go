@@ -26,7 +26,7 @@ func TestParticipantConnect(t *testing.T) {
 		t.Error("NewParticipant should return valid object, not nil")
 	}
 
-	sm1 := helix.NewStateModel(nil)
+	sm1 := helix.NewStateModel()
 	p.RegisterStateModel("dummy", sm1)
 
 	err := p.Start()

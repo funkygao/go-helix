@@ -26,8 +26,10 @@ var _ helix.HelixParticipant = &Participant{}
 type Participant struct {
 	sync.Mutex
 
-	kb   keyBuilder
+	manger helix.HelixManager
+
 	conn *connection
+	kb   keyBuilder
 
 	// The cluster this participant belongs to
 	ClusterID string
@@ -127,14 +129,17 @@ func (p *Participant) Close() {
 		}
 	}
 
+	/* TODO
+	p.conn.Delete(p.kb.liveInstance(p.ParticipantID))
 	if p.conn != nil && p.conn.IsConnected() {
 		p.conn.Disconnect()
 	}
+	*/
 
 	p.state = psDisconnected
 }
 
-func (p *Participant) RegisterStateModel(name string, sm helix.StateModel) error {
+func (p *Participant) RegisterStateModel(name string, sm *helix.StateModel) error {
 	p.Lock()
 	defer p.Unlock()
 
@@ -143,7 +148,7 @@ func (p *Participant) RegisterStateModel(name string, sm helix.StateModel) error
 	} else if _, present := p.stateModels[name]; present {
 		return helix.ErrDupStateModelName
 	}
-	p.stateModels[name] = &sm
+	p.stateModels[name] = sm
 	return nil
 }
 
@@ -364,24 +369,22 @@ func (p *Participant) processMessage(msgID string) error {
 
 	log.Debug("P[%s/%s] message: %s", p.ParticipantID, p.conn.GetSessionID(), message)
 
-	msgType, _ := message.GetSimpleField("MSG_TYPE").(string)
+	msgType := message.MessageType()
 	if msgType == helix.MessageTypeNoOp {
 		log.Warn("P[%s/%s] discard NO-OP message: %s", p.ParticipantID, p.conn.GetSessionID(), msgID)
 		return p.conn.DeleteTree(msgPath)
 	}
 
-	// session id of the destination node, target
-	sessionID, _ := message.GetSimpleField("TGT_SESSION_ID").(string)
+	sessionID := message.TargetSessionID()
 	if sessionID != "*" && sessionID != p.conn.GetSessionID() {
 		// message comes from expired session
 		log.Warn("P[%s/%s] got mismatched message: %s", p.ParticipantID, p.conn.GetSessionID(), message)
 		return p.conn.DeleteTree(msgPath)
 	}
 
-	msgState, _ := message.GetSimpleField("MSG_STATE").(string)
-	if !strings.EqualFold(msgState, helix.MessageStateNew) {
+	if !strings.EqualFold(message.MessageState(), helix.MessageStateNew) {
 		// READ message is not deleted until the state has changed
-		log.Warn("P[%s/%s] skip %s message: %s", p.ParticipantID, p.conn.GetSessionID(), msgState, msgID)
+		log.Warn("P[%s/%s] skip %s message: %s", p.ParticipantID, p.conn.GetSessionID(), message.MessageState(), msgID)
 		return nil
 	}
 
@@ -392,9 +395,9 @@ func (p *Participant) processMessage(msgID string) error {
 
 	// create current state meta data
 	// do it for non-controller and state transition messages only
-	targetName := message.GetSimpleField("TGT_NAME").(string)
+	targetName := message.TargetName()
 	if !strings.EqualFold(targetName, "CONTROLLER") && strings.EqualFold(msgType, "STATE_TRANSITION") {
-		resourceID, _ := message.GetSimpleField("RESOURCE_NAME").(string)
+		resourceID := message.Resource()
 
 		currentStateRecord := helix.NewRecord(resourceID)
 		currentStateRecord.SetIntField("BUCKET_SIZE", message.GetIntField("BUCKET_SIZE", 0))
@@ -445,7 +448,8 @@ func (p *Participant) handleStateTransition(message *helix.Message) {
 			log.Warn("P[%s/%s] state %s -> %s has no handler", p.ParticipantID,
 				p.conn.GetSessionID(), message.FromState(), message.ToState())
 		} else {
-			handler(message.PartitionName())
+			context := helix.NewContext()
+			handler(message, context)
 		}
 	}
 
@@ -460,11 +464,11 @@ func (p *Participant) postHandleMessage(message *helix.Message) error {
 	// sessionID might change when we update the state model
 	// skip if we are handling an expired session
 	sessionID := p.conn.GetSessionID()
-	targetSessionID := message.GetSimpleField("TGT_SESSION_ID")
+	targetSessionID := message.TargetSessionID()
 	toState := message.ToState()
 	partitionName := message.PartitionName()
 
-	if targetSessionID != nil && targetSessionID.(string) != sessionID {
+	if targetSessionID != sessionID {
 		return helix.ErrSessionChanged
 	}
 
@@ -477,7 +481,8 @@ func (p *Participant) postHandleMessage(message *helix.Message) error {
 	}
 
 	// actually set the current state
-	resourceID, _ := message.GetSimpleField("RESOURCE_NAME").(string)
-	currentStateForResourcePath := p.kb.currentStateForResource(p.ParticipantID, p.conn.GetSessionID(), resourceID)
-	return p.conn.UpdateMapField(currentStateForResourcePath, partitionName, "CURRENT_STATE", toState)
+	currentStateForResourcePath := p.kb.currentStateForResource(p.ParticipantID,
+		p.conn.GetSessionID(), message.Resource())
+	return p.conn.UpdateMapField(currentStateForResourcePath, partitionName,
+		"CURRENT_STATE", toState)
 }

@@ -31,7 +31,7 @@ func TestSpectatorConnect(t *testing.T) {
 	// create a participant to trigger the external view change
 	p := manager.NewParticipant(cluster, "localhost", "12913")
 
-	sm1 := helix.NewStateModel(nil)
+	sm1 := helix.NewStateModel()
 	p.RegisterStateModel("dummy", sm1)
 	p.Start()
 	defer p.Close()

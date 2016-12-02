@@ -21,6 +21,8 @@ const (
 type Spectator struct {
 	sync.RWMutex
 
+	manager helix.HelixManager
+
 	kb   keyBuilder
 	conn *connection
 

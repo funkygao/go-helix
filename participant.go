@@ -10,5 +10,5 @@ type HelixParticipant interface {
 	Close()
 
 	// RegisterStateModel associates state trasition functions with the participant.
-	RegisterStateModel(name string, sm StateModel) error
+	RegisterStateModel(name string, sm *StateModel) error
 }

@@ -18,6 +18,10 @@ func (m Message) MessageState() string {
 	return m.GetStringField("MSG_STATE", "")
 }
 
+func (m *Message) SetMessageState(state string) {
+	m.SetSimpleField("MSG_STATE", state)
+}
+
 func (m Message) MessageType() string {
 	return m.GetStringField("MSG_TYPE", "")
 }
@@ -40,4 +44,20 @@ func (m Message) ToState() string {
 
 func (m Message) StateModel() string {
 	return m.GetStringField("STATE_MODEL_DEF", "")
+}
+
+func (m Message) TargetName() string {
+	return m.GetStringField("TGT_NAME", "")
+}
+
+func (m Message) TargetSessionID() string {
+	return m.GetStringField("TGT_SESSION_ID", "")
+}
+
+func (m *Message) SetExecuteSessionID(sessID string) {
+	m.SetSimpleField("EXE_SESSION_ID", sessID)
+}
+
+func (m *Message) SetReadTimestamp(val int64) {
+	m.SetSimpleField("READ_TIMESTAMP", val)
 }

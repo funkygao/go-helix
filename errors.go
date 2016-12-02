@@ -52,4 +52,6 @@ var (
 	ErrDupStateModelName = errors.New("Register a state model over once")
 
 	ErrSessionChanged = errors.New("SessionID changed")
+
+	ErrDupStateTransition = errors.New("Register a state model transition over once")
 )
