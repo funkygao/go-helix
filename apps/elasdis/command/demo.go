@@ -3,25 +3,28 @@ package command
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/store/zk"
 	"github.com/funkygao/gocli"
+	log "github.com/funkygao/log4go"
 )
 
 const (
-	zkSvr      = "localhost:2181"
-	cluster    = "foobar"
-	node1      = "localhost_10925"
-	node2      = "localhost_10926"
-	stateModel = helix.StateModelOnlineOffline
-	resource   = "redis"
-	partitions = 5
+	zkSvr            = "localhost:2181"
+	cluster          = "foobar"
+	node1            = "localhost_10925"
+	node2            = "localhost_10926"
+	stateModel       = helix.StateModelOnlineOffline
+	resource         = "redis"
+	partitions       = 3
+	replicas         = "2"
+	helixInstallBase = "/opt/helix"
 )
 
 type Demo struct {
@@ -36,62 +39,53 @@ func (this *Demo) Run(args []string) (exitCode int) {
 		return 1
 	}
 
+	// create the admin instance and connect
 	admin := zk.NewZKHelixAdmin(zkSvr)
-	admin.AddCluster(cluster)
-	log.Printf("added cluster: %s", cluster)
-	//	defer admin.DropCluster(cluster)
-	admin.AllowParticipantAutoJoin(cluster, true)
+	must(admin.Connect())
+
+	// create the cluster
+	must(admin.AddCluster(cluster))
+	defer admin.DropCluster(cluster)
+	log.Info("added cluster: %s", cluster)
+
+	must(admin.AllowParticipantAutoJoin(cluster, false))
 
 	// add 2 nodes to the cluster
-	err := admin.AddNode(cluster, node1)
-	must(err)
-	err = admin.AddNode(cluster, node2)
-	must(err)
-	log.Printf("node: %s %s added to cluster[%s]", node1, node2, cluster)
+	must(admin.AddNode(cluster, node1))
+	must(admin.AddNode(cluster, node2))
+	log.Info("node: %s %s added to cluster[%s]", node1, node2, cluster)
 
 	// define the resource and partition
 	resourceOption := helix.DefaultAddResourceOption(partitions, stateModel)
-	err = admin.AddResource(cluster, resource, resourceOption)
-	must(err)
-	log.Printf("resource[%s] partitions:%d model:%s added to cluster[%s]", resource,
+	must(admin.AddResource(cluster, resource, resourceOption))
+	log.Info("resource[%s] partitions:%d model:%s added to cluster[%s]", resource,
 		partitions, stateModel, cluster)
 
-	// start contoller
-	go func() {
-		err = helix.StartController(cluster)
-		must(err)
-	}()
-	log.Println("controller started")
+	// create the manager instance and connect
+	manager := zk.NewZKHelixManager(zkSvr, zk.WithSessionTimeout(time.Second*10))
+	must(manager.Connect())
 
-	manager := zk.NewZKHelixManager(zkSvr)
+	// the actual task executor
 	participant := manager.NewParticipant(cluster, "localhost", "10925")
-
-	// creaet OnlineOffline state model
-	sm := helix.NewStateModel([]helix.Transition{
+	participant.RegisterStateModel(stateModel, helix.NewStateModel([]helix.Transition{
 		{"ONLINE", "OFFLINE", func(partition string) {
-			log.Println("ONLINE-->OFFLINE")
+			log.Info("partition[%s] ONLINE-->OFFLINE", partition)
 		}},
 		{"OFFLINE", "ONLINE", func(partition string) {
-			log.Println("OFFLINE-->ONLINE")
+			log.Info("partition[%s] OFFLINE-->ONLINE", partition)
 		}},
-	})
-
-	participant.RegisterStateModel(stateModel, sm)
-
-	err = participant.Start()
-	must(err)
-	log.Println("participant connected")
+	}))
+	must(participant.Start())
+	log.Info("participant started")
 
 	instances, _ := admin.Instances(cluster)
-	log.Printf("instances: %+v", instances)
+	log.Info("instances: %+v", instances)
 
-	go func() {
-		err = helix.Rebalance(cluster, resource, "2")
-		must(err)
-	}()
-	log.Println("rebalanced")
+	log.Info("waiting Ctrl-C...")
 
-	log.Println("waiting Ctrl-C...")
+	log.Info("NOW, start another terminal and run")
+	log.Info("%s/bin/run-helix-controller.sh --zkSvr %s --cluster %s", helixInstallBase, zkSvr, cluster)
+	log.Info("%s/bin/helix-admin.sh --zkSvr %s --rebalance %s %s %s", helixInstallBase, zkSvr, cluster, resource, replicas)
 
 	// block until SIGINT and SIGTERM
 	c := make(chan os.Signal, 2)
@@ -102,7 +96,7 @@ func (this *Demo) Run(args []string) (exitCode int) {
 }
 
 func (*Demo) Synopsis() string {
-	return "Demonstration how to use Helix"
+	return "Demonstration how to use Helix to control redis instances"
 }
 
 func (this *Demo) Help() string {

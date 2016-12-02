@@ -73,23 +73,22 @@ func (p *Participant) Start() error {
 		return helix.ErrEnsureParticipantConfig
 	}
 
-	log.Trace("P[%s] cleanup stale sessions", p.ParticipantID)
 	if err := p.cleanUpStaleSessions(); err != nil {
 		return err
 	}
 
-	log.Trace("P[%s] enter main loop", p.ParticipantID)
 	p.startEventLoop()
 
 	// TODO sync between watcher and live instances
 
-	log.Trace("P[%s] become alive", p.ParticipantID)
 	p.createLiveInstance()
 
 	return nil
 }
 
 func (p *Participant) cleanUpStaleSessions() error {
+	log.Trace("P[%s/%s] cleanup stale sessions", p.ParticipantID, p.conn.GetSessionID())
+
 	sessions, err := p.conn.Children(p.kb.currentStates(p.ParticipantID))
 	if err != nil {
 		return err
@@ -97,6 +96,8 @@ func (p *Participant) cleanUpStaleSessions() error {
 
 	for _, sessionID := range sessions {
 		if sessionID != p.conn.GetSessionID() {
+			log.Warn("P[%s/%s] found stale session: %s", p.ParticipantID, p.conn.GetSessionID(), sessionID)
+
 			if err = p.conn.DeleteTree(p.kb.currentStatesForSession(p.ParticipantID, sessionID)); err != nil {
 				return err
 			}
@@ -221,6 +222,8 @@ func (p *Participant) participantRegistered() (bool, error) {
 }
 
 func (p *Participant) startEventLoop() {
+	log.Trace("P[%s/%s] starting main loop", p.ParticipantID, p.conn.GetSessionID())
+
 	messageProcessedTime := make(map[string]time.Time)
 	go func() {
 		tick := time.NewTicker(time.Second * 5)
@@ -286,7 +289,7 @@ func (p *Participant) watchMessages() (chan []string, chan error) {
 
 			snapshots <- snapshot
 			evt := <-events
-			log.Debug("%+v %+v", snapshots, evt)
+			log.Debug("P[%s/%s] recv message: %+v %+v", p.ParticipantID, p.conn.GetSessionID(), snapshot, evt)
 
 			if evt.Err != nil {
 				errors <- evt.Err
@@ -309,7 +312,8 @@ func (p *Participant) createLiveInstance() error {
 	for retry := 0; retry < 10; retry++ {
 		_, err = p.conn.Create(p.kb.liveInstance(p.ParticipantID), data, flags, acl)
 		if err == nil {
-			break
+			log.Trace("P[%s/%s] become alive", p.ParticipantID, p.conn.GetSessionID())
+			return nil
 		}
 
 		// wait for zookeeper remove the last run's ephemeral znode
@@ -366,7 +370,7 @@ func (p *Participant) processMessage(msgID string) error {
 		return p.conn.DeleteTree(msgPath)
 	}
 
-	// session id of the destination node
+	// session id of the destination node, target
 	sessionID, _ := message.GetSimpleField("TGT_SESSION_ID").(string)
 	if sessionID != "*" && sessionID != p.conn.GetSessionID() {
 		// message comes from expired session
