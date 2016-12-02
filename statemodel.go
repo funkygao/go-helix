@@ -24,3 +24,13 @@ func (sm *StateModel) AddTransition(fromState string, toState string, handler fu
 	transition := Transition{fromState, toState, handler}
 	sm.transitions = append(sm.transitions, transition)
 }
+
+func (sm *StateModel) Handler(fromState, toState string) func(string) {
+	for _, tr := range sm.transitions {
+		if tr.FromState == fromState && tr.ToState == toState {
+			return tr.Handler
+		}
+	}
+
+	return nil
+}

@@ -12,6 +12,7 @@ import (
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/store/zk"
 	"github.com/funkygao/gocli"
+	"github.com/funkygao/golib/color"
 	log "github.com/funkygao/log4go"
 )
 
@@ -69,10 +70,10 @@ func (this *Demo) Run(args []string) (exitCode int) {
 	participant := manager.NewParticipant(cluster, "localhost", "10925")
 	participant.RegisterStateModel(stateModel, helix.NewStateModel([]helix.Transition{
 		{"ONLINE", "OFFLINE", func(partition string) {
-			log.Info("partition[%s] ONLINE-->OFFLINE", partition)
+			log.Info(color.Green("partition[%s] ONLINE-->OFFLINE", partition))
 		}},
 		{"OFFLINE", "ONLINE", func(partition string) {
-			log.Info("partition[%s] OFFLINE-->ONLINE", partition)
+			log.Info(color.Cyan("partition[%s] OFFLINE-->ONLINE", partition))
 		}},
 	}))
 	must(participant.Start())

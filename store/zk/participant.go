@@ -433,7 +433,21 @@ func (p *Participant) handleStateTransition(message *helix.Message) {
 	message.SetSimpleField("EXECUTE_START_TIMESTAMP", startTime)
 
 	p.preHandleMessage(message)
-	// TODO: invoke state model transition function
+
+	// TODO lock
+	transition, present := p.stateModels[message.StateModel()]
+	if !present {
+		log.Error("P[%s/%s] has no transition defined for state model %s", p.ParticipantID,
+			p.conn.GetSessionID(), message.StateModel())
+	} else {
+		handler := transition.Handler(message.FromState(), message.ToState())
+		if handler == nil {
+			log.Warn("P[%s/%s] state %s -> %s has no handler", p.ParticipantID,
+				p.conn.GetSessionID(), message.FromState(), message.ToState())
+		} else {
+			handler(message.PartitionName())
+		}
+	}
 
 	p.postHandleMessage(message)
 }
@@ -447,8 +461,8 @@ func (p *Participant) postHandleMessage(message *helix.Message) error {
 	// skip if we are handling an expired session
 	sessionID := p.conn.GetSessionID()
 	targetSessionID := message.GetSimpleField("TGT_SESSION_ID")
-	toState := message.GetSimpleField("TO_STATE").(string)
-	partitionName := message.GetSimpleField("PARTITION_NAME").(string)
+	toState := message.ToState()
+	partitionName := message.PartitionName()
 
 	if targetSessionID != nil && targetSessionID.(string) != sessionID {
 		return helix.ErrSessionChanged
@@ -459,13 +473,11 @@ func (p *Participant) postHandleMessage(message *helix.Message) error {
 	// In the state model it will be stayed as OFFLINE, which is OK.
 
 	if strings.ToUpper(toState) == "DROPPED" {
-		path := p.kb.currentStatesForSession(p.ParticipantID, sessionID)
-		p.conn.RemoveMapFieldKey(path, partitionName)
+		p.conn.RemoveMapFieldKey(p.kb.currentStatesForSession(p.ParticipantID, sessionID), partitionName)
 	}
 
 	// actually set the current state
-	resourceID := message.GetSimpleField("RESOURCE_NAME").(string)
+	resourceID, _ := message.GetSimpleField("RESOURCE_NAME").(string)
 	currentStateForResourcePath := p.kb.currentStateForResource(p.ParticipantID, p.conn.GetSessionID(), resourceID)
-
 	return p.conn.UpdateMapField(currentStateForResourcePath, partitionName, "CURRENT_STATE", toState)
 }
