@@ -19,6 +19,22 @@ const (
 )
 
 const (
+	MessageTypeStateTransition  = "STATE_TRANSITION"
+	MessageTypeScheduler        = "SCHEDULER_MSG"
+	MessageTypeUserDefine       = "USER_DEFINE_MSG"
+	MessageTypeController       = "USER_DEFINE_MSG"
+	MessageTypeTaskReply        = "TASK_REPLY"
+	MessageTypeNoOp             = "NO_OP"
+	MessageTypeParticipantError = "PARTICIPANT_ERROR_REPORT"
+)
+
+const (
+	MessageStateNew           = "NEW"
+	MessageStateRead          = "READ"
+	MessageStateUnprocessable = "UNPROCESSABLE"
+)
+
+const (
 	StateModelLeaderStandby      = "LeaderStandby"
 	StateModelMasterSlave        = "MasterSlave"
 	StateModelOnlineOffline      = "OnlineOffline"

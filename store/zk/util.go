@@ -1,5 +1,6 @@
 package zk
 
+// TODO kill this
 func must(err error) {
 	if err != nil {
 		panic(err)

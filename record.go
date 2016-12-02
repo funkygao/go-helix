@@ -67,6 +67,20 @@ func (r Record) GetIntField(key string, defaultValue int) int {
 	return intVal
 }
 
+// GetStringField returns the string value of a field in the SimpleField
+func (r Record) GetStringField(key string, defaultValue string) string {
+	value := r.GetSimpleField(key)
+	if value == nil {
+		return defaultValue
+	}
+
+	strVal, ok := value.(string)
+	if !ok {
+		return defaultValue
+	}
+	return strVal
+}
+
 // SetIntField sets the integer value of a key under SimpleField.
 // the value is stored as in string form
 func (r *Record) SetIntField(key string, value int) {
@@ -140,9 +154,8 @@ func NewRecordFromBytes(data []byte) (*Record, error) {
 	return &zn, err
 }
 
-// NewLiveInstanceNode creates a new instance of Record for representing
-// a live instance.
-func NewLiveInstanceNode(participantID string, sessionID string) *Record {
+// NewLiveInstanceRecord creates a new instance of Record for representing a live instance.
+func NewLiveInstanceRecord(participantID string, sessionID string) *Record {
 	hostname, err := os.Hostname()
 	if err != nil {
 		panic(err)

@@ -325,10 +325,10 @@ func (conn *connection) UpdateSimpleField(path string, key string, value string)
 
 func (conn *connection) GetSimpleFieldValueByKey(path string, key string) string {
 	data, err := conn.Get(path)
-	must(err)
+	must(err) // FIXME
 
 	node, err := helix.NewRecordFromBytes(data)
-	must(err)
+	must(err) // FIXME
 
 	if node.SimpleFields == nil {
 		return ""

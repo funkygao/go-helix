@@ -11,3 +11,4 @@ Originally based on https://github.com/yichen/gohelix
 - [ ] rebalance
 - [ ] super cluster
 - [ ] tag
+- [ ] metrics

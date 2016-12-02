@@ -50,4 +50,6 @@ var (
 	ErrPartialSuccess = errors.New("Partial success")
 
 	ErrDupStateModelName = errors.New("Register a state model over once")
+
+	ErrSessionChanged = errors.New("SessionID changed")
 )
