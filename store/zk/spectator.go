@@ -10,6 +10,7 @@ import (
 )
 
 var _ helix.HelixSpectator = &Spectator{}
+var _ helix.HelixService = &Spectator{}
 
 type spectatorState uint8
 
@@ -82,8 +83,12 @@ func (s *Spectator) Start() error {
 	return nil
 }
 
+func (s *Spectator) Started() bool {
+	return s.state == spectatorConnected
+}
+
 // Disconnect the spectator from zookeeper, and also stop all listeners.
-func (s *Spectator) Close() {
+func (s *Spectator) Stop() {
 	if s.state == spectatorDisConnected {
 		return
 	}

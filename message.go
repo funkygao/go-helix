@@ -34,6 +34,10 @@ func (m Message) PartitionName() string {
 	return m.GetStringField("PARTITION_NAME", "")
 }
 
+func (m Message) BatchMessageMode() bool {
+	return m.GetBooleanField("BATCH_MESSAGE_MODE", false)
+}
+
 func (m Message) FromState() string {
 	return m.GetStringField("FROM_STATE", "")
 }

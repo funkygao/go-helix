@@ -4,12 +4,6 @@ package helix
 // but only read cluster data, or listen to cluster updates.
 type HelixSpectator interface {
 
-	//
-	Start() error
-
-	//
-	Close()
-
 	// AddExternalViewChangeListener add a listener to external view changes.
 	AddExternalViewChangeListener(ExternalViewChangeListener)
 

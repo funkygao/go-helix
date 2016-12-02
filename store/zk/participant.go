@@ -22,9 +22,11 @@ const (
 )
 
 var _ helix.HelixParticipant = &Participant{}
+var _ helix.HelixService = &Participant{}
 
 type Participant struct {
 	sync.Mutex
+	helix.HelixService
 
 	manger helix.HelixManager
 
@@ -68,7 +70,7 @@ func (p *Participant) Start() error {
 		return helix.ErrClusterNotSetup
 	}
 
-	if ok, err := p.participantRegistered(); !ok || err != nil {
+	if ok, err := p.joinCluster(); !ok || err != nil {
 		if err != nil {
 			return err
 		}
@@ -86,6 +88,10 @@ func (p *Participant) Start() error {
 	p.createLiveInstance()
 
 	return nil
+}
+
+func (p Participant) Started() bool {
+	return p.state == psConnected
 }
 
 func (p *Participant) cleanUpStaleSessions() error {
@@ -110,7 +116,7 @@ func (p *Participant) cleanUpStaleSessions() error {
 }
 
 // Disconnect the participant from Zookeeper and Helix controller.
-func (p *Participant) Close() {
+func (p *Participant) Stop() {
 	// do i need lock here?
 	if p.state == psDisconnected {
 		return
@@ -173,7 +179,7 @@ func (p *Participant) autoJoinAllowed() (bool, error) {
 	return strings.ToLower(al) == "true", nil
 }
 
-func (p *Participant) participantRegistered() (bool, error) {
+func (p *Participant) joinCluster() (bool, error) {
 	// /{cluster}/CONFIGS/PARTICIPANT/localhost_12000
 	exists, err := p.conn.Exists(p.kb.participantConfig(p.ParticipantID))
 	if err != nil {

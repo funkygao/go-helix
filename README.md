@@ -12,3 +12,4 @@ Originally based on https://github.com/yichen/gohelix
 - [ ] super cluster
 - [ ] tag
 - [ ] metrics
+- [ ] HelixMultiClusterController, HelixStateTransitionHandler
