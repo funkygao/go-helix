@@ -225,15 +225,17 @@ func (adm Admin) AddNode(cluster string, node string) error {
 	n := helix.NewRecord(node)
 	n.SetSimpleField("HELIX_HOST", parts[0])
 	n.SetSimpleField("HELIX_PORT", parts[1])
+	// HELIX_ENABLED not set yet
 
-	adm.CreateRecordWithPath(path, n)
-	adm.CreateEmptyNode(kb.instance(node))
-	adm.CreateEmptyNode(kb.messages(node))
-	adm.CreateEmptyNode(kb.currentStates(node))
-	adm.CreateEmptyNode(kb.errorsR(node))
-	adm.CreateEmptyNode(kb.statusUpdates(node))
-
-	return nil
+	return any(
+		adm.CreateRecordWithPath(path, n),
+		adm.CreateEmptyNode(kb.instance(node)),
+		adm.CreateEmptyNode(kb.messages(node)),
+		adm.CreateEmptyNode(kb.currentStates(node)),
+		adm.CreateEmptyNode(kb.errorsR(node)),
+		adm.CreateEmptyNode(kb.statusUpdates(node)),
+		adm.CreateEmptyNode(kb.healthReport(node)),
+	)
 }
 
 func (adm Admin) DropInstance(cluster string, ic helix.InstanceConfig) error {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/funkygao/go-helix"
+	log "github.com/funkygao/log4go"
 	"github.com/yichen/go-zookeeper/zk"
 )
 
@@ -23,10 +24,10 @@ const (
 
 var _ helix.HelixParticipant = &Participant{}
 
-// Participant is a Helix participant node
 type Participant struct {
 	sync.Mutex
 
+	kb   keyBuilder
 	conn *connection
 
 	// The cluster this participant belongs to
@@ -48,13 +49,8 @@ type Participant struct {
 	started chan interface{}
 	// channel to receive stop participant event
 	stop chan bool
-	// channel to stop watch messages
-	stopWatch chan bool
 
-	// status
 	state participantState
-
-	kb keyBuilder
 }
 
 func (p *Participant) Start() error {
@@ -71,29 +67,30 @@ func (p *Participant) Start() error {
 		return helix.ErrClusterNotSetup
 	}
 
-	// register the participant with the cluster
-	allowed := p.ensureParticipantConfig()
-	if !allowed {
-		p.Close()
+	if ok, err := p.participantRegistered(); !ok || err != nil {
+		if err != nil {
+			return err
+		}
 		return helix.ErrEnsureParticipantConfig
 	}
 
-	// clean up current state of previous sessions
-	if err := p.cleanUp(); err != nil {
+	log.Trace("P[%s] cleanup stale sessions", p.ParticipantID)
+	if err := p.cleanUpStaleSessions(); err != nil {
 		return err
 	}
 
+	log.Trace("P[%s] enter main loop", p.ParticipantID)
 	p.startEventLoop()
 
 	// TODO sync between watcher and live instances
 
-	// bring this participant alive.
+	log.Trace("P[%s] become alive", p.ParticipantID)
 	p.createLiveInstance()
 
 	return nil
 }
 
-func (p *Participant) cleanUp() error {
+func (p *Participant) cleanUpStaleSessions() error {
 	sessions, err := p.conn.Children(p.kb.currentStates(p.ParticipantID))
 	if err != nil {
 		return err
@@ -137,82 +134,93 @@ func (p *Participant) Close() {
 	p.state = psDisconnected
 }
 
-// RegisterStateModel associates state trasition functions with the participant
-func (p *Participant) RegisterStateModel(name string, sm helix.StateModel) {
+func (p *Participant) RegisterStateModel(name string, sm helix.StateModel) error {
+	p.Lock()
+	defer p.Unlock()
+
 	if p.stateModels == nil {
 		p.stateModels = make(map[string]*helix.StateModel)
+	} else if _, present := p.stateModels[name]; present {
+		return helix.ErrDupStateModelName
 	}
 	p.stateModels[name] = &sm
+	return nil
 }
 
-func (p *Participant) autoJoinAllowed() bool {
-	key := p.kb.clusterConfig()
-	config, err := p.conn.Get(key)
-	must(err)
+func (p *Participant) autoJoinAllowed() (bool, error) {
+	config, err := p.conn.Get(p.kb.clusterConfig())
+	if err != nil {
+		return false, err
+	}
 
 	c, err := helix.NewRecordFromBytes(config)
-	must(err)
+	if err != nil {
+		return false, err
+	}
 
 	allowed := c.GetSimpleField("allowParticipantAutoJoin")
 	if allowed == nil {
-		return false
+		// false by default
+		return false, nil
 	}
 
-	al := allowed.(string)
-	if strings.ToLower(al) == "true" {
-		return true
-	}
-	return false
+	al, _ := allowed.(string)
+	return strings.ToLower(al) == "true", nil
 }
 
-func (p *Participant) ensureParticipantConfig() bool {
-	// make sure the participant confis exists in zookeeper
-	key := p.kb.participantConfig(p.ParticipantID)
-	exists, err := p.conn.Exists(key)
+func (p *Participant) participantRegistered() (bool, error) {
+	// /{cluster}/CONFIGS/PARTICIPANT/localhost_12000
+	exists, err := p.conn.Exists(p.kb.participantConfig(p.ParticipantID))
 	if err != nil {
-		return false
+		return false, err
 	}
 
-	allowJoin := p.autoJoinAllowed()
+	if exists {
+		return true, nil
+	}
 
-	// if the participant path does not exist in zookeeper
+	allowAutoJoin, err := p.autoJoinAllowed()
+	if err != nil {
+		return false, err
+	}
+	if !allowAutoJoin {
+		return false, nil
+	}
+
+	// the participant path does not exist in zookeeper
 	// create the data struture
-	if !exists && allowJoin {
-		participant := helix.NewRecord(p.ParticipantID)
-		participant.SetSimpleField("HELIX_HOST", p.Host)
-		participant.SetSimpleField("HELIX_PORT", p.Port)
-		participant.SetSimpleField("HELIX_ENABLED", "true")
+	participant := helix.NewRecord(p.ParticipantID)
+	participant.SetSimpleField("HELIX_HOST", p.Host)
+	participant.SetSimpleField("HELIX_PORT", p.Port)
+	participant.SetSimpleField("HELIX_ENABLED", "true")
+	err = any(
+		p.conn.CreateRecordWithPath(p.kb.participantConfig(p.ParticipantID), participant),
 
-		p.conn.CreateRecordWithPath(key, participant)
+		// /{cluster}/INSTANCES/localhost_12000
+		p.conn.CreateEmptyNode(p.kb.instance(p.ParticipantID)),
 
-		instance := p.kb.instance(p.ParticipantID)
-		p.conn.CreateEmptyNode(instance)
+		// /{cluster}/INSTANCES/localhost_12000/CURRENTSTATES
+		p.conn.CreateEmptyNode(p.kb.currentStates(p.ParticipantID)),
 
-		currentstates := p.kb.currentStates(p.ParticipantID)
-		p.conn.CreateEmptyNode(currentstates)
+		// /{cluster}/INSTANCES/localhost_12000/ERRORS
+		p.conn.CreateEmptyNode(p.kb.errorsR(p.ParticipantID)),
 
-		// errs := p.kb.errors(p.ParticipantID, strconv.FormatInt(p.zkConn.SessionID, 10), "")
-		// createEmptyNode(p.zkConn, errs)
-		errs := p.kb.errorsR(p.ParticipantID)
-		p.conn.CreateEmptyNode(errs)
+		// /{cluster}/INSTANCES/localhost_12000/HEALTHREPORT
+		p.conn.CreateEmptyNode(p.kb.healthReport(p.ParticipantID)),
 
-		health := p.kb.healthReport(p.ParticipantID)
-		p.conn.CreateEmptyNode(health)
+		// /{cluster}/INSTANCES/localhost_12000/MESSAGES
+		p.conn.CreateEmptyNode(p.kb.messages(p.ParticipantID)),
 
-		messages := p.kb.messages(p.ParticipantID)
-		p.conn.CreateEmptyNode(messages)
-
-		updates := p.kb.statusUpdates(p.ParticipantID)
-		p.conn.CreateEmptyNode(updates)
-	} else if !exists {
-		return false
+		// /{cluster}/INSTANCES/localhost_12000/STATUSUPDATES
+		p.conn.CreateEmptyNode(p.kb.statusUpdates(p.ParticipantID)),
+	)
+	if err != nil {
+		return false, err
 	}
 
-	return true
+	return true, nil
 }
 
-// main event loop for the participant. It listens to the participant message in zookeeper
-// and for each update (messageChan), iterate all messages and process them
 func (p *Participant) startEventLoop() {
 	// we need to keep a history of the messages that have been processed, so we don't process
 	// them again. Start a goroutine to clean up this history once every 5 seconds so it won't

@@ -108,6 +108,5 @@ func (m *Manager) NewParticipant(clusterID string, host string, port string) hel
 		ParticipantID: fmt.Sprintf("%s_%s", host, port), // node id
 		started:       make(chan interface{}),
 		stop:          make(chan bool),
-		stopWatch:     make(chan bool),
 	}
 }

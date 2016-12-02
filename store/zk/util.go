@@ -5,3 +5,13 @@ func must(err error) {
 		panic(err)
 	}
 }
+
+func any(errors ...error) error {
+	for _, err := range errors {
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

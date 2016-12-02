@@ -412,6 +412,9 @@ func (conn *connection) RemoveMapFieldKey(path string, key string) error {
 }
 
 func (conn *connection) IsClusterSetup(cluster string) (bool, error) {
+	if cluster == "" {
+		return false, helix.ErrInvalidClusterName
+	}
 	if !conn.IsConnected() {
 		return false, helix.ErrNotConnected
 	}

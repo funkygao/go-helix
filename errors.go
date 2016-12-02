@@ -40,10 +40,14 @@ var (
 	// ErrInvalidAddResourceOption is returned when user provides a invalid resource to add.
 	ErrInvalidAddResourceOption = errors.New("Invalid AddResourceOption")
 
+	ErrInvalidClusterName = errors.New("Invalid cluster name")
+
 	ErrEmptyStateModel = errors.New("Register at least one valid state model before connecting.")
 
 	// ErrNotConnected is returned when call a function without calling Connect() beforehand.
 	ErrNotConnected = errors.New("Not connected yet")
 
 	ErrPartialSuccess = errors.New("Partial success")
+
+	ErrDupStateModelName = errors.New("Register a state model over once")
 )

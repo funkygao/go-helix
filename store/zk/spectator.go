@@ -18,11 +18,10 @@ const (
 	spectatorDisConnected spectatorState = 1
 )
 
-// Spectator is a Helix role that does not participate the cluster state transition
-// but only read cluster data, or listen to cluster updates
 type Spectator struct {
 	sync.RWMutex
 
+	kb   keyBuilder
 	conn *connection
 
 	// The cluster this spectator is specatating
@@ -39,8 +38,6 @@ type Spectator struct {
 
 	// stop the spectator
 	stop chan bool
-
-	kb keyBuilder
 
 	// resources the external view is tracking. It is a map from the resource name to the
 	// current state of the resource: true means it is active, false means the resource is inactive/deleted
