@@ -269,10 +269,11 @@ func (p *Participant) startEventLoop() {
 				}
 
 			case err := <-errChan:
-				log.Error("P[%s] %v", p.ParticipantID, err)
+				log.Error("P[%s/%s] %v", p.ParticipantID, p.conn.GetSessionID(), err)
 
 			case <-p.stop:
 				p.state = psStopped
+				log.Trace("P[%s/%s] stopped", p.ParticipantID, p.conn.GetSessionID())
 				return
 			}
 		}
@@ -282,9 +283,9 @@ func (p *Participant) startEventLoop() {
 func (p *Participant) watchMessages() (chan []string, chan error) {
 	snapshots := make(chan []string)
 	errors := make(chan error)
-	path := p.kb.messages(p.ParticipantID)
 
 	go func() {
+		path := p.kb.messages(p.ParticipantID)
 		for {
 			snapshot, events, err := p.conn.ChildrenW(path)
 			if err != nil {
@@ -302,6 +303,7 @@ func (p *Participant) watchMessages() (chan []string, chan error) {
 			}
 		}
 	}()
+
 	return snapshots, errors
 }
 

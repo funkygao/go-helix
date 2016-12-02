@@ -100,8 +100,10 @@ func (this *Demo) Run(args []string) (exitCode int) {
 
 	log.Info("waiting Ctrl-C...")
 
-	time.Sleep(time.Second * 5)
-	participant.Close()
+	if false {
+		time.Sleep(time.Second * 5)
+		participant.Close()
+	}
 
 	log.Info("%s/bin/run-helix-controller.sh --zkSvr %s --cluster %s", helixInstallBase, zkSvr, cluster)
 
