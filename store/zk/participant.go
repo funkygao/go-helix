@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/funkygao/go-helix"
+	"github.com/funkygao/go-helix/model"
 	log "github.com/funkygao/log4go"
 	"github.com/yichen/go-zookeeper/zk"
 )
@@ -164,7 +165,7 @@ func (p *Participant) autoJoinAllowed() (bool, error) {
 		return false, err
 	}
 
-	c, err := helix.NewRecordFromBytes(config)
+	c, err := model.NewRecordFromBytes(config)
 	if err != nil {
 		return false, err
 	}
@@ -200,7 +201,7 @@ func (p *Participant) joinCluster() (bool, error) {
 
 	// the participant path does not exist in zookeeper
 	// create the data struture
-	participant := helix.NewRecord(p.ParticipantID)
+	participant := model.NewRecord(p.ParticipantID)
 	participant.SetSimpleField("HELIX_HOST", p.Host)
 	participant.SetSimpleField("HELIX_PORT", p.Port)
 	participant.SetSimpleField("HELIX_ENABLED", "true")
@@ -314,7 +315,7 @@ func (p *Participant) watchMessages() (chan []string, chan error) {
 }
 
 func (p *Participant) createLiveInstance() error {
-	record := helix.NewLiveInstanceRecord(p.ParticipantID, p.conn.GetSessionID())
+	record := model.NewLiveInstanceRecord(p.ParticipantID, p.conn.GetSessionID())
 	data, err := json.MarshalIndent(*record, "", "  ")
 	flags := int32(zk.FlagEphemeral)
 	acl := zk.WorldACL(zk.PermAll)
@@ -373,7 +374,7 @@ func (p *Participant) processMessage(msgID string) error {
 		return err
 	}
 
-	message := helix.NewMessageFromRecord(record)
+	message := model.NewMessageFromRecord(record)
 
 	log.Debug("P[%s/%s] message: %s", p.ParticipantID, p.conn.GetSessionID(), message)
 
@@ -407,7 +408,7 @@ func (p *Participant) processMessage(msgID string) error {
 	if !strings.EqualFold(targetName, "CONTROLLER") && strings.EqualFold(msgType, "STATE_TRANSITION") {
 		resourceID := message.Resource()
 
-		currentStateRecord := helix.NewRecord(resourceID)
+		currentStateRecord := model.NewRecord(resourceID)
 		currentStateRecord.SetIntField("BUCKET_SIZE", message.GetIntField("BUCKET_SIZE", 0))
 		currentStateRecord.SetSimpleField("STATE_MODEL_DEF", message.GetSimpleField("STATE_MODEL_DEF"))
 		currentStateRecord.SetSimpleField("SESSION_ID", sessionID)
@@ -434,7 +435,7 @@ func (p *Participant) processMessage(msgID string) error {
 	return p.conn.DeleteTree(msgPath)
 }
 
-func (p *Participant) handleStateTransition(message *helix.Message) {
+func (p *Participant) handleStateTransition(message *model.Message) {
 	log.Trace("P[%s/%s] state %s -> %s", p.ParticipantID,
 		p.conn.GetSessionID(), message.FromState(), message.ToState())
 
@@ -464,11 +465,11 @@ func (p *Participant) handleStateTransition(message *helix.Message) {
 	p.postHandleMessage(message)
 }
 
-func (p *Participant) preHandleMessage(message *helix.Message) {
+func (p *Participant) preHandleMessage(message *model.Message) {
 
 }
 
-func (p *Participant) postHandleMessage(message *helix.Message) error {
+func (p *Participant) postHandleMessage(message *model.Message) error {
 	// sessionID might change when we update the state model
 	// skip if we are handling an expired session
 	sessionID := p.conn.GetSessionID()

@@ -24,4 +24,4 @@ _testmain.go
 *.prof
 
 schema/
-apps/elasdis/elasdis
+apps/edis/edis

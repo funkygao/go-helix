@@ -1,5 +1,9 @@
 package helix
 
+import (
+	"github.com/funkygao/go-helix/model"
+)
+
 // HelixAdmin handles the administration task for the Helix cluster.
 type HelixAdmin interface {
 
@@ -36,15 +40,15 @@ type HelixAdmin interface {
 	AddNode(cluster string, node string) error
 
 	// Add an instance to a cluster.
-	AddInstance(cluster string, config InstanceConfig) error
+	AddInstance(cluster string, config model.InstanceConfig) error
 
 	// Drop an instance from a cluster.
-	DropInstance(cluster string, ic InstanceConfig) error
+	DropInstance(cluster string, ic model.InstanceConfig) error
 
 	// Get a list of instances participating under a cluster.
 	Instances(cluster string) ([]string, error)
 
-	InstanceInfo(cluster string, ic InstanceConfig) (*Record, error)
+	InstanceInfo(cluster string, ic model.InstanceConfig) (*model.Record, error)
 
 	// Add a resource to a cluster.
 	AddResource(cluster string, resource string, option AddResourceOption) error
@@ -62,7 +66,7 @@ type HelixAdmin interface {
 	DisableResource(cluster string, resource string) error
 
 	// AddStateModelDef adds a state model to a cluster.
-	AddStateModelDef(cluster string, stateModel string, definition *Record) error
+	AddStateModelDef(cluster string, stateModel string, definition *model.Record) error
 
 	// StateModelDefs gets a list of state model names under a cluster.
 	StateModelDefs(cluster string) ([]string, error)

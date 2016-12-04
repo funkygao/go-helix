@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/funkygao/go-helix"
+	"github.com/funkygao/go-helix/model"
 )
 
 type Admin struct {
@@ -95,7 +96,7 @@ func (adm Admin) AddCluster(cluster string) error {
 	adm.CreateEmptyNode(kb.resourceConfigs())
 	adm.CreateEmptyNode(kb.clusterConfigs())
 
-	clusterNode := helix.NewRecord(cluster)
+	clusterNode := model.NewRecord(cluster)
 	adm.CreateRecordWithPath(kb.clusterConfig(), clusterNode)
 
 	adm.CreateEmptyNode(kb.controller())
@@ -197,7 +198,7 @@ func (adm Admin) AllowParticipantAutoJoin(cluster string, yes bool) error {
 	return adm.SetConfig(cluster, "CLUSTER", properties)
 }
 
-func (adm Admin) AddInstance(cluster string, config helix.InstanceConfig) error {
+func (adm Admin) AddInstance(cluster string, config model.InstanceConfig) error {
 	return adm.AddNode(cluster, config.Node())
 }
 
@@ -222,7 +223,7 @@ func (adm Admin) AddNode(cluster string, node string) error {
 
 	// create new node for the participant
 	parts := strings.Split(node, "_")
-	n := helix.NewRecord(node)
+	n := model.NewRecord(node)
 	n.SetSimpleField("HELIX_HOST", parts[0])
 	n.SetSimpleField("HELIX_PORT", parts[1])
 	// HELIX_ENABLED not set yet
@@ -238,7 +239,7 @@ func (adm Admin) AddNode(cluster string, node string) error {
 	)
 }
 
-func (adm Admin) DropInstance(cluster string, ic helix.InstanceConfig) error {
+func (adm Admin) DropInstance(cluster string, ic model.InstanceConfig) error {
 	return adm.DropNode(cluster, ic.Node())
 }
 
@@ -289,7 +290,7 @@ func (adm Admin) AddResource(cluster string, resource string, option helix.AddRe
 		return err
 	}
 
-	is := helix.NewRecord(resource)
+	is := model.NewRecord(resource)
 	is.SetSimpleField("NUM_PARTITIONS", strconv.Itoa(option.Partitions))
 	is.SetSimpleField("REPLICAS", "0")
 	is.SetSimpleField("REBALANCE_MODE", option.RebalancerMode)
@@ -359,7 +360,7 @@ func (adm Admin) Resources(cluster string) ([]string, error) {
 }
 
 // ListInstanceInfo shows detailed information of an inspace in the helix cluster
-func (adm Admin) InstanceInfo(cluster string, ic helix.InstanceConfig) (*helix.Record, error) {
+func (adm Admin) InstanceInfo(cluster string, ic model.InstanceConfig) (*model.Record, error) {
 	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
 		return nil, helix.ErrClusterNotSetup
 	}
@@ -387,7 +388,7 @@ func (adm Admin) Instances(cluster string) ([]string, error) {
 	return adm.Children(kb.instances())
 }
 
-func (adm Admin) AddStateModelDef(cluster string, stateModel string, definition *helix.Record) error {
+func (adm Admin) AddStateModelDef(cluster string, stateModel string, definition *model.Record) error {
 	kb := keyBuilder{clusterID: cluster}
 	return adm.CreateRecordWithPath(kb.stateModelDef(stateModel), definition)
 }

@@ -7,9 +7,7 @@ Originally based on https://github.com/yichen/gohelix
 
 - [ ] chroot bug
 - [ ] curator
-- [ ] controller
-- [ ] rebalance
-- [ ] super cluster
-- [ ] tag
+- [ ] super cluster, tag
 - [ ] metrics
+- [ ] constraint
 - [ ] HelixMultiClusterController, HelixStateTransitionHandler

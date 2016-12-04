@@ -1,4 +1,4 @@
-package helix
+package model
 
 import "testing"
 

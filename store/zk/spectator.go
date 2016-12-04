@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/funkygao/go-helix"
+	"github.com/funkygao/go-helix/model"
 	lru "github.com/hashicorp/golang-lru"
 )
 
@@ -212,8 +213,8 @@ func (s *Spectator) watchIdealStateResource(resource string) {
 }
 
 // GetControllerMessages retrieves controller messages from zookeeper
-func (s *Spectator) GetControllerMessages() []*helix.Record {
-	result := []*helix.Record{}
+func (s *Spectator) GetControllerMessages() []*model.Record {
+	result := []*model.Record{}
 
 	messages, err := s.conn.Children(s.kb.controllerMessages())
 	if err != nil {
@@ -233,8 +234,8 @@ func (s *Spectator) GetControllerMessages() []*helix.Record {
 }
 
 // GetInstanceMessages retrieves messages sent to an instance
-func (s *Spectator) GetInstanceMessages(instance string) []*helix.Record {
-	result := []*helix.Record{}
+func (s *Spectator) GetInstanceMessages(instance string) []*model.Record {
+	result := []*model.Record{}
 
 	messages, err := s.conn.Children(s.kb.messages(instance))
 	if err != nil {
@@ -254,8 +255,8 @@ func (s *Spectator) GetInstanceMessages(instance string) []*helix.Record {
 }
 
 // GetLiveInstances retrieve a copy of the current live instances.
-func (s *Spectator) GetLiveInstances() ([]*helix.Record, error) {
-	liveInstances := []*helix.Record{}
+func (s *Spectator) GetLiveInstances() ([]*model.Record, error) {
+	liveInstances := []*model.Record{}
 
 	instances, err := s.conn.Children(s.kb.liveInstances())
 	if err != nil {
@@ -275,8 +276,8 @@ func (s *Spectator) GetLiveInstances() ([]*helix.Record, error) {
 }
 
 // GetExternalView retrieves a copy of the external views
-func (s *Spectator) GetExternalView() []*helix.Record {
-	result := []*helix.Record{}
+func (s *Spectator) GetExternalView() []*model.Record {
+	result := []*model.Record{}
 
 	for k, v := range s.externalViewResourceMap {
 		if v == false {
@@ -295,8 +296,8 @@ func (s *Spectator) GetExternalView() []*helix.Record {
 }
 
 // GetIdealState retrieves a copy of the ideal state
-func (s *Spectator) GetIdealState() []*helix.Record {
-	result := []*helix.Record{}
+func (s *Spectator) GetIdealState() []*model.Record {
+	result := []*model.Record{}
 
 	for k, v := range s.idealStateResourceMap {
 		if v == false {
@@ -314,8 +315,8 @@ func (s *Spectator) GetIdealState() []*helix.Record {
 }
 
 // GetCurrentState retrieves a copy of the current state for specified instance
-func (s *Spectator) GetCurrentState(instance string) []*helix.Record {
-	result := []*helix.Record{}
+func (s *Spectator) GetCurrentState(instance string) []*model.Record {
+	result := []*model.Record{}
 
 	resources, err := s.conn.Children(s.kb.instance(instance))
 	must(err)
@@ -331,8 +332,8 @@ func (s *Spectator) GetCurrentState(instance string) []*helix.Record {
 }
 
 // GetInstanceConfigs retrieves a copy of instance configs from zookeeper
-func (s *Spectator) GetInstanceConfigs() []*helix.Record {
-	result := []*helix.Record{}
+func (s *Spectator) GetInstanceConfigs() []*model.Record {
+	result := []*model.Record{}
 
 	configs, err := s.conn.Children(s.kb.participantConfigs())
 	must(err)

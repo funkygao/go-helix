@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/funkygao/go-helix"
+	"github.com/funkygao/go-helix/model"
 	"github.com/yichen/go-zookeeper/zk"
 	"github.com/yichen/retry"
 )
@@ -114,7 +115,7 @@ func (conn *connection) CreateRecordWithData(path string, data string) error {
 	return err
 }
 
-func (conn *connection) CreateRecordWithPath(p string, r *helix.Record) error {
+func (conn *connection) CreateRecordWithPath(p string, r *model.Record) error {
 	parent := path.Dir(p)
 	conn.ensurePathExists(conn.realPath(parent))
 
@@ -278,7 +279,7 @@ func (conn *connection) UpdateMapField(path string, key string, property string,
 	}
 
 	// convert the result into Record
-	node, err := helix.NewRecordFromBytes(data)
+	node, err := model.NewRecordFromBytes(data)
 	if err != nil {
 		return err
 	}
@@ -305,7 +306,7 @@ func (conn *connection) UpdateSimpleField(path string, key string, value string)
 	}
 
 	// convert the result into Record
-	node, err := helix.NewRecordFromBytes(data)
+	node, err := model.NewRecordFromBytes(data)
 	if err != nil {
 		return err
 	}
@@ -327,7 +328,7 @@ func (conn *connection) GetSimpleFieldValueByKey(path string, key string) string
 	data, err := conn.Get(path)
 	must(err) // FIXME
 
-	node, err := helix.NewRecordFromBytes(data)
+	node, err := model.NewRecordFromBytes(data)
 	must(err) // FIXME
 
 	if node.SimpleFields == nil {
@@ -394,7 +395,7 @@ func (conn *connection) RemoveMapFieldKey(path string, key string) error {
 		return err
 	}
 
-	node, err := helix.NewRecordFromBytes(data)
+	node, err := model.NewRecordFromBytes(data)
 	if err != nil {
 		return err
 	}
@@ -437,15 +438,15 @@ func (conn *connection) IsClusterSetup(cluster string) (bool, error) {
 	)
 }
 
-func (conn *connection) GetRecordFromPath(path string) (*helix.Record, error) {
+func (conn *connection) GetRecordFromPath(path string) (*model.Record, error) {
 	data, err := conn.Get(path)
 	if err != nil {
 		return nil, err
 	}
-	return helix.NewRecordFromBytes(data)
+	return model.NewRecordFromBytes(data)
 }
 
-func (conn *connection) SetRecordForPath(path string, r *helix.Record) error {
+func (conn *connection) SetRecordForPath(path string, r *model.Record) error {
 	exists, err := conn.Exists(path)
 	if err != nil {
 		return err

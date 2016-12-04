@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/funkygao/go-helix"
+	"github.com/funkygao/go-helix/ver"
 	"github.com/funkygao/gocli"
 )
 
 func main() {
 	app := os.Args[0]
-	c := cli.NewCLI(app, helix.Ver)
+	c := cli.NewCLI(app, ver.Ver)
 	c.Args = os.Args[1:]
 	c.Commands = commands
 	c.HelpFunc = func(m map[string]cli.CommandFactory) string {

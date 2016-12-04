@@ -1,4 +1,4 @@
-package helix
+package model
 
 // Message is controller generated payload to instruct participant to carry
 // out some tasks.

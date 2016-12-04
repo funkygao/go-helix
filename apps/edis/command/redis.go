@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/funkygao/go-helix"
+	"github.com/funkygao/go-helix/model"
 	"github.com/funkygao/go-helix/store/zk"
 	"github.com/funkygao/gocli"
 	"github.com/funkygao/golib/color"
@@ -47,13 +48,13 @@ func (this *Redis) Run(args []string) (exitCode int) {
 	participant := manager.NewParticipant(cluster, host, port)
 	sm := helix.NewStateModel()
 	sm.AddTransitions([]helix.Transition{
-		{"OFFLINE", "SLAVE", func(message *helix.Message, context *helix.Context) {
+		{"OFFLINE", "SLAVE", func(message *model.Message, context *helix.Context) {
 			log.Info(color.Green("resource[%s] partition[%s] OFFLINE-->SLAVE",
 				message.Resource(),
 				message.PartitionName()))
 		}},
 
-		{"SLAVE", "MASTER", func(message *helix.Message, context *helix.Context) {
+		{"SLAVE", "MASTER", func(message *model.Message, context *helix.Context) {
 			log.Info(color.Cyan("resource[%s] partition[%s] SLAVE-->MASTER",
 				message.Resource(),
 				message.PartitionName()))

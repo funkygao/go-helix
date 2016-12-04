@@ -1,4 +1,4 @@
-package helix
+package model
 
 import (
 	"encoding/json"
@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+    "github.com/funkygao/go-helix/ver"
 )
 
 // Generic Record Format to store data at a storage Node.
@@ -17,7 +19,7 @@ type Record struct {
 	SimpleFields map[string]interface{} `json:"simpleFields"`
 
 	// all fields whose values are a list of values
-	ListFields map[string]interface{} `json:"listFields"`
+	ListFields map[string][]string `json:"listFields"`
 
 	// all fields whose values are key, value
 	MapFields map[string]map[string]string `json:"mapFields"`
@@ -28,7 +30,7 @@ func NewRecord(id string) *Record {
 	return &Record{
 		ID:           id,
 		SimpleFields: map[string]interface{}{},
-		ListFields:   map[string]interface{}{},
+		ListFields:   map[string][]string{},
 		MapFields:    map[string]map[string]string{},
 	}
 }
@@ -81,6 +83,10 @@ func (r Record) GetStringField(key string, defaultValue string) string {
 	return strVal
 }
 
+func (r Record) SetStringField(key string, value string) {
+	r.SetSimpleField(key, value)
+}
+
 // SetIntField sets the integer value of a key under SimpleField.
 // the value is stored as in string form
 func (r *Record) SetIntField(key string, value int) {
@@ -104,6 +110,20 @@ func (r Record) GetBooleanField(key string, defaultValue bool) bool {
 // "TRUE"
 func (r *Record) SetBooleanField(key string, value bool) {
 	r.SetSimpleField(key, strconv.FormatBool(value))
+}
+
+func (r *Record) GetListField(key string) []string {
+	return r.ListFields[key]
+}
+
+func (r *Record) AddListField(key string, value string) {
+	values, present := r.ListFields[key]
+	if !present {
+		values = []string{value}
+	} else {
+		values = append(values, value)
+	}
+	r.ListFields[key] = values
 }
 
 // SetSimpleField sets the value of a key under SimpleField
@@ -162,7 +182,7 @@ func NewLiveInstanceRecord(participantID string, sessionID string) *Record {
 	}
 
 	node := NewRecord(participantID)
-	node.SetSimpleField("HELIX_VERSION", Ver)
+	node.SetSimpleField("HELIX_VERSION", ver.Ver)
 	node.SetSimpleField("SESSION_ID", sessionID)
 	node.SetSimpleField("LIVE_INSTANCE", fmt.Sprintf("%d@%s", os.Getpid(), hostname))
 
