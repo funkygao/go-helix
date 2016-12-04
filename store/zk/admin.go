@@ -388,6 +388,7 @@ func (adm Admin) Instances(cluster string) ([]string, error) {
 	return adm.Children(kb.instances())
 }
 
+// TODO model.StateModelDef
 func (adm Admin) AddStateModelDef(cluster string, stateModel string, definition *model.Record) error {
 	kb := keyBuilder{clusterID: cluster}
 	return adm.CreateRecordWithPath(kb.stateModelDef(stateModel), definition)

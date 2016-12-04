@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-    "github.com/funkygao/go-helix/ver"
+	"github.com/funkygao/go-helix/ver"
 )
 
 // Generic Record Format to store data at a storage Node.
@@ -33,17 +33,6 @@ func NewRecord(id string) *Record {
 		ListFields:   map[string][]string{},
 		MapFields:    map[string]map[string]string{},
 	}
-}
-
-// Marshal generates the beautified json in byte array format
-func (r Record) Marshal() ([]byte, error) {
-	return json.MarshalIndent(r, "", "    ")
-}
-
-// String returns the beautified JSON string for the Record
-func (r Record) String() string {
-	s, _ := r.Marshal()
-	return string(s)
 }
 
 // GetSimpleField returns a value of a key in SimpleField structure
@@ -165,6 +154,17 @@ func (r Record) GetMapField(key string, property string) string {
 	}
 
 	return r.MapFields[key][property]
+}
+
+// Marshal generates the beautified json in byte array format
+func (r Record) Marshal() ([]byte, error) {
+	return json.MarshalIndent(r, "", "    ")
+}
+
+// String returns the beautified JSON string for the Record
+func (r Record) String() string {
+	s, _ := r.Marshal()
+	return string(s)
 }
 
 // NewRecordFromBytes creates a new znode instance from a byte array
