@@ -29,7 +29,7 @@ type Participant struct {
 	sync.Mutex
 	helix.HelixService
 
-	manger helix.HelixManager
+	manager helix.HelixManager
 
 	conn *connection
 	kb   keyBuilder
@@ -93,6 +93,10 @@ func (p *Participant) Start() error {
 
 func (p Participant) Started() bool {
 	return p.state == psConnected
+}
+
+func (p Participant) Manager() helix.HelixManager {
+	return p.manager
 }
 
 func (p *Participant) cleanUpStaleSessions() error {

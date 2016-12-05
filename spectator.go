@@ -1,12 +1,16 @@
 package helix
 
 import (
-    "github.com/funkygao/go-helix/model"
+	"github.com/funkygao/go-helix/model"
 )
 
 // HelixSpectator is a Helix role that does not participate the cluster state transition
 // but only read cluster data, or listen to cluster updates.
 type HelixSpectator interface {
+	HelixService
+
+	// Manager returns the HelixManager.
+	Manager() HelixManager
 
 	// AddExternalViewChangeListener add a listener to external view changes.
 	AddExternalViewChangeListener(ExternalViewChangeListener)

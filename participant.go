@@ -4,6 +4,9 @@ package helix
 type HelixParticipant interface {
 	HelixService
 
+	// Manager returns the HelixManager.
+	Manager() HelixManager
+
 	// RegisterStateModel associates state trasition functions with the participant.
 	RegisterStateModel(name string, sm *StateModel) error
 }

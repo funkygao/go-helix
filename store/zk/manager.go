@@ -99,7 +99,7 @@ func (m *Manager) NewSpectator(clusterID string) helix.HelixSpectator {
 func (m *Manager) NewParticipant(clusterID string, host string, port string) helix.HelixParticipant {
 	return &Participant{
 		ClusterID:     clusterID,
-		manger:        m,
+		manager:       m,
 		conn:          m.conn,
 		kb:            keyBuilder{clusterID: clusterID},
 		Host:          host,

@@ -41,32 +41,27 @@ func (r *redisNode) Start() {
 
 	// register state model
 	sm := helix.NewStateModel()
-	sm.AddTransitions([]helix.Transition{
+	must(sm.AddTransitions([]helix.Transition{
 		{"MASTER", "SLAVE", func(message *model.Message, context *helix.Context) {
 			log.Info(color.Green("resource[%s/%s] %s->%s", message.Resource(),
 				message.PartitionName(), message.FromState(), message.ToState()))
 		}},
 
 		{"SLAVE", "MASTER", func(message *model.Message, context *helix.Context) {
-			log.Info(color.Green("resource[%s/%s] %s->%s", message.Resource(),
+			log.Info(color.Cyan("resource[%s/%s] %s->%s", message.Resource(),
 				message.PartitionName(), message.FromState(), message.ToState()))
 		}},
 
 		{"OFFLINE", "SLAVE", func(message *model.Message, context *helix.Context) {
-			log.Info(color.Green("resource[%s/%s] %s->%s", message.Resource(),
+			log.Info(color.Blue("resource[%s/%s] %s->%s", message.Resource(),
 				message.PartitionName(), message.FromState(), message.ToState()))
 		}},
 
 		{"SLAVE", "OFFLINE", func(message *model.Message, context *helix.Context) {
-			log.Info(color.Green("resource[%s/%s] %s->%s", message.Resource(),
+			log.Info(color.Red("resource[%s/%s] %s->%s", message.Resource(),
 				message.PartitionName(), message.FromState(), message.ToState()))
 		}},
-
-		{"OFFLINE", "DROPPED", func(message *model.Message, context *helix.Context) {
-			log.Info(color.Green("resource[%s/%s] %s->%s", message.Resource(),
-				message.PartitionName(), message.FromState(), message.ToState()))
-		}},
-	})
+	}))
 	participant.RegisterStateModel(r.stateModel, sm)
 
 	// start the participant

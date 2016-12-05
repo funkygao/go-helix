@@ -88,6 +88,10 @@ func (s *Spectator) Started() bool {
 	return s.state == spectatorConnected
 }
 
+func (s Spectator) Manager() helix.HelixManager {
+	return s.manager
+}
+
 // Disconnect the spectator from zookeeper, and also stop all listeners.
 func (s *Spectator) Stop() {
 	if s.state == spectatorDisConnected {
