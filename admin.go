@@ -65,6 +65,9 @@ type HelixAdmin interface {
 	// DisableResource disables the specified resource in the cluster.
 	DisableResource(cluster string, resource string) error
 
+	// ResetResource ERROR state
+	ResetResource(cluster string, resource string) error
+
 	// AddStateModelDef adds a state model to a cluster.
 	AddStateModelDef(cluster string, stateModel string, definition *model.Record) error
 

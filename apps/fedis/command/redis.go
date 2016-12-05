@@ -3,18 +3,10 @@ package command
 import (
 	"flag"
 	"fmt"
-	"os"
-	"os/signal"
 	"strings"
-	"syscall"
-	"time"
 
-	"github.com/funkygao/go-helix"
-	"github.com/funkygao/go-helix/model"
-	"github.com/funkygao/go-helix/store/zk"
+	"github.com/funkygao/go-helix/apps/fedis/command/redis"
 	"github.com/funkygao/gocli"
-	"github.com/funkygao/golib/color"
-	log "github.com/funkygao/log4go"
 )
 
 type Redis struct {
@@ -33,48 +25,15 @@ func (this *Redis) Run(args []string) (exitCode int) {
 
 	tuples := strings.Split(node, "_")
 	if len(tuples) != 2 {
-		this.Ui.Error("node must in form of host_port")
+		this.Ui.Error("-node must in form of host_port")
 		return 2
 	}
 
 	host := tuples[0]
 	port := tuples[1]
 
-	// create the manager instance and connect
-	manager := zk.NewZKHelixManager(zkSvr, zk.WithSessionTimeout(time.Second*10))
-	must(manager.Connect())
-
-	// the actual task executor
-	participant := manager.NewParticipant(cluster, host, port)
-	sm := helix.NewStateModel()
-	sm.AddTransitions([]helix.Transition{
-		{"OFFLINE", "SLAVE", func(message *model.Message, context *helix.Context) {
-			log.Info(color.Green("resource[%s] partition[%s] OFFLINE-->SLAVE",
-				message.Resource(),
-				message.PartitionName()))
-		}},
-
-		{"SLAVE", "MASTER", func(message *model.Message, context *helix.Context) {
-			log.Info(color.Cyan("resource[%s] partition[%s] SLAVE-->MASTER",
-				message.Resource(),
-				message.PartitionName()))
-		}},
-	})
-	participant.RegisterStateModel(stateModel, sm)
-
-	must(participant.Start())
-	log.Info("participant started")
-
-	log.Info("start rebalancing...")
-	helix.Rebalance(zkSvr, cluster, resource, replicas)
-	log.Info("rebalanced done")
-
-	log.Info("waiting Ctrl-C...")
-
-	// block until SIGINT and SIGTERM
-	c := make(chan os.Signal, 2)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	<-c
+	r := redis.NewNode(zkSvr, cluster, resource, stateModel, replicas, host, port)
+	r.Start()
 
 	return
 }
@@ -92,6 +51,8 @@ Usage: %s redis [options]
 Options:
 
     -node host_port
+
+    -kill host_port
 
 `, this.Cmd, this.Synopsis())
 	return strings.TrimSpace(help)

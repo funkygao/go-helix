@@ -25,6 +25,6 @@ func (smd *StateModelDef) SetStaticUpperBound(state string, bound int) *StateMod
 	return smd
 }
 
-func (smd *StateModelDef) SetDynamicUpperBound(state string, bound string) *StateModelDef {
+func (smd *StateModelDef) SetDynamicUpperBound(state string, bound DynamicBound) *StateModelDef {
 	return smd
 }

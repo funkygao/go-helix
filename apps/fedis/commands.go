@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/funkygao/go-helix/apps/elasdis/command"
+	"github.com/funkygao/go-helix/apps/fedis/command"
 	"github.com/funkygao/gocli"
 )
 
@@ -40,6 +40,20 @@ func init() {
 
 		"redis": func() (cli.Command, error) {
 			return &command.Redis{
+				Ui:  ui,
+				Cmd: cmd,
+			}, nil
+		},
+
+		"trace": func() (cli.Command, error) {
+			return &command.Trace{
+				Ui:  ui,
+				Cmd: cmd,
+			}, nil
+		},
+
+		"status": func() (cli.Command, error) {
+			return &command.Status{
 				Ui:  ui,
 				Cmd: cmd,
 			}, nil

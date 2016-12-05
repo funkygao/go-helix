@@ -302,6 +302,19 @@ func (adm Admin) AddResource(cluster string, resource string, option helix.AddRe
 	if option.BucketSize > 0 {
 		is.SetSimpleField("BUCKET_SIZE", strconv.Itoa(option.BucketSize))
 	}
+	switch option.RebalancerMode {
+	case helix.RebalancerModeFullAuto:
+		// helix manages both state and location
+	case helix.RebalancerModeSemiAuto:
+		// helix manages state, app manages location constraint
+		//is.ListFields
+	case helix.RebalancerModeCustomized:
+		// The application needs to implement a callback interface that Helix invokes when
+		// the cluster state changes. Within this callback, the application can recompute
+		// the idealstate. Helix will then issue appropriate transitions such that Idealstate
+		// and Currentstate converges.
+	case helix.RebalancerModeUserDefined:
+	}
 
 	return adm.CreateRecordWithPath(kb.idealStateForResource(resource), is)
 }
@@ -359,7 +372,10 @@ func (adm Admin) Resources(cluster string) ([]string, error) {
 	return adm.Children(kb.idealStates())
 }
 
-// ListInstanceInfo shows detailed information of an inspace in the helix cluster
+func (adm Admin) ResetResource(cluster string, resource string) error {
+	return nil
+}
+
 func (adm Admin) InstanceInfo(cluster string, ic model.InstanceConfig) (*model.Record, error) {
 	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
 		return nil, helix.ErrClusterNotSetup
