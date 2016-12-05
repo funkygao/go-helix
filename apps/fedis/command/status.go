@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/funkygao/go-helix"
+	//"github.com/funkygao/go-helix"
+	//"github.com/funkygao/go-helix/model"
 	"github.com/funkygao/go-helix/store/zk"
 	"github.com/funkygao/gocli"
-	log "github.com/funkygao/log4go"
 )
 
 type Status struct {
@@ -27,20 +27,11 @@ func (this *Status) Run(args []string) (exitCode int) {
 	admin := zk.NewZKHelixAdmin(zkSvr)
 	must(admin.Connect())
 
-	// create the cluster
-	must(admin.AddCluster(cluster))
-	log.Info("added cluster: %s", cluster)
+	instances, resources, err := admin.ClusterInfo(cluster)
+	must(err)
 
-	must(admin.AllowParticipantAutoJoin(cluster, true))
-
-	// define the resource and partition
-	resourceOption := helix.DefaultAddResourceOption(partitions, stateModel)
-	resourceOption.RebalancerMode = helix.RebalancerModeFullAuto
-	must(admin.AddResource(cluster, resource, resourceOption))
-	log.Info("resource[%s] partitions:%d model:%s added to cluster[%s]", resource,
-		partitions, stateModel, cluster)
-
-	log.Info("%s/bin/run-helix-controller.sh --zkSvr %s --cluster %s", helixInstallBase, zkSvr, cluster)
+	this.Ui.Output(fmt.Sprintf("resources: %+v", resources))
+	this.Ui.Output(fmt.Sprintf("instances: %+v", instances))
 
 	return
 }
