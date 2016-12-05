@@ -11,6 +11,14 @@ import (
 
 func main() {
 	app := os.Args[0]
+	for _, arg := range os.Args[1:] {
+		if arg == "--generate-bash-completion" {
+			for name, _ := range commands {
+				fmt.Println(name)
+			}
+			return
+		}
+	}
 	c := cli.NewCLI(app, ver.Ver)
 	c.Args = os.Args[1:]
 	c.Commands = commands
