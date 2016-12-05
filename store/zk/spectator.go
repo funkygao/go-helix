@@ -7,7 +7,6 @@ import (
 
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
-	lru "github.com/hashicorp/golang-lru"
 )
 
 var _ helix.HelixSpectator = &Spectator{}
@@ -22,44 +21,13 @@ const (
 
 type Spectator struct {
 	sync.RWMutex
-
-	manager helix.HelixManager
+	*Manager
 
 	kb   keyBuilder
 	conn *connection
 
 	// The cluster this spectator is specatating
 	ClusterID string
-
-	// external view change handler
-	externalViewListeners         []helix.ExternalViewChangeListener
-	liveInstanceChangeListeners   []helix.LiveInstanceChangeListener
-	currentStateChangeListeners   map[string][]helix.CurrentStateChangeListener
-	idealStateChangeListeners     []helix.IdealStateChangeListener
-	instanceConfigChangeListeners []helix.InstanceConfigChangeListener
-	controllerMessageListeners    []helix.ControllerMessageListener
-	messageListeners              map[string][]helix.MessageListener
-
-	// stop the spectator
-	stop chan bool
-
-	// resources the external view is tracking. It is a map from the resource name to the
-	// current state of the resource: true means it is active, false means the resource is inactive/deleted
-	externalViewResourceMap map[string]bool
-	idealStateResourceMap   map[string]bool
-	instanceConfigMap       map[string]bool
-
-	// changeNotification is a channel to notify any changes that needs to trigger a listener
-	changeNotificationChan chan helix.ChangeNotification
-
-	// instance message channel. Each item in the channel is the instance name that has new messages
-	instanceMessageChannel chan string
-
-	// a LRU cache of recently received message IDs. Use this to detect new messages and existing messages
-	receivedMessages *lru.Cache
-
-	// control channels for stopping watches
-	stopCurrentStateWatch map[string]chan interface{}
 
 	// context of the specator, accessible from the ExternalViewChangeListener
 	context *helix.Context
@@ -88,10 +56,6 @@ func (s *Spectator) Started() bool {
 	return s.state == spectatorConnected
 }
 
-func (s Spectator) Manager() helix.HelixManager {
-	return s.manager
-}
-
 // Disconnect the spectator from zookeeper, and also stop all listeners.
 func (s *Spectator) Stop() {
 	if s.state == spectatorDisConnected {
@@ -116,26 +80,19 @@ func (s *Spectator) IsConnected() bool {
 	return s.state == spectatorConnected
 }
 
-// SetContext set the context that can be used within the listeners.
-func (s *Spectator) SetContext(context *helix.Context) {
-	s.Lock()
-	s.context = context
-	s.Unlock()
-}
-
-func (s *Spectator) AddExternalViewChangeListener(listener helix.ExternalViewChangeListener) {
+func (s *Manager) AddExternalViewChangeListener(listener helix.ExternalViewChangeListener) {
 	s.Lock()
 	s.externalViewListeners = append(s.externalViewListeners, listener)
 	s.Unlock()
 }
 
-func (s *Spectator) AddLiveInstanceChangeListener(listener helix.LiveInstanceChangeListener) {
+func (s *Manager) AddLiveInstanceChangeListener(listener helix.LiveInstanceChangeListener) {
 	s.Lock()
 	s.liveInstanceChangeListeners = append(s.liveInstanceChangeListeners, listener)
 	s.Unlock()
 }
 
-func (s *Spectator) AddCurrentStateChangeListener(instance string, listener helix.CurrentStateChangeListener) {
+func (s *Manager) AddCurrentStateChangeListener(instance string, listener helix.CurrentStateChangeListener) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -152,7 +109,7 @@ func (s *Spectator) AddCurrentStateChangeListener(instance string, listener heli
 	}
 }
 
-func (s *Spectator) AddMessageListener(instance string, listener helix.MessageListener) {
+func (s *Manager) AddMessageListener(instance string, listener helix.MessageListener) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -170,25 +127,25 @@ func (s *Spectator) AddMessageListener(instance string, listener helix.MessageLi
 	}
 }
 
-func (s *Spectator) AddIdealStateChangeListener(listener helix.IdealStateChangeListener) {
+func (s *Manager) AddIdealStateChangeListener(listener helix.IdealStateChangeListener) {
 	s.Lock()
 	s.idealStateChangeListeners = append(s.idealStateChangeListeners, listener)
 	s.Unlock()
 }
 
-func (s *Spectator) AddInstanceConfigChangeListener(listener helix.InstanceConfigChangeListener) {
+func (s *Manager) AddInstanceConfigChangeListener(listener helix.InstanceConfigChangeListener) {
 	s.Lock()
 	s.instanceConfigChangeListeners = append(s.instanceConfigChangeListeners, listener)
 	s.Unlock()
 }
 
-func (s *Spectator) AddControllerMessageListener(listener helix.ControllerMessageListener) {
+func (s *Manager) AddControllerMessageListener(listener helix.ControllerMessageListener) {
 	s.Lock()
 	s.controllerMessageListeners = append(s.controllerMessageListeners, listener)
 	s.Unlock()
 }
 
-func (s *Spectator) watchExternalViewResource(resource string) {
+func (s *Manager) watchExternalViewResource(resource string) {
 	go func() {
 		for {
 			// block and wait for the next update for the resource
@@ -202,7 +159,7 @@ func (s *Spectator) watchExternalViewResource(resource string) {
 	}()
 }
 
-func (s *Spectator) watchIdealStateResource(resource string) {
+func (s *Manager) watchIdealStateResource(resource string) {
 	go func() {
 		for {
 			// block and wait for the next update for the resource
@@ -217,7 +174,7 @@ func (s *Spectator) watchIdealStateResource(resource string) {
 }
 
 // GetControllerMessages retrieves controller messages from zookeeper
-func (s *Spectator) GetControllerMessages() []*model.Record {
+func (s *Manager) GetControllerMessages() []*model.Record {
 	result := []*model.Record{}
 
 	messages, err := s.conn.Children(s.kb.controllerMessages())
@@ -238,7 +195,7 @@ func (s *Spectator) GetControllerMessages() []*model.Record {
 }
 
 // GetInstanceMessages retrieves messages sent to an instance
-func (s *Spectator) GetInstanceMessages(instance string) []*model.Record {
+func (s *Manager) GetInstanceMessages(instance string) []*model.Record {
 	result := []*model.Record{}
 
 	messages, err := s.conn.Children(s.kb.messages(instance))
@@ -259,7 +216,7 @@ func (s *Spectator) GetInstanceMessages(instance string) []*model.Record {
 }
 
 // GetLiveInstances retrieve a copy of the current live instances.
-func (s *Spectator) GetLiveInstances() ([]*model.Record, error) {
+func (s *Manager) GetLiveInstances() ([]*model.Record, error) {
 	liveInstances := []*model.Record{}
 
 	instances, err := s.conn.Children(s.kb.liveInstances())
@@ -280,7 +237,7 @@ func (s *Spectator) GetLiveInstances() ([]*model.Record, error) {
 }
 
 // GetExternalView retrieves a copy of the external views
-func (s *Spectator) GetExternalView() []*model.Record {
+func (s *Manager) GetExternalView() []*model.Record {
 	result := []*model.Record{}
 
 	for k, v := range s.externalViewResourceMap {
@@ -300,7 +257,7 @@ func (s *Spectator) GetExternalView() []*model.Record {
 }
 
 // GetIdealState retrieves a copy of the ideal state
-func (s *Spectator) GetIdealState() []*model.Record {
+func (s *Manager) GetIdealState() []*model.Record {
 	result := []*model.Record{}
 
 	for k, v := range s.idealStateResourceMap {
@@ -319,7 +276,7 @@ func (s *Spectator) GetIdealState() []*model.Record {
 }
 
 // GetCurrentState retrieves a copy of the current state for specified instance
-func (s *Spectator) GetCurrentState(instance string) []*model.Record {
+func (s *Manager) GetCurrentState(instance string) []*model.Record {
 	result := []*model.Record{}
 
 	resources, err := s.conn.Children(s.kb.instance(instance))
@@ -336,7 +293,7 @@ func (s *Spectator) GetCurrentState(instance string) []*model.Record {
 }
 
 // GetInstanceConfigs retrieves a copy of instance configs from zookeeper
-func (s *Spectator) GetInstanceConfigs() []*model.Record {
+func (s *Manager) GetInstanceConfigs() []*model.Record {
 	result := []*model.Record{}
 
 	configs, err := s.conn.Children(s.kb.participantConfigs())
@@ -352,13 +309,13 @@ func (s *Spectator) GetInstanceConfigs() []*model.Record {
 	return result
 }
 
-func (s *Spectator) watchCurrentStates() {
+func (s *Manager) watchCurrentStates() {
 	for k := range s.currentStateChangeListeners {
 		s.watchCurrentStateForInstance(k)
 	}
 }
 
-func (s *Spectator) watchCurrentStateForInstance(instance string) {
+func (s *Manager) watchCurrentStateForInstance(instance string) {
 	sessions, err := s.conn.Children(s.kb.currentStates(instance))
 	must(err)
 
@@ -373,7 +330,7 @@ func (s *Spectator) watchCurrentStateForInstance(instance string) {
 	}
 }
 
-func (s *Spectator) watchCurrentStateOfInstanceForResource(instance string, resource string, sessionID string) {
+func (s *Manager) watchCurrentStateOfInstanceForResource(instance string, resource string, sessionID string) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -410,7 +367,7 @@ func (s *Spectator) watchCurrentStateOfInstanceForResource(instance string, reso
 	}()
 }
 
-func (s *Spectator) watchLiveInstances() {
+func (s *Manager) watchLiveInstances() {
 	errors := make(chan error)
 
 	go func() {
@@ -434,7 +391,7 @@ func (s *Spectator) watchLiveInstances() {
 	}()
 }
 
-func (s *Spectator) watchInstanceConfig() {
+func (s *Manager) watchInstanceConfig() {
 	errors := make(chan error)
 
 	go func() {
@@ -481,7 +438,7 @@ func (s *Spectator) watchInstanceConfig() {
 	}()
 }
 
-func (s *Spectator) watchInstanceConfigForParticipant(instance string) {
+func (s *Manager) watchInstanceConfigForParticipant(instance string) {
 	go func() {
 		for {
 			// block and wait for the next update for the resource
@@ -496,7 +453,7 @@ func (s *Spectator) watchInstanceConfigForParticipant(instance string) {
 
 }
 
-func (s *Spectator) watchIdealState() {
+func (s *Manager) watchIdealState() {
 	errors := make(chan error)
 
 	go func() {
@@ -538,7 +495,7 @@ func (s *Spectator) watchIdealState() {
 	}()
 }
 
-func (s *Spectator) watchExternalView() {
+func (s *Manager) watchExternalView() {
 	errors := make(chan error)
 
 	go func() {
@@ -583,7 +540,7 @@ func (s *Spectator) watchExternalView() {
 
 // watchControllerMessages only watch the changes of message list, it currently
 // doesn't watch the content of the messages.
-func (s *Spectator) watchControllerMessages() {
+func (s *Manager) watchControllerMessages() {
 	go func() {
 		_, events, err := s.conn.ChildrenW(s.kb.controllerMessages())
 		if err != nil {
@@ -598,7 +555,7 @@ func (s *Spectator) watchControllerMessages() {
 	}()
 }
 
-func (s *Spectator) watchInstanceMessages(instance string) {
+func (s *Manager) watchInstanceMessages(instance string) {
 	go func() {
 		messages, events, err := s.conn.ChildrenW(s.kb.messages(instance))
 		if err != nil {
@@ -618,7 +575,7 @@ func (s *Spectator) watchInstanceMessages(instance string) {
 
 // watchInstanceMessage will watch an individual message and trigger update
 // if the content of the message has changed.
-func (s *Spectator) watchInstanceMessage(instance string, messageID string) {
+func (s *Manager) watchInstanceMessage(instance string, messageID string) {
 	go func() {
 
 	}()
@@ -627,7 +584,7 @@ func (s *Spectator) watchInstanceMessage(instance string, messageID string) {
 // loop is the main event loop for Spectator. Whenever an external view update happpened
 // the loop will pause for a short period of time to bucket all subsequent external view
 // changes so that we don't send duplicate updates too often.
-func (s *Spectator) loop() {
+func (s *Manager) loop() {
 	if len(s.externalViewListeners) > 0 {
 		s.watchExternalView()
 	}
@@ -662,7 +619,7 @@ func (s *Spectator) loop() {
 		for {
 			select {
 			case <-s.stop:
-				s.state = spectatorDisConnected
+				//s.state = spectatorDisConnected
 				return
 
 			case chg := <-s.changeNotificationChan:
@@ -674,7 +631,7 @@ func (s *Spectator) loop() {
 	}()
 }
 
-func (s *Spectator) handleChangeNotification(chg helix.ChangeNotification) {
+func (s *Manager) handleChangeNotification(chg helix.ChangeNotification) {
 	switch chg.ChangeType {
 	case helix.ExternalViewChanged:
 		ev := s.GetExternalView()

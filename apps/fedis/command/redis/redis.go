@@ -39,6 +39,10 @@ func (r *redisNode) Start() {
 	// the actual task executor
 	participant := manager.NewParticipant(r.cluster, r.host, r.port)
 
+	manager.AddExternalViewChangeListener(func(externalViews []*model.Record, context *helix.Context) {
+		log.Info("%+v %+v", externalViews, context)
+	})
+
 	// register state model
 	sm := helix.NewStateModel()
 	must(sm.AddTransitions([]helix.Transition{
