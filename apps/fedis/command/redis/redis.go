@@ -33,14 +33,11 @@ func NewNode(zkSvr, cluster, resource, stateModel, replicas, host, port string) 
 
 func (r *redisNode) Start() {
 	// create the manager instance and connect
-	manager := zk.NewZKHelixManager(r.zkSvr, zk.WithSessionTimeout(time.Second*10))
+	manager := zk.NewZKHelixManager(r.cluster, r.host, r.port, r.zkSvr,
+		helix.InstanceTypeParticipant, zk.WithSessionTimeout(time.Second*10))
 	manager.AddExternalViewChangeListener(func(externalViews []*model.Record, context *helix.Context) {
 		log.Info(color.Red("%+v %+v", externalViews, context))
 	})
-	must(manager.Connect())
-
-	// the actual task executor
-	participant := manager.NewParticipant(r.cluster, r.host, r.port)
 
 	// register state model
 	sm := helix.NewStateModel()
@@ -65,11 +62,9 @@ func (r *redisNode) Start() {
 				message.PartitionName(), message.FromState(), message.ToState()))
 		}},
 	}))
-	participant.RegisterStateModel(r.stateModel, sm)
+	manager.RegisterStateModel(r.stateModel, sm)
 
-	// start the participant
-	must(participant.Start())
-	log.Info("participant started")
+	must(manager.Connect())
 
 	log.Info("start rebalancing...")
 	helix.Rebalance(r.zkSvr, r.cluster, r.resource, r.replicas)
