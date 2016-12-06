@@ -15,12 +15,12 @@ import (
 
 var (
 	zkRetryOptions = retry.RetryOptions{
-		"zookeeper",           // tag
-		time.Millisecond * 50, // backoff
-		time.Second * 1,       // max backoff
-		1,                     // default backoff constant
-		0,                     // infinit retry
-		false,                 // use V(1) level for log messages
+		"zookeeper",            // tag
+		time.Millisecond * 500, // backoff
+		time.Second * 1,        // max backoff
+		1,                      // default backoff constant
+		0,                      // infinit retry
+		false,                  // use V(1) level for log messages
 	}
 )
 

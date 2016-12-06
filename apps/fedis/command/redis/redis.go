@@ -34,14 +34,13 @@ func NewNode(zkSvr, cluster, resource, stateModel, replicas, host, port string) 
 func (r *redisNode) Start() {
 	// create the manager instance and connect
 	manager := zk.NewZKHelixManager(r.zkSvr, zk.WithSessionTimeout(time.Second*10))
+	manager.AddExternalViewChangeListener(func(externalViews []*model.Record, context *helix.Context) {
+		log.Info(color.Red("%+v %+v", externalViews, context))
+	})
 	must(manager.Connect())
 
 	// the actual task executor
 	participant := manager.NewParticipant(r.cluster, r.host, r.port)
-
-	manager.AddExternalViewChangeListener(func(externalViews []*model.Record, context *helix.Context) {
-		log.Info("%+v %+v", externalViews, context)
-	})
 
 	// register state model
 	sm := helix.NewStateModel()

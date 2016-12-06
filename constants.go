@@ -19,6 +19,11 @@ const (
 )
 
 const (
+	InstanceTypeParticipant InstanceType = "PARTICIPANT"
+	InstanceTypeSpectator   InstanceType = "SPECTATOR"
+)
+
+const (
 	MessageTypeStateTransition  = "STATE_TRANSITION"
 	MessageTypeScheduler        = "SCHEDULER_MSG"
 	MessageTypeUserDefine       = "USER_DEFINE_MSG"

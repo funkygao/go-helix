@@ -1,8 +1,18 @@
 package helix
 
 import (
-    "github.com/funkygao/go-helix/model"
+	"github.com/funkygao/go-helix/model"
 )
+
+type InstanceType string
+
+func (it InstanceType) IsParticipant() bool {
+	return it == InstanceTypeParticipant
+}
+
+func (it InstanceType) IsSpectator() bool {
+	return it == InstanceTypeSpectator
+}
 
 type HelixConfigScope string
 
