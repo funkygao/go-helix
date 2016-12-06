@@ -19,17 +19,20 @@ var _ helix.HelixManager = &Manager{}
 
 type Manager struct {
 	sync.RWMutex
+
 	closeOnce sync.Once
 
 	zkSvr     string
 	conn      *connection
 	connected bool
+	stop      chan struct{}
 
-	stop chan bool
-
-	it        helix.InstanceType
 	ClusterID string
+	it        helix.InstanceType
 	kb        keyBuilder
+
+	// only participant holds a state machine engine
+	sme *stateMachineEngine
 
 	// host of this participant
 	Host string
@@ -40,20 +43,18 @@ type Manager struct {
 	// ParticipantID is the optional identifier of this participant, by default to host_port
 	ParticipantID string
 
-	// an instance of StateModel
-	stateModels map[string]*helix.StateModel
-
 	// context of the specator, accessible from the ExternalViewChangeListener
 	context *helix.Context
 
-	// external view change handler
-	externalViewListeners         []helix.ExternalViewChangeListener
-	liveInstanceChangeListeners   []helix.LiveInstanceChangeListener
-	currentStateChangeListeners   map[string][]helix.CurrentStateChangeListener
-	idealStateChangeListeners     []helix.IdealStateChangeListener
-	instanceConfigChangeListeners []helix.InstanceConfigChangeListener
+	externalViewListeners       []helix.ExternalViewChangeListener
+	liveInstanceChangeListeners []helix.LiveInstanceChangeListener
+	currentStateChangeListeners map[string][]helix.CurrentStateChangeListener
+	idealStateChangeListeners   []helix.IdealStateChangeListener
+	messageListeners            map[string][]helix.MessageListener
+
+	// not implemented
 	controllerMessageListeners    []helix.ControllerMessageListener
-	messageListeners              map[string][]helix.MessageListener
+	instanceConfigChangeListeners []helix.InstanceConfigChangeListener
 
 	// resources the external view is tracking.
 	// It is a map from the resource name to the current state of the resource:
@@ -83,7 +84,7 @@ func NewZKHelixManager(clusterID, host, port, zkSvr string, it helix.InstanceTyp
 		zkSvr:     zkSvr,
 		ClusterID: clusterID,
 		conn:      newConnection(zkSvr),
-		stop:      make(chan bool),
+		stop:      make(chan struct{}),
 
 		it:            it,
 		kb:            keyBuilder{clusterID: clusterID},
@@ -95,8 +96,8 @@ func NewZKHelixManager(clusterID, host, port, zkSvr string, it helix.InstanceTyp
 		externalViewListeners:       []helix.ExternalViewChangeListener{},
 		liveInstanceChangeListeners: []helix.LiveInstanceChangeListener{},
 		currentStateChangeListeners: map[string][]helix.CurrentStateChangeListener{},
-		messageListeners:            map[string][]helix.MessageListener{},
 		idealStateChangeListeners:   []helix.IdealStateChangeListener{},
+		messageListeners:            map[string][]helix.MessageListener{},
 
 		// control channels
 		externalViewResourceMap: map[string]bool{},
@@ -113,6 +114,14 @@ func NewZKHelixManager(clusterID, host, port, zkSvr string, it helix.InstanceTyp
 	for _, option := range options {
 		option(mgr.conn)
 	}
+
+	switch it {
+	case helix.InstanceTypeParticipant:
+		mgr.sme = newStateMachineEngine(mgr)
+
+	case helix.InstanceTypeSpectator:
+	}
+
 	return mgr
 }
 
@@ -130,9 +139,15 @@ func (m *Manager) Connect() error {
 		return nil
 	}
 
+	log.Trace("manager{cluster:%s, instance:%s, type:%s, zk:%s} connecting...",
+		m.ClusterID, m.ParticipantID, m.it, m.zkSvr)
+
 	if err := m.conn.Connect(); err != nil {
 		return err
 	}
+
+	// handleNewSessionAsController, handleNewSessionAsParticipant
+	// handleStateChanged
 
 	if ok, err := m.conn.IsClusterSetup(m.ClusterID); !ok || err != nil {
 		return helix.ErrClusterNotSetup
@@ -178,6 +193,10 @@ func (m *Manager) Close() {
 	})
 }
 
+func (m *Manager) StateMachineEngine() helix.StateMachineEngine {
+	return m.sme
+}
+
 func (m *Manager) SetContext(context *helix.Context) {
 	m.Lock()
 	m.context = context
@@ -202,19 +221,6 @@ func (p *Manager) cleanUpStaleSessions() error {
 		}
 	}
 
-	return nil
-}
-
-func (p *Manager) RegisterStateModel(name string, sm *helix.StateModel) error {
-	p.Lock()
-	defer p.Unlock()
-
-	if p.stateModels == nil {
-		p.stateModels = make(map[string]*helix.StateModel)
-	} else if _, present := p.stateModels[name]; present {
-		return helix.ErrDupStateModelName
-	}
-	p.stateModels[name] = sm
 	return nil
 }
 
@@ -502,7 +508,7 @@ func (p *Manager) handleStateTransition(message *model.Message) {
 	p.preHandleMessage(message)
 
 	// TODO lock
-	transition, present := p.stateModels[message.StateModel()]
+	transition, present := p.sme.StateModel(message.StateModel())
 	if !present {
 		log.Error("P[%s/%s] has no transition defined for state model %s", p.ParticipantID,
 			p.conn.GetSessionID(), message.StateModel())

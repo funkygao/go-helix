@@ -39,7 +39,7 @@ func (r *redisNode) Start() {
 		log.Info(color.Red("%+v %+v", externalViews, context))
 	})
 
-	// register state model
+	// register state model before connecting
 	sm := helix.NewStateModel()
 	must(sm.AddTransitions([]helix.Transition{
 		{"MASTER", "SLAVE", func(message *model.Message, context *helix.Context) {
@@ -62,7 +62,7 @@ func (r *redisNode) Start() {
 				message.PartitionName(), message.FromState(), message.ToState()))
 		}},
 	}))
-	manager.RegisterStateModel(r.stateModel, sm)
+	manager.StateMachineEngine().RegisterStateModel(r.stateModel, sm)
 
 	must(manager.Connect())
 

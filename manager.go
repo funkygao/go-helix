@@ -9,8 +9,7 @@ type HelixManager interface {
 	// Close will disconnect the participant from storage and Helix controller.
 	Close()
 
-	// RegisterStateModel associates state trasition functions with the participant.
-	RegisterStateModel(name string, sm *StateModel) error
+	StateMachineEngine() StateMachineEngine
 
 	// AddExternalViewChangeListener add a listener to external view changes.
 	AddExternalViewChangeListener(ExternalViewChangeListener)

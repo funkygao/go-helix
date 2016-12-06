@@ -19,8 +19,10 @@ const (
 )
 
 const (
-	InstanceTypeParticipant InstanceType = "PARTICIPANT"
-	InstanceTypeSpectator   InstanceType = "SPECTATOR"
+	InstanceTypeParticipant    InstanceType = "PARTICIPANT"
+	InstanceTypeSpectator      InstanceType = "SPECTATOR"
+	InstanceTypeController     InstanceType = "CONTROLLER"
+	InstanceTypeNotImplemented InstanceType = "CONTROLLER_PARTICIPANT"
 )
 
 const (

@@ -14,6 +14,10 @@ func (it InstanceType) IsSpectator() bool {
 	return it == InstanceTypeSpectator
 }
 
+func (it InstanceType) IsController() bool {
+	return it == InstanceTypeController
+}
+
 type HelixConfigScope string
 
 type ChangeNotificationType uint8

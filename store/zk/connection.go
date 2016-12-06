@@ -31,9 +31,11 @@ type connection struct {
 	servers        []string
 	chroot         string
 	isConnected    bool
+	close          chan struct{}
 
 	zkConn *zk.Conn
-	stat   *zk.Stat
+	stat   *zk.Stat // storage for the lastest zk query stat info
+	evtCh  <-chan zk.Event
 }
 
 func newConnection(zkSvr string) *connection {
@@ -46,6 +48,7 @@ func newConnection(zkSvr string) *connection {
 	conn := connection{
 		servers:        servers,
 		chroot:         chroot,
+		close:          make(chan struct{}),
 		sessionTimeout: time.Second * 30,
 	}
 
@@ -53,7 +56,7 @@ func newConnection(zkSvr string) *connection {
 }
 
 func (conn *connection) Connect() error {
-	zkConn, _, err := zk.Connect(conn.servers, conn.sessionTimeout)
+	zkConn, evtCh, err := zk.Connect(conn.servers, conn.sessionTimeout)
 	if err != nil {
 		return err
 	}
@@ -64,12 +67,36 @@ func (conn *connection) Connect() error {
 		return err
 	}
 
+	conn.evtCh = evtCh
+
 	if conn.chroot != "" {
 		conn.ensurePathExists(conn.chroot)
 	}
 
 	conn.isConnected = true
 	return nil
+}
+
+func (conn *connection) Disconnect() {
+	if conn.zkConn != nil {
+		conn.zkConn.Close()
+	}
+	close(conn.close)
+	conn.isConnected = false
+}
+
+func (conn *connection) SubscribeStateChanges(handler func(zk.State)) {
+	go func() {
+		for {
+			select {
+			case <-conn.close:
+				return
+
+			case evt := <-conn.evtCh:
+				handler(evt.State)
+			}
+		}
+	}()
 }
 
 func (conn connection) realPath(path string) string {
@@ -94,13 +121,6 @@ func (conn *connection) IsConnected() bool {
 
 func (conn *connection) GetSessionID() string {
 	return strconv.FormatInt(conn.zkConn.SessionID, 10)
-}
-
-func (conn *connection) Disconnect() {
-	if conn.zkConn != nil {
-		conn.zkConn.Close()
-	}
-	conn.isConnected = false
 }
 
 func (conn *connection) CreateEmptyNode(path string) error {
