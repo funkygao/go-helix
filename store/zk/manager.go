@@ -5,10 +5,10 @@ import (
 	"sync"
 
 	"github.com/funkygao/go-helix"
-	"github.com/funkygao/go-helix/model"
 	"github.com/funkygao/golib/sync2"
 	log "github.com/funkygao/log4go"
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/yichen/go-zookeeper/zk"
 )
 
 var _ helix.HelixManager = &Manager{}
@@ -17,27 +17,35 @@ type Manager struct {
 	sync.RWMutex
 
 	closeOnce sync.Once
+	wg        sync.WaitGroup
 
 	zkSvr     string
 	conn      *connection
 	connected sync2.AtomicBool
 	stop      chan struct{}
 
-	ClusterID           string
+	clusterID           string
 	it                  helix.InstanceType
 	kb                  keyBuilder
 	preConnectCallbacks []helix.PreConnectCallback
 
 	// only participant holds a state machine engine
-	sme *stateMachineEngine
+	sme        *stateMachineEngine
+	timerTasks []helix.HelixTimerTask
+
+	// ClusterManagementTool cache
+	admin helix.HelixAdmin
+
+	// ClusterMessagingService cache
+	messaging helix.ClusterMessagingService
 
 	metrics *metricsReporter
 
 	// host of this participant
-	Host string
+	host string
 
 	// port of this participant
-	Port string
+	port string
 
 	// instanceID is the optional identifier of this participant, by default to host_port
 	instanceID string
@@ -77,19 +85,20 @@ type Manager struct {
 	stopCurrentStateWatch map[string]chan interface{}
 }
 
-// NewZKHelixManager creates a HelixManager implementation with zk as storage.
-func NewZKHelixManager(clusterID, host, port, zkSvr string, it helix.InstanceType, options ...managerOption) helix.HelixManager {
+// NewZkHelixManager creates a HelixManager implementation with zk as storage.
+func NewZkHelixManager(clusterID, host, port, zkSvr string,
+	it helix.InstanceType, options ...managerOption) helix.HelixManager {
 	mgr := &Manager{
 		zkSvr:               zkSvr,
-		ClusterID:           clusterID,
+		clusterID:           clusterID,
 		conn:                newConnection(zkSvr),
 		stop:                make(chan struct{}),
 		metrics:             newMetricsReporter(),
 		it:                  it,
 		kb:                  keyBuilder{clusterID: clusterID},
-		preConnectCallbacks: make([]helix.PreConnectCallback, 0),
-		Host:                host,
-		Port:                port,
+		preConnectCallbacks: []helix.PreConnectCallback{},
+		host:                host,
+		port:                port,
 		instanceID:          fmt.Sprintf("%s_%s", host, port), // node id
 
 		// listeners
@@ -120,8 +129,19 @@ func NewZKHelixManager(clusterID, host, port, zkSvr string, it helix.InstanceTyp
 	switch it {
 	case helix.InstanceTypeParticipant:
 		mgr.sme = newStateMachineEngine(mgr)
+		mgr.timerTasks = []helix.HelixTimerTask{}
+		// ParticipantHealthReportTask
 
 	case helix.InstanceTypeSpectator:
+
+	case helix.InstanceTypeController:
+		panic(helix.ErrNotImplemented)
+
+	case helix.InstanceTypeNotImplemented:
+		panic(helix.ErrNotImplemented)
+
+	default:
+		panic("unknown instance type: " + it)
 	}
 
 	return mgr
@@ -142,28 +162,18 @@ func (m *Manager) Connect() error {
 	}
 
 	log.Trace("manager{cluster:%s, instance:%s, type:%s, zk:%s} connecting...",
-		m.ClusterID, m.instanceID, m.it, m.zkSvr)
+		m.clusterID, m.instanceID, m.it, m.zkSvr)
 
-	if err := m.conn.Connect(); err != nil {
+	if err := m.createZkConnection(); err != nil {
 		return err
 	}
-
-	m.conn.SubscribeStateChanges(m.zkStateHandler)
 
 	// handleNewSessionAsController, handleNewSessionAsParticipant
 	// handleStateChanged
 
-	if ok, err := m.conn.IsClusterSetup(m.ClusterID); !ok || err != nil {
+	if ok, err := m.conn.IsClusterSetup(m.clusterID); !ok || err != nil {
 		return helix.ErrClusterNotSetup
 	}
-
-	if m.it.IsParticipant() {
-		if err := m.initParticipant(); err != nil {
-			return err
-		}
-	}
-
-	m.startChangeNotificationLoop()
 
 	m.connected.Set(true)
 	return nil
@@ -184,72 +194,24 @@ func (m *Manager) isConnected() bool {
 	return m.connected.Get()
 }
 
-func (s *Manager) watchExternalViewResource(resource string) {
-	go func() {
-		for {
-			// block and wait for the next update for the resource
-			// when the update happens, unblock, and also send the resource
-			// to the channel
-			_, events, err := s.conn.GetW(s.kb.externalViewForResource(resource))
-			<-events
-			s.changeNotificationChan <- helix.ChangeNotification{helix.ExternalViewChanged, resource}
-			must(err)
-		}
-	}()
-}
-
-func (s *Manager) watchIdealStateResource(resource string) {
-	go func() {
-		for {
-			// block and wait for the next update for the resource
-			// when the update happens, unblock, and also send the resource
-			// to the channel
-			_, events, err := s.conn.GetW(s.kb.idealStateForResource(resource))
-			<-events
-			s.changeNotificationChan <- helix.ChangeNotification{helix.IdealStateChanged, resource}
-			must(err)
-		}
-	}()
-}
-
-// GetControllerMessages retrieves controller messages from zookeeper
-func (s *Manager) GetControllerMessages() []*model.Record {
-	result := []*model.Record{}
-
-	messages, err := s.conn.Children(s.kb.controllerMessages())
-	if err != nil {
-		return result
+func (m *Manager) createZkConnection() error {
+	if err := m.conn.Connect(); err != nil {
+		return err
 	}
 
-	for _, m := range messages {
-		record, err := s.conn.GetRecordFromPath(s.kb.controllerMessage(m))
-		if err == nil {
-			result = append(result, record)
-		} else {
-			// TODO handle the err
+	m.conn.SubscribeStateChanges(m)
+	for retries := 0; retries < 3; retries++ {
+		if err := m.conn.waitUntilConnected(); err != nil {
+			return err
+		}
+
+		if err := m.HandleStateChanged(zk.StateSyncConnected); err != nil {
+			return err
+		}
+		if err := m.HandleNewSession(); err != nil {
+			return err
 		}
 	}
 
-	return result
-}
-
-// GetInstanceMessages retrieves messages sent to an instance
-func (s *Manager) GetInstanceMessages(instance string) []*model.Record {
-	result := []*model.Record{}
-
-	messages, err := s.conn.Children(s.kb.messages(instance))
-	if err != nil {
-		return result
-	}
-
-	for _, m := range messages {
-		record, err := s.conn.GetRecordFromPath(s.kb.message(instance, m))
-		if err == nil {
-			result = append(result, record)
-		} else {
-			// TODO
-		}
-	}
-
-	return result
+	return nil
 }

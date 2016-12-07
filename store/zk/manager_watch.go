@@ -7,6 +7,34 @@ import (
 	"github.com/funkygao/go-helix"
 )
 
+func (s *Manager) watchExternalViewResource(resource string) {
+	go func() {
+		for {
+			// block and wait for the next update for the resource
+			// when the update happens, unblock, and also send the resource
+			// to the channel
+			_, events, err := s.conn.GetW(s.kb.externalViewForResource(resource))
+			<-events
+			s.changeNotificationChan <- helix.ChangeNotification{helix.ExternalViewChanged, resource}
+			must(err)
+		}
+	}()
+}
+
+func (s *Manager) watchIdealStateResource(resource string) {
+	go func() {
+		for {
+			// block and wait for the next update for the resource
+			// when the update happens, unblock, and also send the resource
+			// to the channel
+			_, events, err := s.conn.GetW(s.kb.idealStateForResource(resource))
+			<-events
+			s.changeNotificationChan <- helix.ChangeNotification{helix.IdealStateChanged, resource}
+			must(err)
+		}
+	}()
+}
+
 func (s *Manager) watchCurrentStates() {
 	for k := range s.currentStateChangeListeners {
 		s.watchCurrentStateForInstance(k)

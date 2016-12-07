@@ -18,8 +18,8 @@ type Admin struct {
 	connected bool
 }
 
-// NewZKHelixAdmin creates a HelixAdmin implementation with zk as storage.
-func NewZKHelixAdmin(zkSvr string, options ...zkConnOption) helix.HelixAdmin {
+// NewZkHelixAdmin creates a HelixAdmin implementation with zk as storage.
+func NewZkHelixAdmin(zkSvr string, options ...zkConnOption) helix.HelixAdmin {
 	admin := &Admin{
 		zkSvr:      zkSvr,
 		connected:  false,

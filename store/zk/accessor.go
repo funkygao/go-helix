@@ -1,44 +1,49 @@
 package zk
 
-// Helix property accessor.
-type dataAccessor struct {
+import (
+	"github.com/funkygao/go-helix"
+)
+
+var _ helix.HelixDataAccessor = &zkDataAccessor{}
+
+type zkDataAccessor struct {
 	clusterID string
 	conn      *connection
 	kb        keyBuilder
 }
 
-func newDataAccessor(cluster string, conn *connection) *dataAccessor {
-	return &dataAccessor{
+func newZkDataAccessor(cluster string, conn *connection) *zkDataAccessor {
+	return &zkDataAccessor{
 		clusterID: cluster,
 		conn:      conn,
 		kb:        keyBuilder{clusterID: cluster},
 	}
 }
 
-func (da dataAccessor) create(k, v interface{}) error {
+func (da zkDataAccessor) create(k, v interface{}) error {
 	return nil
 }
 
-func (da dataAccessor) set(k, v interface{}) error {
+func (da zkDataAccessor) set(k, v interface{}) error {
 	return nil
 }
 
-func (da dataAccessor) get(k interface{}) error {
+func (da zkDataAccessor) get(k interface{}) error {
 	return nil
 }
 
-func (da dataAccessor) update() {
+func (da zkDataAccessor) update() {
 }
 
-func (da dataAccessor) remove(k interface{}) error {
+func (da zkDataAccessor) remove(k interface{}) error {
 	return nil
 }
 
-func (da dataAccessor) exists(k interface{}) {
+func (da zkDataAccessor) exists(k interface{}) {
 }
 
-func (da dataAccessor) watchChildren() {
+func (da zkDataAccessor) watchChildren() {
 }
 
-func (da dataAccessor) watchProperty() {
+func (da zkDataAccessor) watchProperty() {
 }

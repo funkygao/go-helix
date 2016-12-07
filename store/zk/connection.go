@@ -39,9 +39,9 @@ type connection struct {
 	isConnected    bool
 	close          chan struct{}
 
-	zkConn *zk.Conn
-	stat   *zk.Stat // storage for the lastest zk query stat info
-	evtCh  <-chan zk.Event
+	zkConn     *zk.Conn
+	stat       *zk.Stat // storage for the lastest zk query stat info
+	stateEvtCh <-chan zk.Event
 
 	stateChangeListeners []ZkStateListener
 }
@@ -54,17 +54,18 @@ func newConnection(zkSvr string) *connection {
 	}
 
 	conn := connection{
-		servers:        servers,
-		chroot:         chroot,
-		close:          make(chan struct{}),
-		sessionTimeout: time.Second * 30,
+		servers:              servers,
+		chroot:               chroot,
+		close:                make(chan struct{}),
+		sessionTimeout:       time.Second * 30,
+		stateChangeListeners: []ZkStateListener{},
 	}
 
 	return &conn
 }
 
 func (conn *connection) Connect() error {
-	zkConn, evtCh, err := zk.Connect(conn.servers, conn.sessionTimeout)
+	zkConn, stateEvtCh, err := zk.Connect(conn.servers, conn.sessionTimeout)
 	if err != nil {
 		return err
 	}
@@ -75,11 +76,26 @@ func (conn *connection) Connect() error {
 		return err
 	}
 
-	conn.evtCh = evtCh
+	conn.stateEvtCh = stateEvtCh
 
 	if conn.chroot != "" {
 		conn.ensurePathExists(conn.chroot)
 	}
+
+	go func() {
+		for {
+			select {
+			case <-conn.close:
+				return
+
+			case evt := <-conn.stateEvtCh:
+				conn.fireStateChangedEvent(evt.State)
+				if evt.State == zk.StateHasSession {
+					conn.fireNewSessionEvents()
+				}
+			}
+		}
+	}()
 
 	conn.isConnected = true
 	return nil
@@ -93,18 +109,28 @@ func (conn *connection) Disconnect() {
 	conn.isConnected = false
 }
 
-func (conn *connection) SubscribeStateChanges(handler func(zk.State)) {
-	go func() {
-		for {
-			select {
-			case <-conn.close:
-				return
+func (conn *connection) SubscribeStateChanges(l ZkStateListener) {
+	conn.Lock()
+	conn.stateChangeListeners = append(conn.stateChangeListeners, l)
+	conn.Unlock()
+}
 
-			case evt := <-conn.evtCh:
-				handler(evt.State)
-			}
-		}
-	}()
+func (conn *connection) fireStateChangedEvent(state zk.State) {
+	conn.RLock()
+	defer conn.RUnlock()
+
+	for _, l := range conn.stateChangeListeners {
+		l.HandleStateChanged(state)
+	}
+}
+
+func (conn *connection) fireNewSessionEvents() {
+	conn.RLock()
+	defer conn.RUnlock()
+
+	for _, l := range conn.stateChangeListeners {
+		l.HandleNewSession()
+	}
 }
 
 func (conn connection) realPath(path string) string {

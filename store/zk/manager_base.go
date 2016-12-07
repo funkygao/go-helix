@@ -9,7 +9,7 @@ func (m *Manager) AddPreConnectCallback(cb helix.PreConnectCallback) {
 }
 
 func (m *Manager) Cluster() string {
-	return m.ClusterID
+	return m.clusterID
 }
 
 func (m *Manager) InstanceType() helix.InstanceType {

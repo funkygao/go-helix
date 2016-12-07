@@ -5,5 +5,8 @@ import (
 )
 
 func (m *Manager) ClusterManagementTool() helix.HelixAdmin {
-	return nil // TODO
+	if m.admin == nil {
+		// TODO
+	}
+	return m.admin
 }

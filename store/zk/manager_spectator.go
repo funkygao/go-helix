@@ -5,6 +5,48 @@ import (
 	"github.com/funkygao/go-helix/model"
 )
 
+// GetControllerMessages retrieves controller messages from zookeeper
+func (s *Manager) GetControllerMessages() []*model.Record {
+	result := []*model.Record{}
+
+	messages, err := s.conn.Children(s.kb.controllerMessages())
+	if err != nil {
+		return result
+	}
+
+	for _, m := range messages {
+		record, err := s.conn.GetRecordFromPath(s.kb.controllerMessage(m))
+		if err == nil {
+			result = append(result, record)
+		} else {
+			// TODO handle the err
+		}
+	}
+
+	return result
+}
+
+// GetInstanceMessages retrieves messages sent to an instance
+func (s *Manager) GetInstanceMessages(instance string) []*model.Record {
+	result := []*model.Record{}
+
+	messages, err := s.conn.Children(s.kb.messages(instance))
+	if err != nil {
+		return result
+	}
+
+	for _, m := range messages {
+		record, err := s.conn.GetRecordFromPath(s.kb.message(instance, m))
+		if err == nil {
+			result = append(result, record)
+		} else {
+			// TODO
+		}
+	}
+
+	return result
+}
+
 // GetLiveInstances retrieve a copy of the current live instances.
 func (s *Manager) GetLiveInstances() ([]*model.Record, error) {
 	liveInstances := []*model.Record{}

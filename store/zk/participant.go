@@ -12,26 +12,35 @@ import (
 	"github.com/yichen/go-zookeeper/zk"
 )
 
-func (m *Manager) initParticipant() error {
-	if ok, err := m.joinCluster(); !ok || err != nil {
-		if err != nil {
-			return err
-		}
-		return helix.ErrEnsureParticipantConfig
-	}
-
-	if err := m.cleanUpStaleSessions(); err != nil {
-		return err
-	}
-
-	m.startEventLoop()
-
-	// TODO sync between watcher and live instances
-
-	return m.createLiveInstance()
+type participant struct {
+	*Manager
 }
 
-func (p *Manager) cleanUpStaleSessions() error {
+func (p *participant) createLiveInstance() error {
+	record := model.NewLiveInstanceRecord(p.instanceID, p.conn.GetSessionID())
+	data, err := json.MarshalIndent(*record, "", "  ")
+	flags := int32(zk.FlagEphemeral)
+	acl := zk.WorldACL(zk.PermAll)
+
+	// it is possible the live instance still exists from last run
+	// retry 5 seconds to wait for the zookeeper to remove the live instance
+	// from previous session
+	for retry := 0; retry < 10; retry++ {
+		_, err = p.conn.Create(p.kb.liveInstance(p.instanceID), data, flags, acl)
+		if err == nil {
+			log.Trace("P[%s/%s] become alive", p.instanceID, p.conn.GetSessionID())
+			return nil
+		}
+
+		// wait for zookeeper remove the last run's ephemeral znode
+		time.Sleep(time.Second * 5)
+
+	}
+
+	return err
+}
+
+func (p *participant) carryOverPreviousCurrentState() error {
 	log.Trace("P[%s/%s] cleanup stale sessions", p.instanceID, p.conn.GetSessionID())
 
 	sessions, err := p.conn.Children(p.kb.currentStates(p.instanceID))
@@ -52,7 +61,7 @@ func (p *Manager) cleanUpStaleSessions() error {
 	return nil
 }
 
-func (p *Manager) autoJoinAllowed() (bool, error) {
+func (p *participant) autoJoinAllowed() (bool, error) {
 	config, err := p.conn.Get(p.kb.clusterConfig())
 	if err != nil {
 		return false, err
@@ -74,7 +83,7 @@ func (p *Manager) autoJoinAllowed() (bool, error) {
 }
 
 // Ensure that ZNodes for a participant all exist.
-func (p *Manager) joinCluster() (bool, error) {
+func (p *participant) joinCluster() (bool, error) {
 	// /{cluster}/CONFIGS/PARTICIPANT/localhost_12000
 	exists, err := p.conn.Exists(p.kb.participantConfig(p.instanceID))
 	if err != nil {
@@ -96,8 +105,8 @@ func (p *Manager) joinCluster() (bool, error) {
 	// the participant path does not exist in zookeeper
 	// create the data struture
 	participant := model.NewRecord(p.instanceID)
-	participant.SetSimpleField("HELIX_HOST", p.Host)
-	participant.SetSimpleField("HELIX_PORT", p.Port)
+	participant.SetSimpleField("HELIX_HOST", p.host)
+	participant.SetSimpleField("HELIX_PORT", p.port)
 	participant.SetSimpleField("HELIX_ENABLED", "true")
 	err = any(
 		p.conn.CreateRecordWithPath(p.kb.participantConfig(p.instanceID), participant),
@@ -127,7 +136,7 @@ func (p *Manager) joinCluster() (bool, error) {
 	return true, nil
 }
 
-func (p *Manager) startEventLoop() {
+func (p *participant) setupMsgHandler() {
 	log.Trace("P[%s/%s] starting main loop", p.instanceID, p.conn.GetSessionID())
 
 	messageProcessedTime := make(map[string]time.Time)
@@ -177,7 +186,7 @@ func (p *Manager) startEventLoop() {
 	}()
 }
 
-func (p *Manager) watchMessages() (chan []string, chan error) {
+func (p *participant) watchMessages() (chan []string, chan error) {
 	snapshots := make(chan []string)
 	errors := make(chan error)
 
@@ -204,33 +213,9 @@ func (p *Manager) watchMessages() (chan []string, chan error) {
 	return snapshots, errors
 }
 
-func (p *Manager) createLiveInstance() error {
-	record := model.NewLiveInstanceRecord(p.instanceID, p.conn.GetSessionID())
-	data, err := json.MarshalIndent(*record, "", "  ")
-	flags := int32(zk.FlagEphemeral)
-	acl := zk.WorldACL(zk.PermAll)
-
-	// it is possible the live instance still exists from last run
-	// retry 5 seconds to wait for the zookeeper to remove the live instance
-	// from previous session
-	for retry := 0; retry < 10; retry++ {
-		_, err = p.conn.Create(p.kb.liveInstance(p.instanceID), data, flags, acl)
-		if err == nil {
-			log.Trace("P[%s/%s] become alive", p.instanceID, p.conn.GetSessionID())
-			return nil
-		}
-
-		// wait for zookeeper remove the last run's ephemeral znode
-		time.Sleep(time.Second * 5)
-
-	}
-
-	return err
-}
-
 // handleClusterMessage dispatches the cluster message to the corresponding
 // handler in the state model.
-func (p *Manager) processMessage(msgID string) error {
+func (p *participant) processMessage(msgID string) error {
 	log.Debug("P[%s/%s] processing msg: %s", p.instanceID, p.conn.GetSessionID(), msgID)
 
 	msgPath := p.kb.message(p.instanceID, msgID)
@@ -300,7 +285,7 @@ func (p *Manager) processMessage(msgID string) error {
 	return p.conn.DeleteTree(msgPath)
 }
 
-func (p *Manager) handleStateTransition(message *model.Message) {
+func (p *participant) handleStateTransition(message *model.Message) {
 	log.Trace("P[%s/%s] state %s -> %s", p.instanceID,
 		p.conn.GetSessionID(), message.FromState(), message.ToState())
 
@@ -330,11 +315,11 @@ func (p *Manager) handleStateTransition(message *model.Message) {
 	p.postHandleMessage(message)
 }
 
-func (p *Manager) preHandleMessage(message *model.Message) {
+func (p *participant) preHandleMessage(message *model.Message) {
 
 }
 
-func (p *Manager) postHandleMessage(message *model.Message) error {
+func (p *participant) postHandleMessage(message *model.Message) error {
 	// sessionID might change when we update the state model
 	// skip if we are handling an expired session
 	sessionID := p.conn.GetSessionID()
