@@ -4,6 +4,8 @@ import (
 	"github.com/funkygao/go-helix/model"
 )
 
+type PreConnectCallback func()
+
 type InstanceType string
 
 func (it InstanceType) IsParticipant() bool {

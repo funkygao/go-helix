@@ -24,6 +24,12 @@ var (
 	}
 )
 
+type ZkStateListener interface {
+	HandleStateChanged(zk.State) error
+
+	HandleNewSession() error
+}
+
 type connection struct {
 	sync.RWMutex
 
@@ -36,6 +42,8 @@ type connection struct {
 	zkConn *zk.Conn
 	stat   *zk.Stat // storage for the lastest zk query stat info
 	evtCh  <-chan zk.Event
+
+	stateChangeListeners []ZkStateListener
 }
 
 func newConnection(zkSvr string) *connection {

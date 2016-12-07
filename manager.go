@@ -9,6 +9,22 @@ type HelixManager interface {
 	// Close will disconnect the participant from storage and Helix controller.
 	Close()
 
+	// Cluster returns the cluster name associated with this cluster manager.
+	Cluster() string
+
+	// Instance returns the instance name used to connect to the cluster.
+	Instance() string
+
+	// InstanceType returns the manager instance type.
+	InstanceType() InstanceType
+
+	// SessionID returns the session id associated with the connection to cluster data store.
+	SessionID() string
+
+	// AddPreConnectCallback adds a callback that is invoked before a participant joins the cluster.
+	AddPreConnectCallback(PreConnectCallback)
+
+	// StateMachineEngine returns the sme of the participant.
 	StateMachineEngine() StateMachineEngine
 
 	// AddExternalViewChangeListener add a listener to external view changes.
@@ -31,4 +47,13 @@ type HelixManager interface {
 
 	// AddInstanceConfigChangeListener add a listener to instance config changes.
 	AddInstanceConfigChangeListener(InstanceConfigChangeListener)
+
+	// HelixDataAccessor returns the client to perform read/write operations on the cluster data.
+	HelixDataAccessor() HelixDataAccessor
+
+	// MessagingService returns ClusterMessagingService which can be used to send cluster wide messages.
+	MessagingService() ClusterMessagingService
+
+	// ClusterManagementTool provides admin interface to setup and modify cluster.
+	ClusterManagementTool() HelixAdmin
 }

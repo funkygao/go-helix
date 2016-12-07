@@ -7,14 +7,19 @@ type Context struct {
 	sync.RWMutex
 	data map[string]interface{}
 
-	Manager HelixManager
+	manager HelixManager
 }
 
 // NewContext creates a new Context instance.
-func NewContext() *Context {
+func NewContext(m HelixManager) *Context {
 	return &Context{
-		data: make(map[string]interface{}),
+		data:    make(map[string]interface{}),
+		manager: m,
 	}
+}
+
+func (c Context) Manager() HelixManager {
+	return c.manager
 }
 
 // Set sets a key value pair.

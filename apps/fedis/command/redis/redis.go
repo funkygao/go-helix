@@ -34,7 +34,7 @@ func NewNode(zkSvr, cluster, resource, stateModel, replicas, host, port string) 
 func (r *redisNode) Start() {
 	// create the manager instance and connect
 	manager := zk.NewZKHelixManager(r.cluster, r.host, r.port, r.zkSvr,
-		helix.InstanceTypeParticipant, zk.WithSessionTimeout(time.Second*10))
+		helix.InstanceTypeParticipant, zk.WithManagerZkSessionTimeout(time.Second*10))
 	manager.AddExternalViewChangeListener(func(externalViews []*model.Record, context *helix.Context) {
 		log.Info(color.Red("%+v %+v", externalViews, context))
 	})
