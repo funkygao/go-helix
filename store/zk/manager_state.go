@@ -46,7 +46,7 @@ func (m *Manager) HandleNewSession() (err error) {
 }
 
 func (m *Manager) handleNewSessionAsParticipant() error {
-	p := participant{Manager: m}
+	p := newParticipant(m)
 
 	if ok, err := p.joinCluster(); !ok || err != nil {
 		if err != nil {

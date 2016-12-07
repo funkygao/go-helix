@@ -1,7 +1,6 @@
 package zk
 
 import (
-	"encoding/json"
 	"strconv"
 	"strings"
 	"time"
@@ -14,31 +13,53 @@ import (
 
 type participant struct {
 	*Manager
+
+	stopper chan struct{}
+}
+
+func newParticipant(m *Manager) *participant {
+	return &participant{
+		Manager: m,
+		stopper: make(chan struct{}),
+	}
 }
 
 func (p *participant) createLiveInstance() error {
 	record := model.NewLiveInstanceRecord(p.instanceID, p.conn.GetSessionID())
-	data, err := json.MarshalIndent(*record, "", "  ")
+	data := record.Marshal()
 
 	// it is possible the live instance still exists from last run
 	// retry 5 seconds to wait for the zookeeper to remove the live instance
 	// from previous session
+	var (
+		backoff = p.conn.sessionTimeout + time.Millisecond*500
+		err     error
+	)
 	for retry := 0; retry < 10; retry++ {
 		_, err = p.conn.Create(p.kb.liveInstance(p.instanceID), data, zk.FlagEphemeral, zk.WorldACL(zk.PermAll))
 		if err == nil {
 			log.Trace("P[%s/%s] become alive", p.instanceID, p.conn.GetSessionID())
 			return nil
 		} else if err == zk.ErrNodeExists {
-			if _, e := p.conn.Get(p.kb.liveInstance(p.instanceID)); e == zk.ErrNoNode {
+			if c, e := p.conn.Get(p.kb.liveInstance(p.instanceID)); e == zk.ErrNoNode {
 				// live instance is gone as we check it, retry create live instance
 				continue
 			} else {
-				// check owner of the ephemeral znode TODO
+				if strconv.FormatInt(p.conn.stat.EphemeralOwner, 10) == p.conn.GetSessionID() {
+					curLiveInstance, err := model.NewRecordFromBytes(c)
+					if err == nil && curLiveInstance.GetStringField("SESSION_ID", "") != p.conn.GetSessionID() {
+						// update session id field
+						curLiveInstance.SetSimpleField("SESSION_ID", p.conn.GetSessionID())
+						p.conn.Set(p.kb.liveInstance(p.instanceID), curLiveInstance.Marshal())
+					}
+				}
 			}
+		} else {
+			log.Error("P[%s/%s] %v, backoff %s then retry", p.instanceID, p.conn.GetSessionID(), backoff)
 		}
 
 		// wait for zookeeper remove the last run's ephemeral znode
-		time.Sleep(p.conn.sessionTimeout + time.Millisecond*500)
+		time.Sleep(backoff)
 	}
 
 	return err

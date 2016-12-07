@@ -173,14 +173,9 @@ func (conn *connection) CreateRecordWithPath(p string, r *model.Record) error {
 	parent := path.Dir(p)
 	conn.ensurePathExists(conn.realPath(parent))
 
-	data, err := r.Marshal()
-	if err != nil {
-		return err
-	}
-
 	flags := int32(0)
 	acl := zk.WorldACL(zk.PermAll)
-	_, err = conn.Create(p, data, flags, acl)
+	_, err := conn.Create(p, r.Marshal(), flags, acl)
 	return err
 }
 
@@ -341,15 +336,8 @@ func (conn *connection) UpdateMapField(path string, key string, property string,
 	// update the value
 	node.SetMapField(key, property, value)
 
-	// mashall to bytes
-	data, err = node.Marshal()
-	if err != nil {
-		return err
-	}
-
 	// copy back to zookeeper
-	err = conn.Set(path, data)
-	return err
+	return conn.Set(path, node.Marshal())
 }
 
 func (conn *connection) UpdateSimpleField(path string, key string, value string) error {
@@ -368,14 +356,8 @@ func (conn *connection) UpdateSimpleField(path string, key string, value string)
 	// update the value
 	node.SetSimpleField(key, value)
 
-	// mashall to bytes
-	data, err = node.Marshal()
-	if err != nil {
-		return err
-	}
-
 	// copy back to zookeeper
-	return conn.Set(path, data)
+	return conn.Set(path, node.Marshal())
 }
 
 func (conn *connection) GetSimpleFieldValueByKey(path string, key string) string {
@@ -456,14 +438,8 @@ func (conn *connection) RemoveMapFieldKey(path string, key string) error {
 
 	node.RemoveMapField(key)
 
-	data, err = node.Marshal()
-	if err != nil {
-		return err
-	}
-
 	// save the data back to zookeeper
-	err = conn.Set(path, data)
-	return err
+	return conn.Set(path, node.Marshal())
 }
 
 func (conn *connection) IsClusterSetup(cluster string) (bool, error) {
@@ -530,27 +506,19 @@ func (conn *connection) SetRecordForPath(path string, r *model.Record) error {
 		conn.ensurePathExists(conn.realPath(path))
 	}
 
-	data, err := r.Marshal()
-	if err != nil {
-		return err
-	}
-
 	// need to get the stat.version before calling set
 	conn.Lock()
+	defer conn.Unlock()
 
 	if _, err := conn.Get(path); err != nil {
-		conn.Unlock()
 		return err
 	}
 
-	if err := conn.Set(path, data); err != nil {
-		conn.Unlock()
+	if err := conn.Set(path, r.Marshal()); err != nil {
 		return err
 	}
 
-	conn.Unlock()
 	return nil
-
 }
 
 func (conn *connection) ensurePathExists(p string) error {

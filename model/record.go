@@ -157,14 +157,14 @@ func (r Record) GetMapField(key string, property string) string {
 }
 
 // Marshal generates the beautified json in byte array format
-func (r Record) Marshal() ([]byte, error) {
-	return json.MarshalIndent(r, "", "    ")
+func (r Record) Marshal() []byte {
+	b, _ := json.MarshalIndent(r, "", "    ") // ignore the err, should never happen
+	return b
 }
 
 // String returns the beautified JSON string for the Record
 func (r Record) String() string {
-	s, _ := r.Marshal()
-	return string(s)
+	return string(r.Marshal())
 }
 
 // NewRecordFromBytes creates a new znode instance from a byte array
