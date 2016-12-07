@@ -19,27 +19,33 @@ type participant struct {
 func (p *participant) createLiveInstance() error {
 	record := model.NewLiveInstanceRecord(p.instanceID, p.conn.GetSessionID())
 	data, err := json.MarshalIndent(*record, "", "  ")
-	flags := int32(zk.FlagEphemeral)
-	acl := zk.WorldACL(zk.PermAll)
 
 	// it is possible the live instance still exists from last run
 	// retry 5 seconds to wait for the zookeeper to remove the live instance
 	// from previous session
 	for retry := 0; retry < 10; retry++ {
-		_, err = p.conn.Create(p.kb.liveInstance(p.instanceID), data, flags, acl)
+		_, err = p.conn.Create(p.kb.liveInstance(p.instanceID), data, zk.FlagEphemeral, zk.WorldACL(zk.PermAll))
 		if err == nil {
 			log.Trace("P[%s/%s] become alive", p.instanceID, p.conn.GetSessionID())
 			return nil
+		} else if err == zk.ErrNodeExists {
+			if _, e := p.conn.Get(p.kb.liveInstance(p.instanceID)); e == zk.ErrNoNode {
+				// live instance is gone as we check it, retry create live instance
+				continue
+			} else {
+				// check owner of the ephemeral znode TODO
+			}
 		}
 
 		// wait for zookeeper remove the last run's ephemeral znode
-		time.Sleep(time.Second * 5)
-
+		time.Sleep(p.conn.sessionTimeout + time.Millisecond*500)
 	}
 
 	return err
 }
 
+// carry over current-states from last sessions
+// set to initial state for current session only when state doesn't exist in current session
 func (p *participant) carryOverPreviousCurrentState() error {
 	log.Trace("P[%s/%s] cleanup stale sessions", p.instanceID, p.conn.GetSessionID())
 
@@ -49,12 +55,14 @@ func (p *participant) carryOverPreviousCurrentState() error {
 	}
 
 	for _, sessionID := range sessions {
-		if sessionID != p.conn.GetSessionID() {
-			log.Warn("P[%s/%s] found stale session: %s", p.instanceID, p.conn.GetSessionID(), sessionID)
+		if sessionID == p.conn.GetSessionID() {
+			continue
+		}
 
-			if err = p.conn.DeleteTree(p.kb.currentStatesForSession(p.instanceID, sessionID)); err != nil {
-				return err
-			}
+		log.Warn("P[%s/%s] found stale session: %s", p.instanceID, p.conn.GetSessionID(), sessionID)
+
+		if err = p.conn.DeleteTree(p.kb.currentStatesForSession(p.instanceID, sessionID)); err != nil {
+			return err
 		}
 	}
 
@@ -84,13 +92,13 @@ func (p *participant) autoJoinAllowed() (bool, error) {
 
 // Ensure that ZNodes for a participant all exist.
 func (p *participant) joinCluster() (bool, error) {
-	// /{cluster}/CONFIGS/PARTICIPANT/localhost_12000
-	exists, err := p.conn.Exists(p.kb.participantConfig(p.instanceID))
+	exists, err := p.conn.IsInstanceSetup(p.clusterID, p.instanceID)
 	if err != nil {
 		return false, err
 	}
 
 	if exists {
+		// this instance is already setup ok
 		return true, nil
 	}
 
@@ -108,7 +116,8 @@ func (p *participant) joinCluster() (bool, error) {
 	participant.SetSimpleField("HELIX_HOST", p.host)
 	participant.SetSimpleField("HELIX_PORT", p.port)
 	participant.SetSimpleField("HELIX_ENABLED", "true")
-	err = any(
+	// TODO p.ClusterManagementTool().AddNode(p.clusterID, p.instanceID)
+	if err = any(
 		p.conn.CreateRecordWithPath(p.kb.participantConfig(p.instanceID), participant),
 
 		// /{cluster}/INSTANCES/localhost_12000
@@ -128,8 +137,7 @@ func (p *participant) joinCluster() (bool, error) {
 
 		// /{cluster}/INSTANCES/localhost_12000/STATUSUPDATES
 		p.conn.CreateEmptyNode(p.kb.statusUpdates(p.instanceID)),
-	)
-	if err != nil {
+	); err != nil {
 		return false, err
 	}
 

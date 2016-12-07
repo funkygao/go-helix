@@ -212,8 +212,8 @@ func (adm Admin) AddNode(cluster string, node string) error {
 
 	// check if node already exists under /<cluster>/CONFIGS/PARTICIPANT/<NODE>
 	kb := keyBuilder{clusterID: cluster}
-	path := kb.participantConfig(node)
-	exists, err := adm.Exists(path)
+	participantConfig := kb.participantConfig(node)
+	exists, err := adm.Exists(participantConfig)
 	if err != nil {
 		return err
 	}
@@ -226,10 +226,9 @@ func (adm Admin) AddNode(cluster string, node string) error {
 	n := model.NewRecord(node)
 	n.SetSimpleField("HELIX_HOST", parts[0])
 	n.SetSimpleField("HELIX_PORT", parts[1])
-	// HELIX_ENABLED not set yet
-
+	n.SetSimpleField("HELIX_ENABLED", "true")
 	return any(
-		adm.CreateRecordWithPath(path, n),
+		adm.CreateRecordWithPath(participantConfig, n),
 		adm.CreateEmptyNode(kb.instance(node)),
 		adm.CreateEmptyNode(kb.messages(node)),
 		adm.CreateEmptyNode(kb.currentStates(node)),

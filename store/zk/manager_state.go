@@ -34,7 +34,9 @@ func (m *Manager) HandleNewSession() (err error) {
 		err = m.handleNewSessionAsController()
 
 	case helix.InstanceTypeSpectator:
+
 	case helix.InstanceTypeNotImplemented:
+		return helix.ErrNotImplemented
 	}
 
 	// TODO restart all listeners, re-watch, recreate ephemeral znodes

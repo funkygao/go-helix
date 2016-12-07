@@ -492,6 +492,26 @@ func (conn *connection) IsClusterSetup(cluster string) (bool, error) {
 	)
 }
 
+func (conn *connection) IsInstanceSetup(cluster, node string) (bool, error) {
+	if cluster == "" {
+		return false, helix.ErrInvalidClusterName
+	}
+	if !conn.IsConnected() {
+		return false, helix.ErrNotConnected
+	}
+
+	kb := keyBuilder{clusterID: cluster}
+	return conn.ExistsAll(
+		kb.participantConfig(node),
+		kb.instance(node),
+		kb.messages(node),
+		kb.currentStates(node),
+		kb.errorsR(node),
+		kb.statusUpdates(node),
+		kb.healthReport(node),
+	)
+}
+
 func (conn *connection) GetRecordFromPath(path string) (*model.Record, error) {
 	data, err := conn.Get(path)
 	if err != nil {
