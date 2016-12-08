@@ -1,7 +1,6 @@
 package zk
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/funkygao/go-helix"
@@ -63,111 +62,88 @@ func (s *Manager) startChangeNotificationLoop() {
 }
 
 func (s *Manager) handleChangeNotification(chg helix.ChangeNotification) {
+	log.Debug("%s handle change notification: %s", s.shortID(),
+		helix.ChangeNotificationText(chg.ChangeType))
+
 	switch chg.ChangeType {
 	case helix.ExternalViewChanged:
-		ev := s.GetExternalView()
 		if s.context != nil {
 			s.context.Set("trigger", chg.ChangeData.(string))
 		}
 
-		for _, evListener := range s.externalViewListeners {
-			go evListener(ev, s.context)
+		externalViews := s.GetExternalView()
+		for _, listener := range s.externalViewListeners {
+			go listener(externalViews, s.context)
 		}
 
 	case helix.LiveInstanceChanged:
-		li, _ := s.GetLiveInstances()
-		for _, l := range s.liveInstanceChangeListeners {
-			go l(li, s.context)
+		liveInstances, _ := s.GetLiveInstances()
+		for _, listener := range s.liveInstanceChangeListeners {
+			go listener(liveInstances, s.context)
 		}
 
 	case helix.IdealStateChanged:
-		is := s.GetIdealState()
-
-		for _, isListener := range s.idealStateChangeListeners {
-			go isListener(is, s.context)
+		idealStates := s.GetIdealState()
+		for _, listener := range s.idealStateChangeListeners {
+			go listener(idealStates, s.context)
 		}
 
 	case helix.CurrentStateChanged:
 		instance := chg.ChangeData.(string)
-		cs := s.GetCurrentState(instance)
+		currentState := s.GetCurrentState(instance)
 		for _, listener := range s.currentStateChangeListeners[instance] {
-			go listener(instance, cs, s.context)
+			go listener(instance, currentState, s.context)
 		}
 
 	case helix.InstanceConfigChanged:
-		ic := s.GetInstanceConfigs()
-		for _, icListener := range s.instanceConfigChangeListeners {
-			go icListener(ic, s.context)
+		instanceConfigs := s.GetInstanceConfigs()
+		for _, listener := range s.instanceConfigChangeListeners {
+			go listener(instanceConfigs, s.context)
 		}
 
 	case helix.ControllerMessagesChanged:
-		cm, _ := s.GetControllerMessages()
-		for _, cmListener := range s.controllerMessageListeners {
-			go cmListener(cm, s.context)
+		controllerMessages, _ := s.GetControllerMessages()
+		for _, listener := range s.controllerMessageListeners {
+			go listener(controllerMessages, s.context)
 		}
 
 	case helix.InstanceMessagesChanged:
 		instance := chg.ChangeData.(string)
 		messageRecords, _ := s.GetInstanceMessages(instance)
-		for _, ml := range s.messageListeners[instance] {
-			go ml(instance, messageRecords, s.context)
+		for _, listener := range s.messageListeners[instance] {
+			go listener(instance, messageRecords, s.context)
 		}
 	}
 }
 
-func (s *Manager) watchExternalViewResource(resource string) {
-	go func() {
-		for {
-			// block and wait for the next update for the resource
-			// when the update happens, unblock, and also send the resource
-			// to the channel
-			_, events, err := s.conn.GetW(s.kb.externalViewForResource(resource))
-			<-events
-			s.changeNotificationChan <- helix.ChangeNotification{helix.ExternalViewChanged, resource}
-			must(err)
-		}
-	}()
-}
-
-func (s *Manager) watchIdealStateResource(resource string) {
-	go func() {
-		for {
-			// block and wait for the next update for the resource
-			// when the update happens, unblock, and also send the resource
-			// to the channel
-			_, events, err := s.conn.GetW(s.kb.idealStateForResource(resource))
-			<-events
-			s.changeNotificationChan <- helix.ChangeNotification{helix.IdealStateChanged, resource}
-			must(err)
-		}
-	}()
-}
-
 func (s *Manager) watchCurrentStates() {
-	for k := range s.currentStateChangeListeners {
-		s.watchCurrentStateForInstance(k)
+	for instance := range s.currentStateChangeListeners {
+		s.watchCurrentStateForInstance(instance)
 	}
 }
 
 func (s *Manager) watchCurrentStateForInstance(instance string) {
 	sessions, err := s.conn.Children(s.kb.currentStates(instance))
-	must(err)
+	if err != nil {
+		s.changeNotificationErrChan <- err
+		return
+	}
 
 	// TODO: only have one session?
 	if len(sessions) > 0 {
 		resources, err := s.conn.Children(s.kb.currentStatesForSession(instance, sessions[0]))
-		must(err)
+		if err != nil {
+			s.changeNotificationErrChan <- err
+			return
+		}
 
-		for _, r := range resources {
-			s.watchCurrentStateOfInstanceForResource(instance, r, sessions[0])
+		for _, resource := range resources {
+			s.watchCurrentStateOfInstanceForResource(instance, resource, sessions[0])
 		}
 	}
 }
 
 func (s *Manager) watchCurrentStateOfInstanceForResource(instance string, resource string, sessionID string) {
-	s.Lock()
-	defer s.Unlock()
-
 	watchPath := s.kb.currentStateForResource(instance, sessionID, resource)
 	if _, ok := s.stopCurrentStateWatch[watchPath]; !ok {
 		s.stopCurrentStateWatch[watchPath] = make(chan interface{})
@@ -175,7 +151,6 @@ func (s *Manager) watchCurrentStateOfInstanceForResource(instance string, resour
 
 	// check if the session are ever expired. If so, remove the watcher
 	go func() {
-
 		c := time.Tick(10 * time.Second)
 		for now := range c {
 			if ok, err := s.conn.Exists(watchPath); !ok || err != nil {
@@ -188,11 +163,15 @@ func (s *Manager) watchCurrentStateOfInstanceForResource(instance string, resour
 	go func() {
 		for {
 			_, events, err := s.conn.GetW(watchPath)
-			must(err)
+			if err != nil {
+				s.changeNotificationErrChan <- err
+				return
+			}
+
 			select {
 			case <-events:
 				s.changeNotificationChan <- helix.ChangeNotification{helix.CurrentStateChanged, instance}
-				continue
+
 			case <-s.stopCurrentStateWatch[watchPath]:
 				delete(s.stopCurrentStateWatch, watchPath)
 				return
@@ -202,13 +181,11 @@ func (s *Manager) watchCurrentStateOfInstanceForResource(instance string, resour
 }
 
 func (s *Manager) watchLiveInstances() {
-	errors := make(chan error)
-
 	go func() {
 		for {
 			_, events, err := s.conn.ChildrenW(s.kb.liveInstances())
 			if err != nil {
-				errors <- err
+				s.changeNotificationErrChan <- err
 				return
 			}
 
@@ -218,7 +195,7 @@ func (s *Manager) watchLiveInstances() {
 			// block the loop to wait for the live instance change
 			evt := <-events
 			if evt.Err != nil {
-				errors <- evt.Err
+				s.changeNotificationErrChan <- evt.Err
 				return
 			}
 		}
@@ -226,38 +203,31 @@ func (s *Manager) watchLiveInstances() {
 }
 
 func (s *Manager) watchInstanceConfig() {
-	errors := make(chan error)
-
 	go func() {
 		for {
 			configs, events, err := s.conn.ChildrenW(s.kb.participantConfigs())
 			if err != nil {
-				errors <- err
+				s.changeNotificationErrChan <- err
 				return
 			}
 
 			// find the resources that are newly added, and create a watcher
 			for _, k := range configs {
-				_, ok := s.instanceConfigMap[k]
-				if !ok {
+				if _, present := s.instanceConfigMap[k]; !present {
 					s.watchInstanceConfigForParticipant(k)
 
-					s.Lock()
 					s.instanceConfigMap[k] = true
-					s.Unlock()
 				}
 			}
 
 			// refresh the instanceConfigMap to make sure only the currently existing resources
 			// are marked as true
-			s.Lock()
 			for k := range s.instanceConfigMap {
 				s.instanceConfigMap[k] = false
 			}
 			for _, k := range configs {
 				s.instanceConfigMap[k] = true
 			}
-			s.Unlock()
 
 			// Notify an update of external view if there are new resources added.
 			s.changeNotificationChan <- helix.ChangeNotification{helix.InstanceConfigChanged, nil}
@@ -265,7 +235,7 @@ func (s *Manager) watchInstanceConfig() {
 			// now need to block the loop to wait for the next update event
 			evt := <-events
 			if evt.Err != nil {
-				panic(evt.Err)
+				s.changeNotificationErrChan <- err
 				return
 			}
 		}
@@ -279,41 +249,42 @@ func (s *Manager) watchInstanceConfigForParticipant(instance string) {
 			// when the update happens, unblock, and also send the resource
 			// to the channel
 			_, events, err := s.conn.GetW(s.kb.participantConfig(instance))
+			if err != nil {
+				s.changeNotificationErrChan <- err
+				return
+			}
+
 			<-events
 			s.changeNotificationChan <- helix.ChangeNotification{helix.InstanceConfigChanged, instance}
-			must(err)
 		}
 	}()
 
 }
 
 func (s *Manager) watchIdealState() {
-	errors := make(chan error)
-
 	go func() {
 		for {
 			resources, events, err := s.conn.ChildrenW(s.kb.idealStates())
 			if err != nil {
-				errors <- err
+				s.changeNotificationErrChan <- err
 				return
 			}
 
 			// find the resources that are newly added, and create a watcher
-			for _, k := range resources {
-				_, ok := s.idealStateResourceMap[k]
-				if !ok {
-					s.watchIdealStateResource(k)
-					s.idealStateResourceMap[k] = true
+			for _, resource := range resources {
+				if _, present := s.idealStateResourceMap[resource]; !present {
+					s.watchIdealStateResource(resource)
+					s.idealStateResourceMap[resource] = true
 				}
 			}
 
 			// refresh the idealStateResourceMap to make sure only the currently existing resources
 			// are marked as true
-			for k := range s.idealStateResourceMap {
-				s.idealStateResourceMap[k] = false
+			for resource := range s.idealStateResourceMap {
+				s.idealStateResourceMap[resource] = false
 			}
-			for _, k := range resources {
-				s.idealStateResourceMap[k] = true
+			for _, resource := range resources {
+				s.idealStateResourceMap[resource] = true
 			}
 
 			// Notify an update of external view if there are new resources added.
@@ -322,40 +293,55 @@ func (s *Manager) watchIdealState() {
 			// now need to block the loop to wait for the next update event
 			evt := <-events
 			if evt.Err != nil {
-				panic(evt.Err)
-				return
+				s.changeNotificationErrChan <- evt.Err
 			}
 		}
 	}()
 }
 
-func (s *Manager) watchExternalView() {
-	errors := make(chan error)
+func (s *Manager) watchIdealStateResource(resource string) {
+	go func() {
+		for {
+			// block and wait for the next update for the resource
+			// when the update happens, unblock, and also send the resource
+			// to the channel
+			_, events, err := s.conn.GetW(s.kb.idealStateForResource(resource))
+			if err != nil {
+				s.changeNotificationErrChan <- err
+				return
+			}
 
+			<-events
+			s.changeNotificationChan <- helix.ChangeNotification{helix.IdealStateChanged, resource}
+		}
+	}()
+}
+
+func (s *Manager) watchExternalView() {
 	go func() {
 		for {
 			resources, events, err := s.conn.ChildrenW(s.kb.externalView())
 			if err != nil {
-				errors <- err
+				s.changeNotificationErrChan <- err
 				return
 			}
 
 			// find the resources that are newly added, and create a watcher
-			for _, k := range resources {
-				_, ok := s.externalViewResourceMap[k]
-				if !ok {
-					s.watchExternalViewResource(k)
-					s.externalViewResourceMap[k] = true
+			// FIXME thread safety
+			for _, resource := range resources {
+				if _, present := s.externalViewResourceMap[resource]; !present {
+					s.watchExternalViewResource(resource)
+					s.externalViewResourceMap[resource] = true
 				}
 			}
 
 			// refresh the externalViewResourceMap to make sure only the currently existing resources
 			// are marked as true
-			for k := range s.externalViewResourceMap {
-				s.externalViewResourceMap[k] = false
+			for resource := range s.externalViewResourceMap {
+				s.externalViewResourceMap[resource] = false
 			}
-			for _, k := range resources {
-				s.externalViewResourceMap[k] = true
+			for _, resource := range resources {
+				s.externalViewResourceMap[resource] = true
 			}
 
 			// Notify an update of external view if there are new resources added.
@@ -364,10 +350,22 @@ func (s *Manager) watchExternalView() {
 			// now need to block the loop to wait for the next update event
 			evt := <-events
 			if evt.Err != nil {
-				//panic(evt.Err)
-				fmt.Println(evt.Err)
-				return
+				s.changeNotificationErrChan <- evt.Err
 			}
+		}
+	}()
+}
+
+func (s *Manager) watchExternalViewResource(resource string) {
+	go func() {
+		for {
+			_, events, err := s.conn.GetW(s.kb.externalViewForResource(resource))
+			if err != nil {
+				s.changeNotificationErrChan <- err
+			}
+
+			<-events
+			s.changeNotificationChan <- helix.ChangeNotification{helix.ExternalViewChanged, resource}
 		}
 	}()
 }

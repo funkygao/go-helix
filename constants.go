@@ -10,6 +10,20 @@ const (
 	InstanceMessagesChanged   ChangeNotificationType = 6
 )
 
+var changeNotificationText = map[ChangeNotificationType]string{
+	ExternalViewChanged:       "ExternalView",
+	LiveInstanceChanged:       "LiveInstance",
+	IdealStateChanged:         "IdealState",
+	CurrentStateChanged:       "CurrentState",
+	InstanceConfigChanged:     "InstanceConfig",
+	ControllerMessagesChanged: "ControllerMessage",
+	InstanceMessagesChanged:   "InstanceMessage",
+}
+
+func ChangeNotificationText(t ChangeNotificationType) string {
+	return changeNotificationText[t]
+}
+
 const (
 	ConfigScopeCluster     HelixConfigScope = "CLUSTER"
 	ConfigScopeParticipant HelixConfigScope = "PARTICIPANT"
