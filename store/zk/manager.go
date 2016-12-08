@@ -236,6 +236,9 @@ func (m *Manager) HandleStateChanged(state zk.State) (err error) {
 	switch state {
 	case zk.StateDisconnected:
 
+	case zk.StateUnknown:
+		// e,g. EventNodeChildrenChanged
+
 	case zk.StateExpired:
 	}
 

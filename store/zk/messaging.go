@@ -38,7 +38,9 @@ func (p *zkMessagingService) onConnected() {
 				for _, msg := range m {
 					// messageChan is a snapshot of all unprocessed messages whenever
 					// a new message is added, so it will have duplicates.
-					p.processMessage(msg)
+					if err := p.processMessage(msg); err != nil {
+						log.Error("%s %v", p.shortID(), err)
+					}
 				}
 
 			case err := <-errChan:
@@ -69,7 +71,7 @@ func (p *zkMessagingService) watchMessages() (chan []string, chan error) {
 
 			snapshots <- snapshot
 			evt := <-events
-			log.Debug("P[%s/%s] recv message: %+v %+v", p.instanceID, p.conn.GetSessionID(), snapshot, evt)
+			log.Debug("%s recv message: %+v %+v", p.shortID(), snapshot, evt)
 
 			if evt.Err != nil {
 				errors <- evt.Err
@@ -95,24 +97,24 @@ func (p *zkMessagingService) processMessage(msgID string) error {
 
 	message := model.NewMessageFromRecord(record)
 
-	log.Debug("P[%s/%s] message: %s", p.instanceID, p.conn.GetSessionID(), message)
+	log.Debug("%s message: %s", p.shortID(), message)
 
 	msgType := message.MessageType()
 	if msgType == helix.MessageTypeNoOp {
-		log.Warn("P[%s/%s] discard NO-OP message: %s", p.instanceID, p.conn.GetSessionID(), msgID)
+		log.Warn("%s discard NO-OP message: %s", p.shortID(), msgID)
 		return p.conn.DeleteTree(msgPath)
 	}
 
 	sessionID := message.TargetSessionID()
 	if sessionID != "*" && sessionID != p.conn.GetSessionID() {
 		// message comes from expired session
-		log.Warn("P[%s/%s] got mismatched message: %s", p.instanceID, p.conn.GetSessionID(), message)
+		log.Warn("%s got mismatched message: %s/%s, dropped", p.shortID(), msgID, sessionID)
 		return p.conn.DeleteTree(msgPath)
 	}
 
 	if !strings.EqualFold(message.MessageState(), helix.MessageStateNew) {
 		// READ message is not deleted until the state has changed
-		log.Warn("P[%s/%s] skip %s message: %s", p.instanceID, p.conn.GetSessionID(), message.MessageState(), msgID)
+		log.Warn("%s skip %s message: %s", p.shortID(), message.MessageState(), msgID)
 		return nil
 	}
 
@@ -155,8 +157,7 @@ func (p *zkMessagingService) processMessage(msgID string) error {
 }
 
 func (p *zkMessagingService) handleStateTransition(message *model.Message) {
-	log.Trace("P[%s/%s] state %s -> %s", p.instanceID,
-		p.conn.GetSessionID(), message.FromState(), message.ToState())
+	log.Trace("%s state %s -> %s", p.shortID(), message.FromState(), message.ToState())
 
 	// set the message execution time
 	nowMilli := time.Now().UnixNano() / 1000000

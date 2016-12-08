@@ -43,7 +43,7 @@ func (this *Init) Run(args []string) (exitCode int) {
 
 	// define the resource and partition
 	resourceOption := helix.DefaultAddResourceOption(partitions, stateModel)
-	//resourceOption.RebalancerMode = helix.RebalancerModeFullAuto
+	resourceOption.RebalancerMode = helix.RebalancerModeFullAuto
 	must(admin.AddResource(cluster, resource, resourceOption))
 	log.Info("resource[%s] partitions:%d model:%s added to cluster[%s]", resource,
 		partitions, stateModel, cluster)

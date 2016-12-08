@@ -59,6 +59,8 @@ func (s *Manager) startChangeNotificationLoop() {
 			}
 		}
 	}()
+
+	log.Trace("%s started change notification main loop", s.shortID())
 }
 
 func (s *Manager) handleChangeNotification(chg helix.ChangeNotification) {
