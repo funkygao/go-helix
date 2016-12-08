@@ -51,7 +51,7 @@ func newConnection(zkSvr string) *connection {
 	servers, chroot, err := parseZkConnStr(zkSvr)
 	if err != nil || len(servers) == 0 {
 		// yes, panic!
-		panic("invalid zk connection")
+		panic("invalid zkSvr")
 	}
 
 	conn := connection{
@@ -72,11 +72,6 @@ func (conn *connection) Connect() error {
 	}
 
 	conn.zkConn = zkConn
-	if err = conn.waitUntilConnected(); err != nil {
-		conn.zkConn = nil
-		return err
-	}
-
 	conn.stateEvtCh = stateEvtCh
 
 	if conn.chroot != "" {

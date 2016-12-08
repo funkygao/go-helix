@@ -2,6 +2,8 @@ package zk
 
 import (
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"sync"
 
 	"github.com/funkygao/go-helix"
@@ -27,6 +29,7 @@ type Manager struct {
 	clusterID           string
 	it                  helix.InstanceType
 	kb                  keyBuilder
+	pprofPort           int
 	preConnectCallbacks []helix.PreConnectCallback
 
 	// only participant holds a state machine engine
@@ -55,9 +58,9 @@ type Manager struct {
 
 	externalViewListeners       []helix.ExternalViewChangeListener
 	liveInstanceChangeListeners []helix.LiveInstanceChangeListener
-	currentStateChangeListeners map[string][]helix.CurrentStateChangeListener
 	idealStateChangeListeners   []helix.IdealStateChangeListener
-	messageListeners            map[string][]helix.MessageListener // key is instance
+	currentStateChangeListeners map[string][]helix.CurrentStateChangeListener // key is instance
+	messageListeners            map[string][]helix.MessageListener            // key is instance
 
 	// not implemented
 	controllerMessageListeners    []helix.ControllerMessageListener
@@ -66,9 +69,9 @@ type Manager struct {
 	// resources the external view is tracking.
 	// It is a map from the resource name to the current state of the resource:
 	// true means it is active, false means the resource is inactive/deleted
-	externalViewResourceMap map[string]bool
-	idealStateResourceMap   map[string]bool
-	instanceConfigMap       map[string]bool
+	externalViewResourceMap map[string]bool // key is resource
+	idealStateResourceMap   map[string]bool // key is resource
+	instanceConfigMap       map[string]bool // key is resource
 
 	// changeNotification is a channel to notify any changes that needs to trigger a listener
 	changeNotificationChan chan helix.ChangeNotification
@@ -87,8 +90,8 @@ type Manager struct {
 
 // NewZkHelixManager creates a HelixManager implementation with zk as storage.
 func NewZkHelixManager(clusterID, host, port, zkSvr string,
-	it helix.InstanceType, options ...managerOption) helix.HelixManager {
-	mgr := &Manager{
+	it helix.InstanceType, options ...managerOption) (mgr *Manager, err error) {
+	mgr = &Manager{
 		zkSvr:               zkSvr,
 		clusterID:           clusterID,
 		conn:                newConnection(zkSvr),
@@ -97,6 +100,7 @@ func NewZkHelixManager(clusterID, host, port, zkSvr string,
 		it:                  it,
 		kb:                  keyBuilder{clusterID: clusterID},
 		preConnectCallbacks: []helix.PreConnectCallback{},
+		pprofPort:           10001,
 		host:                host,
 		port:                port,
 		instanceID:          fmt.Sprintf("%s_%s", host, port), // node id
@@ -104,8 +108,8 @@ func NewZkHelixManager(clusterID, host, port, zkSvr string,
 		// listeners
 		externalViewListeners:       []helix.ExternalViewChangeListener{},
 		liveInstanceChangeListeners: []helix.LiveInstanceChangeListener{},
-		currentStateChangeListeners: map[string][]helix.CurrentStateChangeListener{},
 		idealStateChangeListeners:   []helix.IdealStateChangeListener{},
+		currentStateChangeListeners: map[string][]helix.CurrentStateChangeListener{},
 		messageListeners:            map[string][]helix.MessageListener{},
 
 		// control channels
@@ -113,7 +117,7 @@ func NewZkHelixManager(clusterID, host, port, zkSvr string,
 		idealStateResourceMap:   map[string]bool{},
 		instanceConfigMap:       map[string]bool{},
 
-		changeNotificationChan: make(chan helix.ChangeNotification, 1000),
+		changeNotificationChan: make(chan helix.ChangeNotification, 16),
 
 		stopCurrentStateWatch: make(map[string]chan interface{}),
 
@@ -121,6 +125,9 @@ func NewZkHelixManager(clusterID, host, port, zkSvr string,
 		instanceMessageChannel: make(chan string, 100),
 	}
 
+	if mgr.receivedMessages, err = lru.New(10 << 10); err != nil {
+		return
+	}
 	mgr.messaging = newZkMessagingService(mgr)
 
 	// apply additional options over the default
@@ -136,17 +143,14 @@ func NewZkHelixManager(clusterID, host, port, zkSvr string,
 
 	case helix.InstanceTypeSpectator:
 
-	case helix.InstanceTypeController:
-		panic(helix.ErrNotImplemented)
-
-	case helix.InstanceTypeNotImplemented:
-		panic(helix.ErrNotImplemented)
+	case helix.InstanceTypeController, helix.InstanceTypeNotImplemented:
+		err = helix.ErrNotImplemented
 
 	default:
-		panic("unknown instance type: " + it)
+		err = helix.ErrNotImplemented
 	}
 
-	return mgr
+	return
 }
 
 func (m *Manager) Connect() error {
@@ -166,22 +170,28 @@ func (m *Manager) Connect() error {
 	log.Trace("manager{cluster:%s, instance:%s, type:%s, zk:%s} connecting...",
 		m.clusterID, m.instanceID, m.it, m.zkSvr)
 
+	if m.pprofPort > 0 {
+		addr := fmt.Sprintf("localhost:%d", m.pprofPort)
+		go http.ListenAndServe(addr, nil)
+		log.Info("pprof ready on http://%s/debug/pprof", addr)
+	}
+
 	if err := m.createZkConnection(); err != nil {
 		return err
 	}
-
-	// handleNewSessionAsController, handleNewSessionAsParticipant
-	// handleStateChanged
 
 	if ok, err := m.conn.IsClusterSetup(m.clusterID); !ok || err != nil {
 		return helix.ErrClusterNotSetup
 	}
 
 	m.connected.Set(true)
+
+	log.Trace("manager{cluster:%s, instance:%s, type:%s, zk:%s} connected",
+		m.clusterID, m.instanceID, m.it, m.zkSvr)
 	return nil
 }
 
-func (m *Manager) Close() {
+func (m *Manager) Disconnect() {
 	m.closeOnce.Do(func() {
 		m.Lock()
 		if m.connected.Get() {
@@ -197,23 +207,25 @@ func (m *Manager) isConnected() bool {
 }
 
 func (m *Manager) createZkConnection() error {
+	m.conn.SubscribeStateChanges(m)
+
 	if err := m.conn.Connect(); err != nil {
 		return err
 	}
 
-	m.conn.SubscribeStateChanges(m)
+	var err error
 	for retries := 0; retries < 3; retries++ {
-		if err := m.conn.waitUntilConnected(); err != nil {
-			return err
+		if err = m.conn.waitUntilConnected(); err != nil {
+			continue
 		}
 
-		if err := m.HandleStateChanged(zk.StateSyncConnected); err != nil {
-			return err
+		if err = m.HandleStateChanged(zk.StateSyncConnected); err != nil {
+			continue
 		}
-		if err := m.HandleNewSession(); err != nil {
-			return err
+		if err = m.HandleNewSession(); err != nil {
+			continue
 		}
 	}
 
-	return nil
+	return err
 }

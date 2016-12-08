@@ -3,11 +3,11 @@ package helix
 // HelixManager is a common component that connects each system component with the controller.
 type HelixManager interface {
 
-	// Connect the participant to storage and start housekeeping.
+	// Connect will connect manager to storage and start housekeeping.
 	Connect() error
 
-	// Close will disconnect the participant from storage and Helix controller.
-	Close()
+	// Disconnect will disconnect manager from storage.
+	Disconnect()
 
 	// Cluster returns the cluster name associated with this cluster manager.
 	Cluster() string
