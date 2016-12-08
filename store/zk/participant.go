@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/funkygao/go-helix/model"
+	"github.com/funkygao/go-zookeeper/zk"
 	log "github.com/funkygao/log4go"
-	"github.com/yichen/go-zookeeper/zk"
 )
 
 type participant struct {

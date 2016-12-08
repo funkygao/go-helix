@@ -7,10 +7,10 @@ import (
 	"sync"
 
 	"github.com/funkygao/go-helix"
+	"github.com/funkygao/go-zookeeper/zk"
 	"github.com/funkygao/golib/sync2"
 	log "github.com/funkygao/log4go"
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/yichen/go-zookeeper/zk"
 )
 
 var _ helix.HelixManager = &Manager{}
@@ -234,9 +234,6 @@ func (m *Manager) HandleStateChanged(state zk.State) (err error) {
 	m.connected.Set(false)
 
 	switch state {
-	case zk.StateSyncConnected:
-		// TODO
-
 	case zk.StateDisconnected:
 
 	case zk.StateExpired:

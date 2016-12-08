@@ -10,8 +10,8 @@ import (
 
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
+	"github.com/funkygao/go-zookeeper/zk"
 	log "github.com/funkygao/log4go"
-	"github.com/yichen/go-zookeeper/zk"
 	"github.com/yichen/retry"
 )
 
@@ -152,7 +152,7 @@ func (conn *connection) IsConnected() bool {
 }
 
 func (conn *connection) GetSessionID() string {
-	return strconv.FormatInt(conn.zkConn.SessionID, 10)
+	return strconv.FormatInt(conn.zkConn.SessionID(), 10)
 }
 
 func (conn *connection) CreateEmptyNode(path string) error {
