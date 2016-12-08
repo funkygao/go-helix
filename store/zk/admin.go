@@ -31,6 +31,14 @@ func NewZkHelixAdmin(zkSvr string, options ...zkConnOption) helix.HelixAdmin {
 	return admin
 }
 
+func newZkHelixAdminWithConn(c *connection) helix.HelixAdmin {
+	admin := &Admin{
+		connection: c,
+	}
+	admin.connected = admin.connection.IsConnected()
+	return admin
+}
+
 func (adm *Admin) Connect() error {
 	adm.RLock()
 	if adm.connected {

@@ -33,10 +33,13 @@ func NewNode(zkSvr, cluster, resource, stateModel, replicas, host, port string) 
 
 func (r *redisNode) Start() {
 	// create the manager instance and connect
-	manager := zk.NewZKHelixManager(r.cluster, r.host, r.port, r.zkSvr,
+	manager := zk.NewZkHelixManager(r.cluster, r.host, r.port, r.zkSvr,
 		helix.InstanceTypeParticipant, zk.WithManagerZkSessionTimeout(time.Second*10))
 	manager.AddExternalViewChangeListener(func(externalViews []*model.Record, context *helix.Context) {
 		log.Info(color.Red("%+v %+v", externalViews, context))
+	})
+	manager.AddIdealStateChangeListener(func(idealState []*model.Record, context *helix.Context) {
+		log.Info(color.Yellow("%+v %+v", idealState, context))
 	})
 
 	// register state model before connecting
@@ -66,7 +69,7 @@ func (r *redisNode) Start() {
 
 	must(manager.Connect())
 
-	log.Info("start rebalancing...")
+	log.Info("start rebalancing %s/%s ...", r.replicas, r.replicas)
 	helix.Rebalance(r.zkSvr, r.cluster, r.resource, r.replicas)
 	log.Info("rebalanced done")
 

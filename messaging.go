@@ -10,5 +10,5 @@ import (
 // Broadcast message to all participants
 // Send message to instances that hold a specific resource
 type ClusterMessagingService interface {
-	send(*model.Message) error
+	Send(*model.Message) error
 }

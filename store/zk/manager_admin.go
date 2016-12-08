@@ -6,7 +6,7 @@ import (
 
 func (m *Manager) ClusterManagementTool() helix.HelixAdmin {
 	if m.admin == nil {
-		// TODO
+		m.admin = newZkHelixAdminWithConn(m.conn)
 	}
 	return m.admin
 }

@@ -1,6 +1,7 @@
 package zk
 
 import (
+	"fmt"
 	"path"
 	"strconv"
 	"strings"
@@ -190,7 +191,7 @@ func (conn *connection) Exists(path string) (bool, error) {
 	err := retry.RetryWithBackoff(zkRetryOptions, func() (retry.RetryStatus, error) {
 		r, s, err := conn.zkConn.Exists(conn.realPath(path))
 		if err != nil {
-			return retry.RetryContinue, err
+			return retry.RetryContinue, conn.wrapZkError(conn.realPath(path), err)
 		}
 		result = r
 		stat = s
@@ -221,7 +222,7 @@ func (conn *connection) Get(path string) ([]byte, error) {
 	err := retry.RetryWithBackoff(zkRetryOptions, func() (retry.RetryStatus, error) {
 		d, s, err := conn.zkConn.Get(conn.realPath(path))
 		if err != nil {
-			return retry.RetryContinue, err
+			return retry.RetryContinue, conn.wrapZkError(conn.realPath(path), err)
 		}
 		data = d
 		conn.stat = s
@@ -242,7 +243,7 @@ func (conn *connection) GetW(path string) ([]byte, <-chan zk.Event, error) {
 	err := retry.RetryWithBackoff(zkRetryOptions, func() (retry.RetryStatus, error) {
 		d, s, evts, err := conn.zkConn.GetW(conn.realPath(path))
 		if err != nil {
-			return retry.RetryContinue, err
+			return retry.RetryContinue, conn.wrapZkError(conn.realPath(path), err)
 		}
 		data = d
 		conn.stat = s
@@ -279,7 +280,7 @@ func (conn *connection) Children(path string) ([]string, error) {
 	err := retry.RetryWithBackoff(zkRetryOptions, func() (retry.RetryStatus, error) {
 		c, s, err := conn.zkConn.Children(conn.realPath(path))
 		if err != nil {
-			return retry.RetryContinue, err
+			return retry.RetryContinue, conn.wrapZkError(conn.realPath(path), err)
 		}
 		children = c
 		conn.stat = s
@@ -300,7 +301,7 @@ func (conn *connection) ChildrenW(path string) ([]string, <-chan zk.Event, error
 	err := retry.RetryWithBackoff(zkRetryOptions, func() (retry.RetryStatus, error) {
 		c, s, evts, err := conn.zkConn.ChildrenW(conn.realPath(path))
 		if err != nil {
-			return retry.RetryContinue, err
+			return retry.RetryContinue, conn.wrapZkError(conn.realPath(path), err)
 		}
 		children = c
 		conn.stat = s
@@ -535,4 +536,8 @@ func (conn *connection) ensurePathExists(p string) error {
 
 	conn.zkConn.Create(p, []byte{}, 0, zk.WorldACL(zk.PermAll))
 	return nil
+}
+
+func (conn *connection) wrapZkError(path string, err error) error {
+	return fmt.Errorf("%s %v", path, err)
 }

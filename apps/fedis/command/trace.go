@@ -24,7 +24,7 @@ func (this *Trace) Run(args []string) (exitCode int) {
 	}
 
 	// create the admin instance and connect
-	admin := zk.NewZKHelixAdmin(zkSvr)
+	admin := zk.NewZkHelixAdmin(zkSvr)
 	must(admin.Connect())
 
 	// create the cluster

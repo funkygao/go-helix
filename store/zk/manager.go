@@ -37,7 +37,7 @@ type Manager struct {
 	admin helix.HelixAdmin
 
 	// ClusterMessagingService cache
-	messaging helix.ClusterMessagingService
+	messaging *zkMessagingService
 
 	metrics *metricsReporter
 
@@ -120,6 +120,8 @@ func NewZkHelixManager(clusterID, host, port, zkSvr string,
 		// channel for receiving instance messages
 		instanceMessageChannel: make(chan string, 100),
 	}
+
+	mgr.messaging = newZkMessagingService(mgr)
 
 	// apply additional options over the default
 	for _, option := range options {
