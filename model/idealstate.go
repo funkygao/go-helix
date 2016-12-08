@@ -66,6 +66,14 @@ func (is *IdealState) Resource() string {
 	return is.ID
 }
 
+func (is *IdealState) SetRebalanceMode(mode string) {
+	is.SetSimpleField("REBALANCE_MODE", mode)
+}
+
+func (is *IdealState) RebalanceMode() string {
+	return is.GetStringField("REBALANCE_MODE", "")
+}
+
 func (is *IdealState) SetRebalancerClassName(clazz string) {
 	is.SetSimpleField("REBALANCER_CLASS_NAME", clazz)
 }

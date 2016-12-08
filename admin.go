@@ -50,6 +50,12 @@ type HelixAdmin interface {
 
 	InstanceInfo(cluster string, ic model.InstanceConfig) (*model.Record, error)
 
+	// Enable or disable an instance.
+	EnableInstance(cluster, instanceName string, yes bool) error
+
+	//
+	SetResourceIdealState(cluster, instanceName string, is *model.IdealState) error
+
 	// Add a resource to a cluster.
 	AddResource(cluster string, resource string, option AddResourceOption) error
 

@@ -422,6 +422,16 @@ func (adm Admin) StateModelDefs(cluster string) ([]string, error) {
 	return adm.Children(kb.stateModelDefs())
 }
 
+// TODO
+func (adm Admin) EnableInstance(cluster, instanceName string, yes bool) error {
+	return nil
+}
+
+// TODO
+func (adm Admin) SetResourceIdealState(cluster, instanceName string, is *model.IdealState) error {
+	return nil
+}
+
 // Rebalance not implemented yet TODO
 func (adm Admin) Rebalance(cluster string, resource string, replica int) error {
 	if !adm.connected {
