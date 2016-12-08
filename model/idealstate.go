@@ -8,6 +8,7 @@ package model
 //     "NUM_PARTITIONS" : "6",
 //     "REBALANCE_MODE" : "SEMI_AUTO",
 //     "REBALANCE_STRATEGY" : "DEFAULT",
+//     "REBALANCER_CLASS_NAME": "",
 //     "REPLICAS" : "3",
 //     "STATE_MODEL_DEF_REF" : "MyStateModel",
 //     "STATE_MODEL_FACTORY_NAME" : "DEFAULT"
@@ -59,4 +60,24 @@ type IdealState struct {
 
 func NewIdealStateFromRecord(record *Record) *IdealState {
 	return &IdealState{Record: record}
+}
+
+func (is *IdealState) Resource() string {
+	return is.ID
+}
+
+func (is *IdealState) SetRebalancerClassName(clazz string) {
+	is.SetSimpleField("REBALANCER_CLASS_NAME", clazz)
+}
+
+func (is *IdealState) RebalancerClassName() string {
+	return is.GetStringField("REBALANCER_CLASS_NAME", "")
+}
+
+func (is *IdealState) MaxPartitionsPerInstance() int {
+	return is.GetIntField("MAX_PARTITIONS_PER_INSTANCE", 0)
+}
+
+func (is *IdealState) SetMaxPartitionsPerInstance(max int) {
+	is.SetIntField("MAX_PARTITIONS_PER_INSTANCE", max)
 }

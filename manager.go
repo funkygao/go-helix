@@ -56,4 +56,6 @@ type HelixManager interface {
 
 	// ClusterManagementTool provides admin interface to setup and modify cluster.
 	ClusterManagementTool() HelixAdmin
+
+	// RemoveListener()
 }
