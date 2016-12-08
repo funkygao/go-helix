@@ -3,7 +3,6 @@ package model
 // Message is controller generated payload to instruct participant to carry out some tasks.
 //
 // message content example:
-// 9ff57fc1-9f2a-41a5-af46-c4ae2a54c539
 // {
 //     "id": "9ff57fc1-9f2a-41a5-af46-c4ae2a54c539",
 //     "simpleFields": {

@@ -4,6 +4,8 @@ import (
 	"github.com/funkygao/go-helix/model"
 )
 
+type HelixDefinedState string
+
 type PreConnectCallback func()
 
 type InstanceType string
