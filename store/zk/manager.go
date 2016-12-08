@@ -14,6 +14,7 @@ import (
 )
 
 var _ helix.HelixManager = &Manager{}
+var _ ZkStateListener = &Manager{}
 
 type Manager struct {
 	sync.RWMutex
@@ -173,10 +174,10 @@ func (m *Manager) Connect() error {
 	if m.pprofPort > 0 {
 		addr := fmt.Sprintf("localhost:%d", m.pprofPort)
 		go http.ListenAndServe(addr, nil)
-		log.Info("pprof ready on http://%s/debug/pprof", addr)
+		log.Trace("pprof ready on http://%s/debug/pprof", addr)
 	}
 
-	if err := m.createZkConnection(); err != nil {
+	if err := m.connectToZookeeper(); err != nil {
 		return err
 	}
 
@@ -206,7 +207,7 @@ func (m *Manager) isConnected() bool {
 	return m.connected.Get()
 }
 
-func (m *Manager) createZkConnection() error {
+func (m *Manager) connectToZookeeper() error {
 	m.conn.SubscribeStateChanges(m)
 
 	if err := m.conn.Connect(); err != nil {
@@ -216,16 +217,94 @@ func (m *Manager) createZkConnection() error {
 	var err error
 	for retries := 0; retries < 3; retries++ {
 		if err = m.conn.waitUntilConnected(); err != nil {
+			log.Error("%+v", err)
 			continue
 		}
 
 		if err = m.HandleStateChanged(zk.StateSyncConnected); err != nil {
+			log.Error("%+v", err)
 			continue
 		}
 		if err = m.HandleNewSession(); err != nil {
+			log.Error("%+v", err)
 			continue
 		}
 	}
 
 	return err
+}
+
+func (m *Manager) HandleStateChanged(state zk.State) (err error) {
+	log.Debug("new state: %s", state)
+
+	m.connected.Set(false)
+
+	switch state {
+	case zk.StateSyncConnected:
+		// TODO
+
+	case zk.StateDisconnected:
+
+	case zk.StateExpired:
+	}
+
+	return
+}
+
+func (m *Manager) HandleNewSession() (err error) {
+	if err = m.conn.waitUntilConnected(); err != nil {
+		return
+	}
+
+	m.connected.Set(true)
+
+	switch m.it {
+	case helix.InstanceTypeParticipant:
+		err = m.handleNewSessionAsParticipant()
+
+	case helix.InstanceTypeController:
+		err = m.handleNewSessionAsController()
+
+	case helix.InstanceTypeSpectator:
+
+	case helix.InstanceTypeNotImplemented:
+		return helix.ErrNotImplemented
+	}
+
+	// TODO restart all listeners, re-watch, recreate ephemeral znodes
+	m.startChangeNotificationLoop()
+
+	return
+}
+
+func (m *Manager) handleNewSessionAsParticipant() error {
+	p := newParticipant(m)
+
+	if ok, err := p.joinCluster(); !ok || err != nil {
+		if err != nil {
+			return err
+		}
+		return helix.ErrEnsureParticipantConfig
+	}
+
+	// invoke preconnection callbacks
+	for _, cb := range m.preConnectCallbacks {
+		cb()
+	}
+
+	if err := p.createLiveInstance(); err != nil {
+		return err
+	}
+
+	if err := p.carryOverPreviousCurrentState(); err != nil {
+		return err
+	}
+
+	p.setupMsgHandler()
+
+	return nil
+}
+
+func (m *Manager) handleNewSessionAsController() error {
+	return helix.ErrNotImplemented
 }

@@ -5,10 +5,10 @@ package helix
 type StateMachineEngine interface {
 
 	// RegisterStateModel associates state trasition functions with the participant.
-	RegisterStateModel(stateModel string, sm *StateModel) error
+	RegisterStateModel(stateModelDef string, sm *StateModel) error
 
 	// RemoveStateModel disconnects a state transition with the participant.
-	RemoveStateModel(stateModel string) error
+	RemoveStateModel(stateModelDef string) error
 
-	StateModel(stateModel string) (*StateModel, bool)
+	StateModel(stateModelDef string) (*StateModel, bool)
 }

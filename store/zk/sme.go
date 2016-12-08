@@ -23,23 +23,23 @@ func newStateMachineEngine(m *Manager) *stateMachineEngine {
 	}
 }
 
-func (sme *stateMachineEngine) RegisterStateModel(stateModel string, sm *helix.StateModel) error {
+func (sme *stateMachineEngine) RegisterStateModel(stateModelDef string, sm *helix.StateModel) error {
 	sme.Lock()
 	defer sme.Unlock()
 
-	if _, present := sme.stateModels[stateModel]; present {
+	if _, present := sme.stateModels[stateModelDef]; present {
 		return helix.ErrDupStateModelName
 	}
 
-	sme.stateModels[stateModel] = sm
+	sme.stateModels[stateModelDef] = sm
 	return nil
 }
 
-func (sme *stateMachineEngine) RemoveStateModel(stateModel string) error {
+func (sme *stateMachineEngine) RemoveStateModel(stateModelDef string) error {
 	sme.Lock()
 	defer sme.Unlock()
 
-	delete(sme.stateModels, stateModel)
+	delete(sme.stateModels, stateModelDef)
 	return nil
 }
 
