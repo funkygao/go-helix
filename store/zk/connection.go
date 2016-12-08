@@ -10,6 +10,7 @@ import (
 
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
+	log "github.com/funkygao/log4go"
 	"github.com/yichen/go-zookeeper/zk"
 	"github.com/yichen/retry"
 )
@@ -112,18 +113,12 @@ func (conn *connection) SubscribeStateChanges(l ZkStateListener) {
 }
 
 func (conn *connection) fireStateChangedEvent(state zk.State) {
-	conn.RLock()
-	defer conn.RUnlock()
-
 	for _, l := range conn.stateChangeListeners {
 		l.HandleStateChanged(state)
 	}
 }
 
 func (conn *connection) fireNewSessionEvents() {
-	conn.RLock()
-	defer conn.RUnlock()
-
 	for _, l := range conn.stateChangeListeners {
 		l.HandleNewSession()
 	}
@@ -137,12 +132,19 @@ func (conn connection) realPath(path string) string {
 	return strings.TrimRight(conn.chroot+path, "/")
 }
 
-func (conn *connection) waitUntilConnected() error {
-	if _, _, err := conn.zkConn.Exists("/zookeeper"); err != nil {
-		return err
+func (conn *connection) waitUntilConnected() (err error) {
+	t1 := time.Now()
+	for retries := 0; retries < 5; retries++ {
+		if _, _, err = conn.zkConn.Exists("/zookeeper"); err == nil {
+			break
+		}
+
+		log.Debug("waitUntilConnected: retry=%d %v", retries, err)
+		time.Sleep(time.Second)
 	}
 
-	return nil
+	log.Debug("waitUntilConnected elapsed %s", time.Since(t1))
+	return
 }
 
 func (conn *connection) IsConnected() bool {

@@ -57,7 +57,7 @@ func (p *participant) createLiveInstance() error {
 						p.conn.Set(p.kb.liveInstance(p.instanceID), curLiveInstance.Marshal())
 					}
 				} else {
-					log.Warn("%s await last session expire...", p.shortID())
+					log.Warn("%s await previous session expire...", p.shortID())
 				}
 			}
 		}

@@ -183,6 +183,12 @@ func (m *Manager) Connect() error {
 		return err
 	}
 
+	if err := m.conn.waitUntilConnected(); err != nil {
+		return err
+	}
+
+	log.Debug("zk connected")
+
 	if ok, err := m.conn.IsClusterSetup(m.clusterID); !ok || err != nil {
 		return helix.ErrClusterNotSetup
 	}
@@ -219,13 +225,6 @@ func (m *Manager) connectToZookeeper() (err error) {
 		return
 	}
 
-	if err = m.HandleStateChanged(zk.StateSyncConnected); err != nil {
-		return
-	}
-	if err = m.HandleNewSession(); err != nil {
-		return
-	}
-
 	return
 }
 
@@ -247,6 +246,8 @@ func (m *Manager) HandleStateChanged(state zk.State) (err error) {
 }
 
 func (m *Manager) HandleNewSession() (err error) {
+	log.Trace("%s handling new session", m.shortID())
+
 	if err = m.conn.waitUntilConnected(); err != nil {
 		return
 	}
