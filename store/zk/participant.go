@@ -39,7 +39,6 @@ func (p *participant) createLiveInstance() error {
 	)
 	for retry := 0; retry < 10; retry++ {
 		_, err = p.conn.Create(p.kb.liveInstance(p.instanceID), data, zk.FlagEphemeral, zk.WorldACL(zk.PermAll))
-		log.Debug("%s retry=%d err=%+v", p.shortID(), retry, err)
 		if err == nil {
 			break
 		} else if err == zk.ErrNodeExists {
@@ -52,7 +51,8 @@ func (p *participant) createLiveInstance() error {
 				if currentSessionID == p.conn.GetSessionID() {
 					curLiveInstance, err := model.NewRecordFromBytes(c)
 					if err == nil && curLiveInstance.GetStringField("SESSION_ID", "") != p.conn.GetSessionID() {
-						// update session id field
+						log.Trace("%s update session id field", p.shortID())
+
 						curLiveInstance.SetSimpleField("SESSION_ID", p.conn.GetSessionID())
 						p.conn.Set(p.kb.liveInstance(p.instanceID), curLiveInstance.Marshal())
 					}
