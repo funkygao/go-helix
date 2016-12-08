@@ -1,6 +1,7 @@
 package zk
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -24,6 +25,8 @@ func newParticipant(m *Manager) *participant {
 }
 
 func (p *participant) createLiveInstance() error {
+	log.Debug("%s creating live instance...", p.shortID())
+
 	record := model.NewLiveInstanceRecord(p.instanceID, p.conn.GetSessionID())
 	data := record.Marshal()
 
@@ -31,37 +34,42 @@ func (p *participant) createLiveInstance() error {
 	// retry 5 seconds to wait for the zookeeper to remove the live instance
 	// from previous session
 	var (
-		backoff = p.conn.sessionTimeout + time.Millisecond*500
+		backoff = p.conn.sessionTimeout + time.Millisecond*50
 		err     error
 	)
 	for retry := 0; retry < 10; retry++ {
 		_, err = p.conn.Create(p.kb.liveInstance(p.instanceID), data, zk.FlagEphemeral, zk.WorldACL(zk.PermAll))
+		log.Debug("%s retry=%d err=%+v", p.shortID(), retry, err)
 		if err == nil {
-			log.Trace("P[%s/%s] become alive", p.instanceID, p.conn.GetSessionID())
-			return nil
+			break
 		} else if err == zk.ErrNodeExists {
 			if c, e := p.conn.Get(p.kb.liveInstance(p.instanceID)); e == zk.ErrNoNode {
-				// live instance is gone as we check it, retry create live instance
-				continue
+				log.Trace("%s live instance is gone as we check it, retry create live instance", p.shortID())
+				continue // needn't sleep backoff
 			} else {
-				if strconv.FormatInt(p.conn.stat.EphemeralOwner, 10) == p.conn.GetSessionID() {
+				currentSessionID := strconv.FormatInt(p.conn.stat.EphemeralOwner, 10)
+				log.Debug("%s current session: %s, same: %+v", p.shortID(), currentSessionID, currentSessionID == p.conn.GetSessionID())
+				if currentSessionID == p.conn.GetSessionID() {
 					curLiveInstance, err := model.NewRecordFromBytes(c)
 					if err == nil && curLiveInstance.GetStringField("SESSION_ID", "") != p.conn.GetSessionID() {
 						// update session id field
 						curLiveInstance.SetSimpleField("SESSION_ID", p.conn.GetSessionID())
 						p.conn.Set(p.kb.liveInstance(p.instanceID), curLiveInstance.Marshal())
 					}
+				} else {
+					log.Warn("%s await last session expire...", p.shortID())
 				}
 			}
-		} else {
-			log.Error("P[%s/%s] %v, backoff %s then retry", p.instanceID, p.conn.GetSessionID(), backoff)
 		}
 
 		// wait for zookeeper remove the last run's ephemeral znode
+		log.Debug("%s retry=%d backoff: %s", p.shortID(), retry, backoff)
 		time.Sleep(backoff)
 	}
 
-	log.Debug("P[%s/%s] create live instance %v", p.instanceID, p.conn.GetSessionID(), err)
+	if err == nil {
+		log.Trace("%s created live instance", p.shortID())
+	}
 
 	return err
 }
@@ -69,7 +77,7 @@ func (p *participant) createLiveInstance() error {
 // carry over current-states from last sessions
 // set to initial state for current session only when state doesn't exist in current session
 func (p *participant) carryOverPreviousCurrentState() error {
-	log.Trace("P[%s/%s] cleanup stale sessions", p.instanceID, p.conn.GetSessionID())
+	log.Trace("%s cleanup stale sessions", p.shortID())
 
 	sessions, err := p.conn.Children(p.kb.currentStates(p.instanceID))
 	if err != nil {
@@ -81,7 +89,7 @@ func (p *participant) carryOverPreviousCurrentState() error {
 			continue
 		}
 
-		log.Warn("P[%s/%s] found stale session: %s", p.instanceID, p.conn.GetSessionID(), sessionID)
+		log.Warn("%s found stale session: %s, will be removed", p.shortID(), sessionID)
 
 		if err = p.conn.DeleteTree(p.kb.currentStatesForSession(p.instanceID, sessionID)); err != nil {
 			return err
@@ -112,15 +120,21 @@ func (p *participant) autoJoinAllowed() (bool, error) {
 	return strings.ToLower(al) == "true", nil
 }
 
+func (p *participant) shortID() string {
+	return fmt.Sprintf("P[%s/%s]", p.instanceID, p.conn.GetSessionID())
+}
+
 // Ensure that ZNodes for a participant all exist.
 func (p *participant) joinCluster() (bool, error) {
+	log.Debug("%s join cluster...", p.shortID())
+
 	exists, err := p.conn.IsInstanceSetup(p.clusterID, p.instanceID)
 	if err != nil {
 		return false, err
 	}
-
 	if exists {
 		// this instance is already setup ok
+		log.Debug("%s instance setup ok", p.shortID())
 		return true, nil
 	}
 
@@ -134,6 +148,7 @@ func (p *participant) joinCluster() (bool, error) {
 
 	// the participant path does not exist in zookeeper
 	// create the data struture
+	log.Debug("%s auto setup instance", p.shortID())
 	participant := model.NewRecord(p.instanceID)
 	participant.SetSimpleField("HELIX_HOST", p.host)
 	participant.SetSimpleField("HELIX_PORT", p.port)

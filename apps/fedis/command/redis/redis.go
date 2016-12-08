@@ -34,12 +34,19 @@ func NewNode(zkSvr, cluster, resource, stateModel, replicas, host, port string) 
 func (r *redisNode) Start() {
 	// create the manager instance and connect
 	manager, _ := zk.NewZkHelixManager(r.cluster, r.host, r.port, r.zkSvr,
-		helix.InstanceTypeParticipant, zk.WithManagerZkSessionTimeout(time.Second*10))
+		helix.InstanceTypeParticipant,
+		zk.WithManagerZkSessionTimeout(time.Second*5),
+		zk.WithPprofPort(10001))
+
+	manager.AddPreConnectCallback(func() {
+		log.Info("will be connecting...")
+	})
+
 	manager.AddExternalViewChangeListener(func(externalViews []*model.Record, context *helix.Context) {
-		log.Info(color.Red("%+v %+v", externalViews, context))
+		log.Info(color.Red("external view changed: %+v %+v", externalViews, context))
 	})
 	manager.AddIdealStateChangeListener(func(idealState []*model.Record, context *helix.Context) {
-		log.Info(color.Yellow("%+v %+v", idealState, context))
+		log.Info(color.Yellow("ideal state changed: %+v %+v", idealState, context))
 	})
 
 	// register state model before connecting

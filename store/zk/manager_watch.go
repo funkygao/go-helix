@@ -5,7 +5,115 @@ import (
 	"time"
 
 	"github.com/funkygao/go-helix"
+	log "github.com/funkygao/log4go"
 )
+
+// startChangeNotificationLoop is the main event loop for Spectator.
+// Whenever an external view update happpened
+// the loop will pause for a short period of time to bucket all subsequent external view
+// changes so that we don't send duplicate updates too often.
+func (s *Manager) startChangeNotificationLoop() {
+	log.Trace("%s starting change notification main loop...", s.shortID())
+
+	if len(s.externalViewListeners) > 0 {
+		s.watchExternalView()
+	}
+
+	if len(s.liveInstanceChangeListeners) > 0 {
+		s.watchLiveInstances()
+	}
+
+	if len(s.currentStateChangeListeners) > 0 {
+		s.watchCurrentStates()
+	}
+
+	if len(s.idealStateChangeListeners) > 0 {
+		s.watchIdealState()
+	}
+
+	if len(s.controllerMessageListeners) > 0 {
+		s.watchControllerMessages()
+	}
+
+	if len(s.instanceConfigChangeListeners) > 0 {
+		s.watchInstanceConfig()
+	}
+
+	if len(s.messageListeners) > 0 {
+		for instance := range s.messageListeners {
+			s.watchInstanceMessages(instance)
+		}
+	}
+
+	go func() {
+		var err error
+		for {
+			select {
+			case <-s.stop:
+				return
+
+			case err = <-s.changeNotificationErrChan:
+				log.Error("%s %v", s.shortID(), err)
+
+			case chg := <-s.changeNotificationChan:
+				s.handleChangeNotification(chg)
+			}
+		}
+	}()
+}
+
+func (s *Manager) handleChangeNotification(chg helix.ChangeNotification) {
+	switch chg.ChangeType {
+	case helix.ExternalViewChanged:
+		ev := s.GetExternalView()
+		if s.context != nil {
+			s.context.Set("trigger", chg.ChangeData.(string))
+		}
+
+		for _, evListener := range s.externalViewListeners {
+			go evListener(ev, s.context)
+		}
+
+	case helix.LiveInstanceChanged:
+		li, _ := s.GetLiveInstances()
+		for _, l := range s.liveInstanceChangeListeners {
+			go l(li, s.context)
+		}
+
+	case helix.IdealStateChanged:
+		is := s.GetIdealState()
+
+		for _, isListener := range s.idealStateChangeListeners {
+			go isListener(is, s.context)
+		}
+
+	case helix.CurrentStateChanged:
+		instance := chg.ChangeData.(string)
+		cs := s.GetCurrentState(instance)
+		for _, listener := range s.currentStateChangeListeners[instance] {
+			go listener(instance, cs, s.context)
+		}
+
+	case helix.InstanceConfigChanged:
+		ic := s.GetInstanceConfigs()
+		for _, icListener := range s.instanceConfigChangeListeners {
+			go icListener(ic, s.context)
+		}
+
+	case helix.ControllerMessagesChanged:
+		cm, _ := s.GetControllerMessages()
+		for _, cmListener := range s.controllerMessageListeners {
+			go cmListener(cm, s.context)
+		}
+
+	case helix.InstanceMessagesChanged:
+		instance := chg.ChangeData.(string)
+		messageRecords, _ := s.GetInstanceMessages(instance)
+		for _, ml := range s.messageListeners[instance] {
+			go ml(instance, messageRecords, s.context)
+		}
+	}
+}
 
 func (s *Manager) watchExternalViewResource(resource string) {
 	go func() {
@@ -305,107 +413,4 @@ func (s *Manager) watchInstanceMessage(instance string, messageID string) {
 	go func() {
 
 	}()
-}
-
-// loop is the main event loop for Spectator. Whenever an external view update happpened
-// the loop will pause for a short period of time to bucket all subsequent external view
-// changes so that we don't send duplicate updates too often.
-func (s *Manager) startChangeNotificationLoop() {
-	if len(s.externalViewListeners) > 0 {
-		s.watchExternalView()
-	}
-
-	if len(s.liveInstanceChangeListeners) > 0 {
-		s.watchLiveInstances()
-	}
-
-	if len(s.currentStateChangeListeners) > 0 {
-		s.watchCurrentStates()
-	}
-
-	if len(s.idealStateChangeListeners) > 0 {
-		s.watchIdealState()
-	}
-
-	if len(s.controllerMessageListeners) > 0 {
-		s.watchControllerMessages()
-	}
-
-	if len(s.instanceConfigChangeListeners) > 0 {
-		s.watchInstanceConfig()
-	}
-
-	if len(s.messageListeners) > 0 {
-		for instance := range s.messageListeners {
-			s.watchInstanceMessages(instance)
-		}
-	}
-
-	go func() {
-		for {
-			select {
-			case <-s.stop:
-				//s.state = spectatorDisConnected
-				return
-
-			case chg := <-s.changeNotificationChan:
-				s.handleChangeNotification(chg)
-				continue
-
-			}
-		}
-	}()
-}
-
-func (s *Manager) handleChangeNotification(chg helix.ChangeNotification) {
-	switch chg.ChangeType {
-	case helix.ExternalViewChanged:
-		ev := s.GetExternalView()
-		if s.context != nil {
-			s.context.Set("trigger", chg.ChangeData.(string))
-		}
-
-		for _, evListener := range s.externalViewListeners {
-			go evListener(ev, s.context)
-		}
-
-	case helix.LiveInstanceChanged:
-		li, _ := s.GetLiveInstances()
-		for _, l := range s.liveInstanceChangeListeners {
-			go l(li, s.context)
-		}
-
-	case helix.IdealStateChanged:
-		is := s.GetIdealState()
-
-		for _, isListener := range s.idealStateChangeListeners {
-			go isListener(is, s.context)
-		}
-
-	case helix.CurrentStateChanged:
-		instance := chg.ChangeData.(string)
-		cs := s.GetCurrentState(instance)
-		for _, listener := range s.currentStateChangeListeners[instance] {
-			go listener(instance, cs, s.context)
-		}
-
-	case helix.InstanceConfigChanged:
-		ic := s.GetInstanceConfigs()
-		for _, icListener := range s.instanceConfigChangeListeners {
-			go icListener(ic, s.context)
-		}
-
-	case helix.ControllerMessagesChanged:
-		cm := s.GetControllerMessages()
-		for _, cmListener := range s.controllerMessageListeners {
-			go cmListener(cm, s.context)
-		}
-
-	case helix.InstanceMessagesChanged:
-		instance := chg.ChangeData.(string)
-		messageRecords := s.GetInstanceMessages(instance)
-		for _, ml := range s.messageListeners[instance] {
-			go ml(instance, messageRecords, s.context)
-		}
-	}
 }

@@ -75,7 +75,8 @@ type Manager struct {
 	instanceConfigMap       map[string]bool // key is resource
 
 	// changeNotification is a channel to notify any changes that needs to trigger a listener
-	changeNotificationChan chan helix.ChangeNotification
+	changeNotificationChan    chan helix.ChangeNotification
+	changeNotificationErrChan chan error
 
 	// instance message channel.
 	// Each item in the channel is the instance name that has new messages
@@ -118,7 +119,8 @@ func NewZkHelixManager(clusterID, host, port, zkSvr string,
 		idealStateResourceMap:   map[string]bool{},
 		instanceConfigMap:       map[string]bool{},
 
-		changeNotificationChan: make(chan helix.ChangeNotification, 16),
+		changeNotificationChan:    make(chan helix.ChangeNotification, 16),
+		changeNotificationErrChan: make(chan error, 10),
 
 		stopCurrentStateWatch: make(map[string]chan interface{}),
 
@@ -186,9 +188,9 @@ func (m *Manager) Connect() error {
 	}
 
 	m.connected.Set(true)
-
 	log.Trace("manager{cluster:%s, instance:%s, type:%s, zk:%s} connected",
 		m.clusterID, m.instanceID, m.it, m.zkSvr)
+
 	return nil
 }
 
@@ -203,35 +205,28 @@ func (m *Manager) Disconnect() {
 	})
 }
 
+func (m *Manager) shortID() string {
+	return fmt.Sprintf("M[%s/%s]", m.instanceID, m.conn.GetSessionID())
+}
+
 func (m *Manager) isConnected() bool {
 	return m.connected.Get()
 }
 
-func (m *Manager) connectToZookeeper() error {
+func (m *Manager) connectToZookeeper() (err error) {
 	m.conn.SubscribeStateChanges(m)
-
-	if err := m.conn.Connect(); err != nil {
-		return err
+	if err = m.conn.Connect(); err != nil {
+		return
 	}
 
-	var err error
-	for retries := 0; retries < 3; retries++ {
-		if err = m.conn.waitUntilConnected(); err != nil {
-			log.Error("%+v", err)
-			continue
-		}
-
-		if err = m.HandleStateChanged(zk.StateSyncConnected); err != nil {
-			log.Error("%+v", err)
-			continue
-		}
-		if err = m.HandleNewSession(); err != nil {
-			log.Error("%+v", err)
-			continue
-		}
+	if err = m.HandleStateChanged(zk.StateSyncConnected); err != nil {
+		return
+	}
+	if err = m.HandleNewSession(); err != nil {
+		return
 	}
 
-	return err
+	return
 }
 
 func (m *Manager) HandleStateChanged(state zk.State) (err error) {

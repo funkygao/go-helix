@@ -28,7 +28,7 @@ func (m *zkMessagingService) Send(msg *model.Message) error {
 }
 
 func (p *zkMessagingService) onConnected() {
-	log.Trace("P[%s/%s] starting main loop", p.instanceID, p.conn.GetSessionID())
+	log.Trace("P[%s/%s] starting messaging main loop", p.instanceID, p.conn.GetSessionID())
 
 	messagesChan, errChan := p.watchMessages()
 	go func() {
