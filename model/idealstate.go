@@ -78,6 +78,26 @@ func (is *IdealState) RebalanceMode() string {
 	return is.GetStringField("REBALANCE_MODE", "")
 }
 
+func (is IdealState) RebalanceStrategy() string {
+	return is.GetStringField("REBALANCE_STRATEGY", "")
+}
+
+func (is IdealState) PreferenceList(partitionName string) []string {
+	return is.GetListField(partitionName)
+}
+
+func (is IdealState) ExternalViewDisabled() bool {
+	return is.GetBooleanField("EXTERNAL_VIEW_DISABLED", false)
+}
+
+func (is IdealState) ResourceGroupName() string {
+	return is.GetStringField("RESOURCE_GROUP_NAME", "")
+}
+
+func (is *IdealState) EnableGroupRouting(yes bool) {
+	is.SetBooleanField("GROUP_ROUTING_ENABLED", yes)
+}
+
 func (is *IdealState) SetRebalancerClassName(clazz string) {
 	is.SetSimpleField("REBALANCER_CLASS_NAME", clazz)
 }
@@ -94,6 +114,10 @@ func (is *IdealState) SetMaxPartitionsPerInstance(max int) {
 	is.SetIntField("MAX_PARTITIONS_PER_INSTANCE", max)
 }
 
+func (is IdealState) Replicas() string {
+	return is.GetStringField("REPLICAS", "")
+}
+
 func (is *IdealState) SetReplicas(replicas string) {
 	is.SetStringField("REPLICAS", replicas)
 }
@@ -103,6 +127,27 @@ func (is IdealState) NumPartitions() int {
 	return n
 }
 
+// StateModelDefRef returns the state model associated with this resource.
+func (is IdealState) StateModelDefRef() string {
+	return is.GetStringField("STATE_MODEL_DEF_REF", "")
+}
+
 func (is IdealState) SetNumPartitions(n int) {
 	is.SetStringField("NUM_PARTITIONS", strconv.Itoa(n))
+}
+
+func (is IdealState) Valid() bool {
+	isInvalid := is.NumPartitions() < 0 ||
+		is.StateModelDefRef() == ""
+	if isInvalid {
+		return false
+	}
+
+	if is.RebalanceMode() == "SEMI_AUTO" {
+		if is.Replicas() == "" {
+			return false
+		}
+	}
+
+	return true
 }
