@@ -44,7 +44,7 @@ func (m Message) ID() string {
 }
 
 func (m Message) Valid() bool {
-	if m.MessageType() == "STATE_TRANSITION" {
+	if strings.ToUpper(m.MessageType()) == "STATE_TRANSITION" {
 		notValid := m.TargetName() == "" ||
 			m.PartitionName() == "" ||
 			m.Resource() == "" ||
@@ -53,6 +53,7 @@ func (m Message) Valid() bool {
 			m.FromState() == ""
 		return !notValid
 	}
+
 	return true
 }
 

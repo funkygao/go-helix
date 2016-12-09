@@ -83,6 +83,16 @@ func (adm *Admin) SetInstallPath(path string) {
 	adm.helixInstallPath = path
 }
 
+func (adm Admin) ControllerHistory(cluster string) ([]string, error) {
+	kb := keyBuilder{clusterID: cluster}
+	record, err := adm.GetRecordFromPath(kb.controllerHistory())
+	if err != nil {
+		return nil, err
+	}
+
+	return record.GetListField(cluster), nil
+}
+
 func (adm Admin) AddCluster(cluster string) error {
 	kb := keyBuilder{clusterID: cluster}
 

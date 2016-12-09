@@ -35,6 +35,9 @@ type HelixAdmin interface {
 	// GetConfig obtains the configuration value of a property, defined by a config scope.
 	GetConfig(cluster string, scope HelixConfigScope, keys []string) (map[string]interface{}, error)
 
+	// ControllerHistory returns all controller instance names in history.
+	ControllerHistory(cluster string) ([]string, error)
+
 	// Add a node to a cluster.
 	// node has the form of host_port.
 	AddNode(cluster string, node string) error
