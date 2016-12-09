@@ -7,6 +7,7 @@ import (
 	log "github.com/funkygao/log4go"
 )
 
+// GenericHelixController is a loop that drives the current state towards the ideal state.
 type GenericHelixController struct {
 	manager  helix.HelixManager
 	paused   sync2.AtomicBool
