@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/funkygao/go-helix"
+	"github.com/funkygao/go-helix/controller"
 	"github.com/funkygao/go-zookeeper/zk"
 	"github.com/funkygao/golib/sync2"
 	log "github.com/funkygao/log4go"
@@ -39,6 +40,9 @@ type Manager struct {
 
 	// ClusterManagementTool cache
 	admin helix.HelixAdmin
+
+	// GenericHelixController cache
+	controller *controller.GenericHelixController
 
 	// ClusterMessagingService cache
 	messaging *zkMessagingService
@@ -158,7 +162,7 @@ func NewZkHelixManager(clusterID, host, port, zkSvr string,
 
 func (m *Manager) Connect() error {
 	m.RLock()
-	if m.connected.Get() {
+	if m.isConnected() {
 		m.RUnlock()
 		return nil
 	}
@@ -166,7 +170,7 @@ func (m *Manager) Connect() error {
 
 	m.Lock()
 	defer m.Unlock()
-	if m.connected.Get() {
+	if m.isConnected() {
 		return nil
 	}
 
@@ -177,6 +181,12 @@ func (m *Manager) Connect() error {
 		addr := fmt.Sprintf("localhost:%d", m.pprofPort)
 		go http.ListenAndServe(addr, nil)
 		log.Trace("pprof ready on http://%s/debug/pprof", addr)
+	}
+
+	if m.it.IsControllerStandalone() || m.it.IsControllerDistributed() {
+		if m.controller == nil {
+			m.controller = controller.NewGenericHelixController()
+		}
 	}
 
 	if err := m.connectToZookeeper(); err != nil {
@@ -210,7 +220,7 @@ func (m *Manager) Disconnect() {
 }
 
 func (m *Manager) shortID() string {
-	return fmt.Sprintf("M[%s/%s]", m.instanceID, m.conn.GetSessionID())
+	return fmt.Sprintf("%s[%s/%s@%s]", m.it, m.instanceID, m.conn.GetSessionID(), m.clusterID)
 }
 
 func (m *Manager) isConnected() bool {
@@ -241,13 +251,19 @@ func (m *Manager) HandleStateChanged(state zk.State) (err error) {
 
 	m.connected.Set(false)
 
+	// StateHasSession will be handled by HandleNewSession
 	switch state {
+	case zk.StateConnecting:
+
+	case zk.StateConnected:
+
 	case zk.StateDisconnected:
+
+	case zk.StateExpired:
 
 	case zk.StateUnknown:
 		// e,g. EventNodeChildrenChanged
 
-	case zk.StateExpired:
 	}
 
 	return

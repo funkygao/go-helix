@@ -120,10 +120,6 @@ func (p *participant) autoJoinAllowed() (bool, error) {
 	return strings.ToLower(al) == "true", nil
 }
 
-func (p *participant) shortID() string {
-	return fmt.Sprintf("P[%s/%s]", p.instanceID, p.conn.GetSessionID())
-}
-
 // Ensure that ZNodes for a participant all exist.
 func (p *participant) joinCluster() (bool, error) {
 	log.Debug("%s join cluster...", p.shortID())

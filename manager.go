@@ -12,6 +12,9 @@ type HelixManager interface {
 	// Cluster returns the cluster name associated with this cluster manager.
 	Cluster() string
 
+	//
+	IsLeader() bool
+
 	// Instance returns the instance name used to connect to the cluster.
 	Instance() string
 

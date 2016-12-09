@@ -18,6 +18,10 @@ func (m *Manager) InstanceType() helix.InstanceType {
 	return m.it
 }
 
+func (m *Manager) IsLeader() bool {
+	return false
+}
+
 func (m *Manager) Instance() string {
 	return m.instanceID
 }

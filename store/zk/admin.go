@@ -453,6 +453,7 @@ func (adm Admin) SetResourceIdealState(cluster, instanceName string, is *model.I
 	return nil
 }
 
+// TODO just set ideal state of the resource
 func (adm Admin) Rebalance(cluster string, resource string, replica int) error {
 	err, errCh := execCommand(fmt.Sprintf("%s/bin/helix-admin.sh", adm.helixInstallPath),
 		"--zkSvr", adm.zkSvr, "--rebalance", cluster, resource, strconv.Itoa(replica))
