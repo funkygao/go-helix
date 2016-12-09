@@ -37,6 +37,7 @@ const (
 	InstanceTypeSpectator      InstanceType = "SPECTATOR"
 	InstanceTypeController     InstanceType = "CONTROLLER"
 	InstanceTypeNotImplemented InstanceType = "CONTROLLER_PARTICIPANT"
+	InstanceTypeAdministrator  InstanceType = "ADMINISTRATOR"
 )
 
 const (

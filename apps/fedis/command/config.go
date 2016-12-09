@@ -10,7 +10,7 @@ const (
 	stateModel       = helix.StateModelMasterSlave
 	resource         = "redis"
 	partitions       = 3
-	replicas         = "2"
+	replicas         = 2
 	helixInstallBase = "/opt/helix"
 	redisServer      = "/opt/app/redis3/redis-server"
 )

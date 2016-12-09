@@ -1,5 +1,9 @@
 package zk
 
+import (
+	"os/exec"
+)
+
 // TODO kill this
 func must(err error) {
 	if err != nil {
@@ -15,4 +19,22 @@ func any(errors ...error) error {
 	}
 
 	return nil
+}
+
+func execCommand(name string, args ...string) (err error, exitCh chan error) {
+	exitCh = make(chan error)
+	cmd := exec.Command(name, args...)
+	waitStart := make(chan struct{})
+	go func() {
+		<-waitStart
+		if err := cmd.Wait(); err != nil {
+			exitCh <- err
+		} else {
+			close(exitCh)
+		}
+	}()
+
+	err = cmd.Start()
+	close(waitStart)
+	return
 }

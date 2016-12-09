@@ -14,12 +14,13 @@ import (
 )
 
 type redisNode struct {
-	cluster, zkSvr                 string
-	resource, stateModel, replicas string
-	host, port                     string
+	cluster, zkSvr       string
+	resource, stateModel string
+	replicas             int
+	host, port           string
 }
 
-func NewNode(zkSvr, cluster, resource, stateModel, replicas, host, port string) *redisNode {
+func NewNode(zkSvr, cluster, resource, stateModel string, replicas int, host, port string) *redisNode {
 	return &redisNode{
 		zkSvr:      zkSvr,
 		cluster:    cluster,
@@ -77,8 +78,12 @@ func (r *redisNode) Start() {
 	must(manager.Connect())
 
 	log.Info("start rebalancing %s/%s ...", r.replicas, r.replicas)
-	helix.Rebalance(r.zkSvr, r.cluster, r.resource, r.replicas)
-	log.Info("rebalanced done")
+	admin := manager.ClusterManagementTool()
+	if err := admin.Rebalance(r.cluster, r.resource, r.replicas); err != nil {
+		log.Error("rebalance: %v", err)
+	} else {
+		log.Info("rebalance: ok")
+	}
 
 	log.Info("waiting Ctrl-C...")
 

@@ -1,6 +1,7 @@
 package zk
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -16,18 +17,24 @@ type Admin struct {
 	zkSvr string
 	*connection
 	connected bool
+
+	helixInstallPath string
 }
 
 // NewZkHelixAdmin creates a HelixAdmin implementation with zk as storage.
 func NewZkHelixAdmin(zkSvr string, options ...zkConnOption) helix.HelixAdmin {
 	admin := &Admin{
-		zkSvr:      zkSvr,
-		connected:  false,
-		connection: newConnection(zkSvr),
+		zkSvr:            zkSvr,
+		connected:        false,
+		connection:       newConnection(zkSvr),
+		helixInstallPath: "/opt/helix",
 	}
+
+	// apply additional options over the default
 	for _, option := range options {
 		option(admin.connection)
 	}
+
 	return admin
 }
 
@@ -70,6 +77,10 @@ func (adm *Admin) Close() {
 		}
 		adm.Unlock()
 	})
+}
+
+func (adm *Admin) SetInstallPath(path string) {
+	adm.helixInstallPath = path
 }
 
 func (adm Admin) AddCluster(cluster string) error {
@@ -432,11 +443,12 @@ func (adm Admin) SetResourceIdealState(cluster, instanceName string, is *model.I
 	return nil
 }
 
-// Rebalance not implemented yet TODO
 func (adm Admin) Rebalance(cluster string, resource string, replica int) error {
-	if !adm.connected {
-		return helix.ErrNotConnected
+	err, errCh := execCommand(fmt.Sprintf("%s/bin/helix-admin.sh", adm.helixInstallPath),
+		"--zkSvr", adm.zkSvr, "--rebalance", cluster, resource, strconv.Itoa(replica))
+	if err != nil {
+		return err
 	}
 
-	return helix.ErrNotImplemented
+	return <-errCh
 }

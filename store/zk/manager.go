@@ -267,7 +267,6 @@ func (m *Manager) HandleNewSession() (err error) {
 		return helix.ErrNotImplemented
 	}
 
-	// TODO restart all listeners, re-watch, recreate ephemeral znodes
 	m.startChangeNotificationLoop()
 
 	return

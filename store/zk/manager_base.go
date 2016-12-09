@@ -38,6 +38,13 @@ func (m *Manager) MessagingService() helix.ClusterMessagingService {
 	return m.messaging
 }
 
+func (m *Manager) ClusterManagementTool() helix.HelixAdmin {
+	if m.admin == nil {
+		m.admin = newZkHelixAdminWithConn(m.conn)
+	}
+	return m.admin
+}
+
 // GetControllerMessages retrieves controller messages from zookeeper
 func (s *Manager) GetControllerMessages() ([]*model.Record, error) {
 	messages, err := s.conn.Children(s.kb.controllerMessages())

@@ -83,6 +83,9 @@ type HelixAdmin interface {
 	// Rebalance a resource in cluster.
 	Rebalance(cluster string, resource string, replica int) error
 
+	// SetInstallPath will setup the local helix installation base path.
+	SetInstallPath(path string)
+
 	// TODO
 	//setConstraint(String clusterName, ConstraintType constraintType, String constraintId, ConstraintItem constraintItem)
 	// getInstanceConfig(String clusterName, String instanceName)
