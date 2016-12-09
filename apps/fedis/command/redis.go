@@ -46,7 +46,7 @@ func (this *Redis) Run(args []string) (exitCode int) {
 }
 
 func (*Redis) setupLogging(level string) {
-	logLevel := log.ToLogLevel(level)
+	logLevel := log.ToLogLevel(level, log.DEBUG)
 	for _, filter := range log.Global {
 		filter.Level = logLevel
 	}

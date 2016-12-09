@@ -18,8 +18,12 @@ func (it InstanceType) IsSpectator() bool {
 	return it == InstanceTypeSpectator
 }
 
-func (it InstanceType) IsController() bool {
-	return it == InstanceTypeController
+func (it InstanceType) IsControllerStandalone() bool {
+	return it == InstanceTypeControllerStandalone
+}
+
+func (it InstanceType) IsControllerDistributed() bool {
+	return it == InstanceTypeControllerDistributed
 }
 
 type HelixConfigScope string

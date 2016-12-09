@@ -146,7 +146,7 @@ func NewZkHelixManager(clusterID, host, port, zkSvr string,
 
 	case helix.InstanceTypeSpectator:
 
-	case helix.InstanceTypeController, helix.InstanceTypeNotImplemented:
+	case helix.InstanceTypeControllerStandalone, helix.InstanceTypeControllerDistributed:
 		err = helix.ErrNotImplemented
 
 	default:
@@ -258,12 +258,9 @@ func (m *Manager) HandleNewSession() (err error) {
 	case helix.InstanceTypeParticipant:
 		err = m.handleNewSessionAsParticipant()
 
-	case helix.InstanceTypeController:
-		err = m.handleNewSessionAsController()
-
 	case helix.InstanceTypeSpectator:
 
-	case helix.InstanceTypeNotImplemented:
+	case helix.InstanceTypeControllerStandalone, helix.InstanceTypeControllerDistributed:
 		return helix.ErrNotImplemented
 	}
 

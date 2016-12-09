@@ -1,5 +1,9 @@
 package model
 
+import (
+	"strings"
+)
+
 // Message is controller generated payload to instruct participant to carry out some tasks.
 //
 // message content example:
@@ -34,8 +38,27 @@ func NewMessageFromRecord(record *Record) *Message {
 	return &Message{Record: record}
 }
 
+// ID returns the unique identifier of this message.
 func (m Message) ID() string {
 	return m.GetStringField("MSG_ID", "")
+}
+
+func (m Message) Valid() bool {
+	if m.MessageType() == "STATE_TRANSITION" {
+		notValid := m.TargetName() == "" ||
+			m.PartitionName() == "" ||
+			m.Resource() == "" ||
+			m.StateModelDef() == "" ||
+			m.ToState() == "" ||
+			m.FromState() == ""
+		return !notValid
+	}
+	return true
+}
+
+// IsControllerMsg checks if this message is targetted for a controller.
+func (m Message) IsControllerMsg() bool {
+	return strings.ToLower(m.TargetName()) == "controller"
 }
 
 func (m Message) MessageState() string {
@@ -50,12 +73,33 @@ func (m Message) MessageType() string {
 	return m.GetStringField("MSG_TYPE", "")
 }
 
+func (m Message) MessageSubType() string {
+	return m.GetStringField("MSG_SUBTYPE", "")
+}
+
+// Resource returns the resource associated with this message.
 func (m Message) Resource() string {
 	return m.GetStringField("RESOURCE_NAME", "")
 }
 
+// ResourceGroupName returns the resource group associated with this message.
+func (m Message) ResourceGroupName() string {
+	return m.GetStringField("RESOURCE_GROUP_NAME", "")
+}
+
+// ResourceTag returns the resource tag associated with this message.
+func (m Message) ResourceTag() string {
+	return m.GetStringField("RESOURCE_TAG", "")
+}
+
+// PartitionName returns the name of the partition this message concerns.
 func (m Message) PartitionName() string {
 	return m.GetStringField("PARTITION_NAME", "")
+}
+
+// PartitionNames returns a list of partitions associated with this message.
+func (m Message) PartitionNames() []string {
+	return m.GetListField("PARTITION_NAME")
 }
 
 func (m Message) BatchMessageMode() bool {
@@ -70,8 +114,18 @@ func (m Message) ToState() string {
 	return m.GetStringField("TO_STATE", "")
 }
 
+// StateModelDef returns the state model definition name.
 func (m Message) StateModelDef() string {
 	return m.GetStringField("STATE_MODEL_DEF", "")
+}
+
+// SrcName returns the instance from which the message originated.
+func (m Message) SrcName() string {
+	return m.GetStringField("SRC_NAME", "")
+}
+
+func (m Message) SrcInstanceType() string {
+	return m.GetStringField("SRC_INSTANCE_TYPE", "")
 }
 
 // TargetName returns the target instance name.
@@ -79,6 +133,12 @@ func (m Message) TargetName() string {
 	return m.GetStringField("TGT_NAME", "")
 }
 
+// SrcSessionId returns the session identifier of the source node.
+func (m Message) SrcSessionId() string {
+	return m.GetStringField("SRC_SESSION_ID", "")
+}
+
+// TargetSessionID returns the session identifier of the destination node.
 func (m Message) TargetSessionID() string {
 	return m.GetStringField("TGT_SESSION_ID", "")
 }
@@ -87,10 +147,37 @@ func (m Message) BucketSize() int {
 	return m.GetIntField("BUCKET_SIZE", 0)
 }
 
+// SetExecuteSessionID sets the session identifier of the node that executes the message.
 func (m *Message) SetExecuteSessionID(sessID string) {
 	m.SetSimpleField("EXE_SESSION_ID", sessID)
 }
 
+// CreateTimeStamp returns the time that this message was created.
+func (m Message) CreateTimeStamp() int64 {
+	return int64(m.GetIntField("CREATE_TIMESTAMP", 0))
+}
+
+func (m Message) RetryCount() int {
+	return m.GetIntField("RETRY_COUNT", 0)
+}
+
+// ExecutionTimeout returns the time to wait before stopping execution of this message.
+func (m Message) ExecutionTimeout() int {
+	return m.GetIntField("TIMEOUT", -1)
+}
+
+// SetReadTimestamp sets the time that this message was read.
 func (m *Message) SetReadTimestamp(val int64) {
 	m.SetSimpleField("READ_TIMESTAMP", val)
+}
+
+// SetExecuteStartTimeStamp sets the time that the instance executes tasks as instructed by this message.
+func (m *Message) SetExecuteStartTimeStamp(val int64) {
+	m.SetSimpleField("EXECUTE_START_TIMESTAMP", val)
+}
+
+// TODO
+// CreateReplyMessage creates a reply based on an incoming message.
+func (m Message) CreateReplyMessage(src *Message) {
+
 }

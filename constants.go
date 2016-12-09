@@ -33,11 +33,11 @@ const (
 )
 
 const (
-	InstanceTypeParticipant    InstanceType = "PARTICIPANT"
-	InstanceTypeSpectator      InstanceType = "SPECTATOR"
-	InstanceTypeController     InstanceType = "CONTROLLER"
-	InstanceTypeNotImplemented InstanceType = "CONTROLLER_PARTICIPANT"
-	InstanceTypeAdministrator  InstanceType = "ADMINISTRATOR"
+	InstanceTypeParticipant           InstanceType = "PARTICIPANT"
+	InstanceTypeSpectator             InstanceType = "SPECTATOR"
+	InstanceTypeControllerStandalone  InstanceType = "CONTROLLER"
+	InstanceTypeControllerDistributed InstanceType = "CONTROLLER_PARTICIPANT"
+	InstanceTypeAdministrator         InstanceType = "ADMINISTRATOR"
 )
 
 const (

@@ -126,7 +126,8 @@ func (p *zkMessagingService) processMessage(msgID string) error {
 	// create current state meta data
 	// do it for non-controller and state transition messages only
 	targetName := message.TargetName()
-	if !strings.EqualFold(targetName, string(helix.InstanceTypeController)) && strings.EqualFold(msgType, helix.MessageTypeStateTransition) {
+	if !strings.EqualFold(targetName, string(helix.InstanceTypeControllerStandalone)) &&
+		strings.EqualFold(msgType, helix.MessageTypeStateTransition) {
 		resourceID := message.Resource()
 
 		currentStateRecord := model.NewRecord(resourceID)
