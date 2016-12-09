@@ -183,9 +183,7 @@ func (m *Manager) Connect() error {
 		return err
 	}
 
-	if err := m.conn.waitUntilConnected(); err != nil {
-		return err
-	}
+	m.messaging.onConnected()
 
 	log.Debug("zk connected")
 
@@ -220,9 +218,19 @@ func (m *Manager) isConnected() bool {
 }
 
 func (m *Manager) connectToZookeeper() (err error) {
-	m.conn.SubscribeStateChanges(m)
 	if err = m.conn.Connect(); err != nil {
 		return
+	}
+
+	// will trigger HandleStateChanged, HandleNewSession
+	m.conn.SubscribeStateChanges(m)
+
+	for retries := 0; retries < 3; retries++ {
+		if err = m.conn.waitUntilConnected(m.conn.sessionTimeout); err == nil {
+			break
+		}
+
+		log.Warn("%s retry=%d %v", m.shortID(), retries, err)
 	}
 
 	return
@@ -248,7 +256,7 @@ func (m *Manager) HandleStateChanged(state zk.State) (err error) {
 func (m *Manager) HandleNewSession() (err error) {
 	log.Trace("%s handling new session", m.shortID())
 
-	if err = m.conn.waitUntilConnected(); err != nil {
+	if err = m.conn.waitUntilConnected(0); err != nil {
 		return
 	}
 

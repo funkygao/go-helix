@@ -132,15 +132,24 @@ func (conn connection) realPath(path string) string {
 	return strings.TrimRight(conn.chroot+path, "/")
 }
 
-func (conn *connection) waitUntilConnected() (err error) {
+func (conn *connection) waitUntilConnected(t time.Duration) (err error) {
 	t1 := time.Now()
-	for retries := 0; retries < 5; retries++ {
+	retries := 0
+	for {
 		if _, _, err = conn.zkConn.Exists("/zookeeper"); err == nil {
 			break
 		}
 
+		retries++
 		log.Debug("waitUntilConnected: retry=%d %v", retries, err)
-		time.Sleep(time.Second)
+
+		if t > 0 && time.Since(t1) > t {
+			break
+		} else if t > 0 {
+			time.Sleep(t)
+		} else {
+			time.Sleep(conn.sessionTimeout)
+		}
 	}
 
 	log.Debug("waitUntilConnected elapsed %s", time.Since(t1))

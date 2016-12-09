@@ -1,5 +1,9 @@
 package model
 
+import (
+	"strconv"
+)
+
 // ideal state content example:
 // {
 //   "id" : "MyResource",
@@ -88,4 +92,17 @@ func (is *IdealState) MaxPartitionsPerInstance() int {
 
 func (is *IdealState) SetMaxPartitionsPerInstance(max int) {
 	is.SetIntField("MAX_PARTITIONS_PER_INSTANCE", max)
+}
+
+func (is *IdealState) SetReplicas(replicas string) {
+	is.SetStringField("REPLICAS", replicas)
+}
+
+func (is IdealState) NumPartitions() int {
+	n, _ := strconv.Atoi(is.GetStringField("NUM_PARTITIONS", "-1"))
+	return n
+}
+
+func (is IdealState) SetNumPartitions(n int) {
+	is.SetStringField("NUM_PARTITIONS", strconv.Itoa(n))
 }
