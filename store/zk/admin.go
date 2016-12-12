@@ -14,7 +14,6 @@ type Admin struct {
 	sync.RWMutex
 	closeOnce sync.Once
 
-	zkSvr string
 	*connection
 	connected bool
 
@@ -24,7 +23,6 @@ type Admin struct {
 // NewZkHelixAdmin creates a HelixAdmin implementation with zk as storage.
 func NewZkHelixAdmin(zkSvr string, options ...zkConnOption) helix.HelixAdmin {
 	admin := &Admin{
-		zkSvr:            zkSvr,
 		connected:        false,
 		connection:       newConnection(zkSvr),
 		helixInstallPath: "/opt/helix",
@@ -40,7 +38,8 @@ func NewZkHelixAdmin(zkSvr string, options ...zkConnOption) helix.HelixAdmin {
 
 func newZkHelixAdminWithConn(c *connection) helix.HelixAdmin {
 	admin := &Admin{
-		connection: c,
+		connection:       c,
+		helixInstallPath: "/opt/helix",
 	}
 	admin.connected = admin.connection.IsConnected()
 	return admin

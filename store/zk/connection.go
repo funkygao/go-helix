@@ -21,7 +21,7 @@ var (
 		time.Millisecond * 5, // backoff
 		time.Second * 1,      // max backoff
 		1,                    // default backoff constant
-		2,                    // MaxAttempts, 0 means infinite
+		1,                    // MaxAttempts, 0 means infinite
 		false,                // use V(1) level for log messages
 	}
 )
@@ -35,6 +35,7 @@ type ZkStateListener interface {
 type connection struct {
 	sync.RWMutex
 
+	zkSvr          string
 	sessionTimeout time.Duration
 	servers        []string
 	chroot         string
@@ -56,6 +57,7 @@ func newConnection(zkSvr string) *connection {
 	}
 
 	conn := connection{
+		zkSvr:                zkSvr,
 		servers:              servers,
 		chroot:               chroot,
 		close:                make(chan struct{}),

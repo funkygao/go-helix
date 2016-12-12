@@ -77,7 +77,7 @@ func (r *redisNode) Start() {
 
 	must(manager.Connect())
 
-	log.Info("start rebalancing %s/%s ...", r.replicas, r.replicas)
+	log.Info("start rebalancing %s/%d ...", r.resource, r.replicas)
 	admin := manager.ClusterManagementTool()
 	if err := admin.Rebalance(r.cluster, r.resource, r.replicas); err != nil {
 		log.Error("rebalance: %v", err)
