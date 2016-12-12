@@ -131,10 +131,10 @@ func (p *zkMessagingService) processMessage(msgID string) error {
 		resourceID := message.Resource()
 
 		currentStateRecord := model.NewRecord(resourceID)
-		currentStateRecord.SetIntField("BUCKET_SIZE", message.GetIntField("BUCKET_SIZE", 0))
+		currentStateRecord.SetBucketSize(message.BucketSize())
+		currentStateRecord.SetBatchMessageMode(message.BatchMessageMode())
 		currentStateRecord.SetSimpleField("STATE_MODEL_DEF", message.GetSimpleField("STATE_MODEL_DEF"))
 		currentStateRecord.SetSimpleField("SESSION_ID", sessionID)
-		currentStateRecord.SetBooleanField("BATCH_MESSAGE_MODE", message.GetBooleanField("BATCH_MESSAGE_MODE", false))
 		currentStateRecord.SetSimpleField("STATE_MODEL_FACTORY_NAME", message.GetStringField("STATE_MODEL_FACTORY_NAME", "DEFAULT"))
 
 		resourceCurrentStatePath := p.kb.currentStateForResource(p.instanceID, sessionID, resourceID)

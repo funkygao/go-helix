@@ -328,7 +328,7 @@ func (adm Admin) AddResource(cluster string, resource string, option helix.AddRe
 		is.SetIntField("MAX_PARTITIONS_PER_INSTANCE", option.MaxPartitionsPerInstance)
 	}
 	if option.BucketSize > 0 {
-		is.SetSimpleField("BUCKET_SIZE", strconv.Itoa(option.BucketSize))
+		is.SetBucketSize(option.BucketSize)
 	}
 	switch option.RebalancerMode {
 	case helix.RebalancerModeFullAuto:

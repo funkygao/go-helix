@@ -103,10 +103,6 @@ func (m Message) PartitionNames() []string {
 	return m.GetListField("PARTITION_NAME")
 }
 
-func (m Message) BatchMessageMode() bool {
-	return m.GetBooleanField("BATCH_MESSAGE_MODE", false)
-}
-
 func (m Message) FromState() string {
 	return m.GetStringField("FROM_STATE", "")
 }
@@ -142,10 +138,6 @@ func (m Message) SrcSessionId() string {
 // TargetSessionID returns the session identifier of the destination node.
 func (m Message) TargetSessionID() string {
 	return m.GetStringField("TGT_SESSION_ID", "")
-}
-
-func (m Message) BucketSize() int {
-	return m.GetIntField("BUCKET_SIZE", 0)
 }
 
 // SetExecuteSessionID sets the session identifier of the node that executes the message.
