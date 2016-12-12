@@ -1,6 +1,7 @@
 package model
 
 import (
+	"math"
 	"strconv"
 )
 
@@ -107,7 +108,7 @@ func (is *IdealState) RebalancerClassName() string {
 }
 
 func (is *IdealState) MaxPartitionsPerInstance() int {
-	return is.GetIntField("MAX_PARTITIONS_PER_INSTANCE", 0)
+	return is.GetIntField("MAX_PARTITIONS_PER_INSTANCE", int(math.MaxInt64))
 }
 
 func (is *IdealState) SetMaxPartitionsPerInstance(max int) {
