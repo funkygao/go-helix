@@ -34,10 +34,6 @@ func (m *Manager) StateMachineEngine() helix.StateMachineEngine {
 	return m.sme
 }
 
-func (m *Manager) HelixDataAccessor() helix.HelixDataAccessor {
-	return nil // TODO
-}
-
 func (m *Manager) MessagingService() helix.ClusterMessagingService {
 	return m.messaging
 }

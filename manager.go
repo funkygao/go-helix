@@ -51,9 +51,6 @@ type HelixManager interface {
 	// AddInstanceConfigChangeListener add a listener to instance config changes.
 	AddInstanceConfigChangeListener(InstanceConfigChangeListener)
 
-	// HelixDataAccessor returns the client to perform read/write operations on the cluster data.
-	HelixDataAccessor() HelixDataAccessor
-
 	// MessagingService returns ClusterMessagingService which can be used to send cluster wide messages.
 	MessagingService() ClusterMessagingService
 
