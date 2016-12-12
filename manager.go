@@ -1,10 +1,14 @@
 package helix
 
-// HelixManager is a common component that connects each system component with the controller.
+// HelixManager is a facade component that connects each system component with the controller.
 type HelixManager interface {
 
 	// Connect will connect manager to storage and start housekeeping.
 	Connect() error
+
+	// IsConnected checks if the connection is alive.
+	// There is no need to invoke Connect again if IsConnected return false.
+	IsConnected() bool
 
 	// Disconnect will disconnect manager from storage.
 	Disconnect()
@@ -12,7 +16,7 @@ type HelixManager interface {
 	// Cluster returns the cluster name associated with this cluster manager.
 	Cluster() string
 
-	//
+	// IsLeader checks if this is a controller and a leader of the cluster.
 	IsLeader() bool
 
 	// Instance returns the instance name used to connect to the cluster.
@@ -27,9 +31,6 @@ type HelixManager interface {
 	// AddPreConnectCallback adds a callback that is invoked before a participant joins the cluster.
 	AddPreConnectCallback(PreConnectCallback)
 
-	// StateMachineEngine returns the sme of the participant.
-	StateMachineEngine() StateMachineEngine
-
 	// AddExternalViewChangeListener add a listener to external view changes.
 	AddExternalViewChangeListener(ExternalViewChangeListener)
 
@@ -37,7 +38,7 @@ type HelixManager interface {
 	AddLiveInstanceChangeListener(LiveInstanceChangeListener)
 
 	// AddCurrentStateChangeListener add a listener to current state changes of the specified instance.
-	AddCurrentStateChangeListener(instance string, listener CurrentStateChangeListener)
+	AddCurrentStateChangeListener(instance, sessionID string, listener CurrentStateChangeListener)
 
 	// AddMessageListener adds a listener to the messages of an instance.
 	AddMessageListener(instance string, listener MessageListener)
@@ -57,5 +58,14 @@ type HelixManager interface {
 	// ClusterManagementTool provides admin interface to setup and modify cluster.
 	ClusterManagementTool() HelixAdmin
 
-	// RemoveListener()
+	// StateMachineEngine returns the sme of the participant.
+	StateMachineEngine() StateMachineEngine
+
+	// StartTimerTasks start timer tasks when becomes leader.
+	StartTimerTasks()
+
+	// StopTimerTasks stop timer tasks when becomes standby.
+	StopTimerTasks()
+
+	RemoveListener()
 }

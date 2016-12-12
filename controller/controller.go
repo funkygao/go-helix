@@ -1,3 +1,4 @@
+// Package controller provides implementation of the default Helix controller.
 package controller
 
 import (

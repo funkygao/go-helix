@@ -5,6 +5,11 @@ import (
 )
 
 const (
+	ConstaintTypeState   = "STATE_CONSTRAINT"
+	ConstaintTypeMessage = "MESSAGE_CONSTRAINT"
+)
+
+const (
 	MessageStateNew           = "NEW"
 	MessageStateRead          = "READ"
 	MessageStateUnprocessable = "UNPROCESSABLE"

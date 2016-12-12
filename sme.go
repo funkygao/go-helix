@@ -10,5 +10,6 @@ type StateMachineEngine interface {
 	// RemoveStateModel disconnects a state transition with the participant.
 	RemoveStateModel(stateModelDef string) error
 
+	// StateModel returns a state model by name.
 	StateModel(stateModelDef string) (*StateModel, bool)
 }

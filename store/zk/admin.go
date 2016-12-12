@@ -15,18 +15,14 @@ type Admin struct {
 	closeOnce sync.Once
 
 	*connection
-	connected bool
 
+	// TODO kill this
 	helixInstallPath string
 }
 
 // NewZkHelixAdmin creates a HelixAdmin implementation with zk as storage.
 func NewZkHelixAdmin(zkSvr string, options ...zkConnOption) helix.HelixAdmin {
-	admin := &Admin{
-		connected:        false,
-		connection:       newConnection(zkSvr),
-		helixInstallPath: "/opt/helix",
-	}
+	admin := newZkHelixAdminWithConn(newConnection(zkSvr))
 
 	// apply additional options over the default
 	for _, option := range options {
@@ -37,12 +33,14 @@ func NewZkHelixAdmin(zkSvr string, options ...zkConnOption) helix.HelixAdmin {
 }
 
 func newZkHelixAdminWithConn(c *connection) helix.HelixAdmin {
-	admin := &Admin{
+	return &Admin{
 		connection:       c,
 		helixInstallPath: "/opt/helix",
 	}
-	admin.connected = admin.connection.IsConnected()
-	return admin
+}
+
+func (adm Admin) connected() bool {
+	return adm.connection.IsConnected()
 }
 
 func (adm *Admin) Connect() error {
@@ -360,16 +358,7 @@ func (adm Admin) DropResource(cluster string, resource string) error {
 	return adm.DeleteTree(kb.resourceConfig(resource))
 }
 
-func (adm Admin) EnableResource(cluster string, resource string) error {
-	return adm.setResourceEnabled(cluster, resource, true)
-}
-
-// DisableResource disables the specified resource in the cluster.
-func (adm Admin) DisableResource(cluster string, resource string) error {
-	return adm.setResourceEnabled(cluster, resource, false)
-}
-
-func (adm Admin) setResourceEnabled(cluster string, resource string, enabled bool) error {
+func (adm Admin) EnableResource(cluster string, resource string, enabled bool) error {
 	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
 		return helix.ErrClusterNotSetup
 	}
@@ -397,10 +386,6 @@ func (adm Admin) Resources(cluster string) ([]string, error) {
 
 	kb := keyBuilder{clusterID: cluster}
 	return adm.Children(kb.idealStates())
-}
-
-func (adm Admin) ResetResource(cluster string, resource string) error {
-	return nil
 }
 
 func (adm Admin) InstanceInfo(cluster string, ic model.InstanceConfig) (*model.Record, error) {

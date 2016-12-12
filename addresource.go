@@ -18,9 +18,9 @@ func DefaultAddResourceOption(partitions int, stateModel string) AddResourceOpti
 	}
 }
 
-func (opt AddResourceOption) Validate() error {
+func (opt AddResourceOption) Valid() bool {
 	if opt.Partitions < 1 || opt.StateModel == "" || opt.RebalancerMode == "" {
-		return ErrInvalidAddResourceOption
+		return false
 	}
-	return nil
+	return true
 }
