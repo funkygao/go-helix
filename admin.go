@@ -25,9 +25,6 @@ type HelixAdmin interface {
 	// Clusters return all Helix managed clusters under '/'.
 	Clusters() ([]string, error)
 
-	// ClusterInfo returns the existing resources and instances in the cluster.
-	ClusterInfo(cluster string) (instances []string, resources []string, err error)
-
 	// DropCluster removes a Helix managed cluster.
 	DropCluster(cluster string) error
 
@@ -127,5 +124,5 @@ type HelixAdmin interface {
 
 	AddConstaint()
 	RemoveConstaint()
-	Constrains()
+	Constraints()
 }

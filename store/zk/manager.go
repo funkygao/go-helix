@@ -162,7 +162,7 @@ func NewZkHelixManager(clusterID, host, port, zkSvr string,
 
 func (m *Manager) Connect() error {
 	m.RLock()
-	if m.isConnected() {
+	if m.IsConnected() {
 		m.RUnlock()
 		return nil
 	}
@@ -170,7 +170,7 @@ func (m *Manager) Connect() error {
 
 	m.Lock()
 	defer m.Unlock()
-	if m.isConnected() {
+	if m.IsConnected() {
 		return nil
 	}
 
@@ -223,7 +223,7 @@ func (m *Manager) shortID() string {
 	return fmt.Sprintf("%s[%s/%s@%s]", m.it, m.instanceID, m.conn.SessionID(), m.clusterID)
 }
 
-func (m *Manager) isConnected() bool {
+func (m *Manager) IsConnected() bool {
 	return m.connected.Get()
 }
 

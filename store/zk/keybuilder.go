@@ -14,6 +14,7 @@ import (
 // /{cluster}/CONTROLLER
 // /{cluster}/CONTROLLER/ERRORS
 // /{cluster}/CONTROLLER/HISTORY
+// /{cluster}/CONTROLLER/LEADER
 // /{cluster}/CONTROLLER/MESSAGES
 // /{cluster}/CONTROLLER/STATUSUPDATES
 // /{cluster}/EXTERNALVIEW
@@ -72,12 +73,20 @@ func (k *keyBuilder) controllerHistory() string {
 	return fmt.Sprintf("/%s/CONTROLLER/HISTORY", k.clusterID)
 }
 
+func (k *keyBuilder) controllerLeader() string {
+	return fmt.Sprintf("/%s/CONTROLLER/LEADER", k.clusterID)
+}
+
 func (k *keyBuilder) controllerMessages() string {
 	return fmt.Sprintf("/%s/CONTROLLER/MESSAGES", k.clusterID)
 }
 
 func (k *keyBuilder) controllerMessage(ID string) string {
 	return fmt.Sprintf("/%s/CONTROLLER/MESSAGES/%s", k.clusterID, ID)
+}
+
+func (k *keyBuilder) pause() string {
+	return fmt.Sprintf("/%s/CONTROLLER/PAUSE", k.clusterID)
 }
 
 func (k *keyBuilder) controllerStatusUpdates() string {

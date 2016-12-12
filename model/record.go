@@ -134,6 +134,21 @@ func (r *Record) AddListField(key string, value string) {
 	r.ListFields[key] = values
 }
 
+func (r *Record) RemoveListField(key string, value string) {
+	values, present := r.ListFields[key]
+	if !present {
+		return
+	}
+
+	newValues := make([]string, 0, len(values))
+	for _, v := range values {
+		if v != value {
+			newValues = append(newValues, v)
+		}
+	}
+	r.ListFields[key] = newValues
+}
+
 // SetSimpleField sets the value of a key under SimpleField
 func (r *Record) SetSimpleField(key string, value interface{}) {
 	if r.SimpleFields == nil {

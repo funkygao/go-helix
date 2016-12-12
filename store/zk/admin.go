@@ -49,7 +49,7 @@ func (adm *Admin) Connect() error {
 
 	adm.Lock()
 	defer adm.Unlock()
-	if adm.connected {
+	if adm.connected() {
 		return nil
 	}
 
@@ -110,6 +110,7 @@ func (adm *Admin) AddCluster(cluster string) error {
 	adm.CreateEmptyPersistent(kb.externalView())
 	adm.CreateEmptyPersistent(kb.liveInstances())
 
+	// create all the default state mode definitions
 	adm.CreateEmptyPersistent(kb.stateModelDefs())
 	adm.CreatePersistent(kb.stateModelDef(helix.StateModelLeaderStandby), helix.HelixDefaultStateModels[helix.StateModelLeaderStandby])
 	adm.CreatePersistent(kb.stateModelDef(helix.StateModelMasterSlave), helix.HelixDefaultStateModels[helix.StateModelMasterSlave])
@@ -132,6 +133,7 @@ func (adm *Admin) AddCluster(cluster string) error {
 	adm.CreateEmptyPersistent(kb.controllerMessages())
 	adm.CreateEmptyPersistent(kb.controllerStatusUpdates())
 
+	// checkup before we return
 	ok, err := adm.IsClusterSetup(cluster)
 	if err != nil {
 		return err
@@ -143,7 +145,46 @@ func (adm *Admin) AddCluster(cluster string) error {
 
 func (adm Admin) DropCluster(cluster string) error {
 	kb := keyBuilder{clusterID: cluster}
+
+	// cannot drop cluster if there is live instances running
+	liveInstances, err := adm.Children(kb.liveInstances())
+	if err != nil {
+		return err
+	}
+	if len(liveInstances) > 0 {
+		return helix.ErrNotEmpty
+	}
+
+	// cannot dro cluster if there is controller running
+	leader, err := adm.Get(kb.controllerLeader())
+	if err == nil && len(leader) > 0 {
+		return helix.ErrNotEmpty
+	}
+
 	return adm.DeleteTree(kb.cluster())
+}
+
+func (adm Admin) EnableCluster(cluster string, yes bool) error {
+	kb := keyBuilder{clusterID: cluster}
+	if yes {
+		return adm.Delete(kb.pause())
+	} else {
+		return adm.CreatePersistent(kb.pause(), []byte("pause"))
+	}
+}
+
+func (adm Admin) AddClusterToGrandCluster(cluster, grandCluster string) (err error) {
+	if ok, e := adm.IsClusterSetup(cluster); !ok || e != nil {
+		err = helix.ErrClusterNotSetup
+		return
+	}
+	if ok, e := adm.IsClusterSetup(grandCluster); !ok || e != nil {
+		err = helix.ErrClusterNotSetup
+		return
+	}
+
+	// TODO
+	return helix.ErrNotImplemented
 }
 
 func (adm Admin) Clusters() ([]string, error) {
@@ -154,28 +195,12 @@ func (adm Admin) Clusters() ([]string, error) {
 
 	var clusters []string
 	for _, cluster := range children {
-		if ok, err := adm.IsClusterSetup(cluster); ok && err == nil {
+		if ok, err := adm.IsClusterSetup(cluster); err == nil && ok {
 			clusters = append(clusters, cluster)
 		}
 	}
 
 	return clusters, nil
-}
-
-func (adm Admin) ClusterInfo(cluster string) (instances []string, resources []string, err error) {
-	if ok, e := adm.IsClusterSetup(cluster); !ok || e != nil {
-		err = helix.ErrClusterNotSetup
-		return
-	}
-
-	kb := keyBuilder{clusterID: cluster}
-	resources, err = adm.Children(kb.idealStates())
-	if err != nil {
-		return
-	}
-
-	instances, err = adm.Children(kb.instances())
-	return
 }
 
 func (adm Admin) SetConfig(cluster string, scope helix.HelixConfigScope, properties map[string]string) error {
@@ -197,13 +222,17 @@ func (adm Admin) SetConfig(cluster string, scope helix.HelixConfigScope, propert
 	return nil
 }
 
+func (adm Admin) DropConfig(scope helix.HelixConfigScope, keys []string) error {
+	return helix.ErrNotImplemented
+}
+
 func (adm Admin) GetConfig(cluster string, scope helix.HelixConfigScope, keys []string) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 	switch scope {
 	case helix.ConfigScopeCluster:
 		kb := keyBuilder{clusterID: cluster}
 		for _, k := range keys {
-			result[k] = adm.GetSimpleFieldValueByKey(kb.clusterConfig(), k)
+			result[k], _ = adm.GetSimpleFieldValueByKey(kb.clusterConfig(), k)
 		}
 
 	case helix.ConfigScopeConstraint:
@@ -227,6 +256,72 @@ func (adm Admin) AllowParticipantAutoJoin(cluster string, yes bool) error {
 
 func (adm Admin) AddInstance(cluster string, config model.InstanceConfig) error {
 	return adm.AddNode(cluster, config.Node())
+}
+
+func (adm Admin) AddInstanceTag(cluster, instance, tag string) error {
+	if ok, err := adm.IsClusterSetup(cluster); ok == false || err != nil {
+		return helix.ErrClusterNotSetup
+	}
+	if ok, err := adm.IsInstanceSetup(cluster, instance); ok == false || err != nil {
+		return helix.ErrClusterNotSetup
+	}
+
+	kb := keyBuilder{clusterID: cluster}
+	data, err := adm.Get(kb.participantConfig(instance))
+	if err != nil {
+		return err
+	}
+
+	r, err := model.NewRecordFromBytes(data)
+	if err != nil {
+		return err
+	}
+	ic := model.NewInstanceConfigFromRecord(r)
+	ic.AddTag(tag)
+	return adm.Set(kb.participantConfig(instance), ic.Marshal())
+}
+
+func (adm Admin) RemoveInstanceTag(cluster, instance, tag string) error {
+	if ok, err := adm.IsClusterSetup(cluster); ok == false || err != nil {
+		return helix.ErrClusterNotSetup
+	}
+	if ok, err := adm.IsInstanceSetup(cluster, instance); ok == false || err != nil {
+		return helix.ErrClusterNotSetup
+	}
+
+	kb := keyBuilder{clusterID: cluster}
+	data, err := adm.Get(kb.participantConfig(instance))
+	if err != nil {
+		return err
+	}
+
+	r, err := model.NewRecordFromBytes(data)
+	if err != nil {
+		return err
+	}
+	ic := model.NewInstanceConfigFromRecord(r)
+	ic.RemoveTag(tag)
+	return adm.Set(kb.participantConfig(instance), ic.Marshal())
+}
+
+func (adm Admin) InstanceConfig(cluster, instance string) (*model.InstanceConfig, error) {
+	return nil, helix.ErrNotImplemented
+}
+
+func (adm Admin) InstancesWithTag(cluster, tag string) ([]string, error) {
+	return nil, helix.ErrNotImplemented
+}
+
+func (adm Admin) ResourceExternalView(cluster string, resource string) (*model.ExternalView, error) {
+	return nil, helix.ErrNotImplemented
+}
+
+func (adm Admin) ResourceIdealState(cluster, resource string) (*model.IdealState, error) {
+	return nil, helix.ErrNotImplemented
+}
+
+func (adm Admin) ResourcesWithTag(cluster, tag string) ([]string, error) {
+	return nil, helix.ErrNotImplemented
 }
 
 // AddNode is the internal implementation corresponding to command
@@ -266,6 +361,11 @@ func (adm Admin) AddNode(cluster string, node string) error {
 }
 
 func (adm Admin) DropInstance(cluster string, ic model.InstanceConfig) error {
+	kb := keyBuilder{clusterID: cluster}
+	if err := adm.Delete(kb.participantConfig(ic.Node())); err != nil {
+		return err
+	}
+
 	return adm.DropNode(cluster, ic.Node())
 }
 
@@ -293,8 +393,8 @@ func (adm Admin) DropNode(cluster string, node string) error {
 }
 
 func (adm Admin) AddResource(cluster string, resource string, option helix.AddResourceOption) error {
-	if err := option.Validate(); err != nil {
-		return err
+	if !option.Valid() {
+		return helix.ErrInvalidAddResourceOption
 	}
 
 	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
@@ -381,10 +481,6 @@ func (adm Admin) EnableResource(cluster string, resource string, enabled bool) e
 }
 
 func (adm Admin) Resources(cluster string) ([]string, error) {
-	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
-		return nil, helix.ErrClusterNotSetup
-	}
-
 	kb := keyBuilder{clusterID: cluster}
 	return adm.Children(kb.idealStates())
 }
@@ -406,19 +502,12 @@ func (adm Admin) InstanceInfo(cluster string, ic model.InstanceConfig) (*model.R
 	return adm.GetRecord(instanceCfg)
 }
 
-// Instances returns lists of instances.
 func (adm Admin) Instances(cluster string) ([]string, error) {
-	// make sure the cluster is already setup
-	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
-		return nil, helix.ErrClusterNotSetup
-	}
-
 	kb := keyBuilder{clusterID: cluster}
 	return adm.Children(kb.instances())
 }
 
-// TODO model.StateModelDef
-func (adm Admin) AddStateModelDef(cluster string, stateModel string, definition *model.Record) error {
+func (adm Admin) AddStateModelDef(cluster string, stateModel string, definition *model.StateModelDef) error {
 	kb := keyBuilder{clusterID: cluster}
 	return adm.CreatePersistentRecord(kb.stateModelDef(stateModel), definition)
 }
@@ -426,6 +515,10 @@ func (adm Admin) AddStateModelDef(cluster string, stateModel string, definition 
 func (adm Admin) StateModelDefs(cluster string) ([]string, error) {
 	kb := keyBuilder{clusterID: cluster}
 	return adm.Children(kb.stateModelDefs())
+}
+
+func (adm Admin) StateModelDef(cluster, stateModel string) (*model.StateModelDef, error) {
+	return nil, helix.ErrNotImplemented
 }
 
 // TODO
@@ -447,4 +540,20 @@ func (adm Admin) Rebalance(cluster string, resource string, replica int) error {
 	}
 
 	return <-errCh
+}
+
+func (adm Admin) EnablePartitions(cluster, resource string, partitions []string, yes bool) error {
+	return helix.ErrNotImplemented
+}
+
+func (adm Admin) AddConstaint() {
+	// TODO
+}
+
+func (adm Admin) RemoveConstaint() {
+	// TODO
+}
+
+func (adm Admin) Constraints() {
+	// TODO
 }

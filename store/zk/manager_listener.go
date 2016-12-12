@@ -16,7 +16,8 @@ func (s *Manager) AddLiveInstanceChangeListener(listener helix.LiveInstanceChang
 	s.Unlock()
 }
 
-func (s *Manager) AddCurrentStateChangeListener(instance string, listener helix.CurrentStateChangeListener) {
+// FIXME sessionID
+func (s *Manager) AddCurrentStateChangeListener(instance string, sessionID string, listener helix.CurrentStateChangeListener) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -28,7 +29,7 @@ func (s *Manager) AddCurrentStateChangeListener(instance string, listener helix.
 
 	// if we are adding new listeners when the specator is already connected, we need
 	// to kick of the listener in the event loop
-	if len(s.currentStateChangeListeners[instance]) == 1 && s.isConnected() {
+	if len(s.currentStateChangeListeners[instance]) == 1 && s.IsConnected() {
 		s.watchCurrentStateForInstance(instance)
 	}
 }
@@ -46,7 +47,7 @@ func (s *Manager) AddMessageListener(instance string, listener helix.MessageList
 	// if the spectator is already connected and this is the first listener
 	// for the instance, we need to start watching the zookeeper path for
 	// upcoming messages
-	if len(s.messageListeners[instance]) == 1 && s.isConnected() {
+	if len(s.messageListeners[instance]) == 1 && s.IsConnected() {
 		s.watchInstanceMessages(instance)
 	}
 }
@@ -67,4 +68,8 @@ func (s *Manager) AddControllerMessageListener(listener helix.ControllerMessageL
 	s.Lock()
 	s.controllerMessageListeners = append(s.controllerMessageListeners, listener)
 	s.Unlock()
+}
+
+func (s *Manager) RemoveListener() {
+	panic(helix.ErrNotImplemented)
 }

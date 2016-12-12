@@ -46,6 +46,10 @@ func (ic *InstanceConfig) AddTag(tag string) {
 	ic.AddListField("TAG_LIST", tag)
 }
 
+func (ic *InstanceConfig) RemoveTag(tag string) {
+	ic.RemoveListField("TAG_LIST", tag)
+}
+
 func (ic InstanceConfig) DisabledPartitions() []string {
 	return ic.GetListField("HELIX_DISABLED_PARTITION")
 }
