@@ -10,7 +10,6 @@ func TestNewStateModel(t *testing.T) {
 	t.Parallel()
 
 	sm1 := NewStateModel()
-
 	if len(sm1.transitions) != 0 {
 		t.Error("The Statemodel should be empty")
 	}

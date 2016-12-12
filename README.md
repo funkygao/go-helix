@@ -11,3 +11,7 @@ Originally based on https://github.com/yichen/gohelix
 - [ ] metrics
 - [ ] constraint
 - [ ] HelixMultiClusterController, HelixStateTransitionHandler, HelixTaskExecutor.onMessage
+
+### Codebase
+
+- helix.Context

@@ -29,6 +29,26 @@ func (c *Context) Set(key string, value interface{}) {
 	c.Unlock()
 }
 
+// SetNX is Set if Not eXists.
+func (c *Context) SetNX(key string, value interface{}) (ok bool) {
+	c.RLock()
+	if _, present := c.data[key]; present {
+		c.RUnlock()
+		return false
+	}
+	c.RUnlock()
+
+	c.Lock()
+	defer c.Unlock()
+
+	if _, present := c.data[key]; present {
+		return false
+	}
+
+	c.data[key] = value
+	return true
+}
+
 // Get gets the value of a key.
 func (c *Context) Get(key string) interface{} {
 	v, ok := c.data[key]
