@@ -10,8 +10,8 @@ type HelixAdmin interface {
 	// Connect will connect to the storage.
 	Connect() error
 
-	// Close will release resources.
-	Close()
+	// Disconnect will disconnect from the storage and release resources.
+	Disconnect()
 
 	// AddCluster add a managed cluster to Helix.
 	AddCluster(cluster string) error

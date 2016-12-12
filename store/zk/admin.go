@@ -67,7 +67,7 @@ func (adm *Admin) Connect() error {
 	return nil
 }
 
-func (adm *Admin) Close() {
+func (adm *Admin) Disconnect() {
 	adm.closeOnce.Do(func() {
 		adm.Lock()
 		if adm.connected {
