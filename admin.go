@@ -42,10 +42,13 @@ type HelixAdmin interface {
 	// node has the form of host_port.
 	AddNode(cluster string, node string) error
 
+	// DropNode drops a node from a cluster.
+	DropNode(cluster string, node string) error
+
 	// Add an instance to a cluster.
 	AddInstance(cluster string, config model.InstanceConfig) error
 
-	// Drop an instance from a cluster.
+	// DropInstance drops an instance from a cluster.
 	DropInstance(cluster string, ic model.InstanceConfig) error
 
 	// Get a list of instances participating under a cluster.

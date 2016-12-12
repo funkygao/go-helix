@@ -1,7 +1,7 @@
 package helix
 
 import (
-    "github.com/funkygao/go-helix/model"
+	"github.com/funkygao/go-helix/model"
 )
 
 // Transition associates a handler function with the state transition from the from state

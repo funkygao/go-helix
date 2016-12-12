@@ -26,7 +26,7 @@ func TestAddAndDropCluster(t *testing.T) {
 	now := time.Now().Local()
 	cluster := "AdminTest_TestAddAndDropCluster_" + now.Format("20060102150405")
 
-	a := Admin{zkSvr: testZkSvr}
+	a := NewZkHelixAdmin(testZkSvr)
 	err := a.AddCluster(cluster)
 	if err != nil {
 		t.Error(err)
@@ -61,7 +61,7 @@ func TestAddCluster(t *testing.T) {
 	now := time.Now().Local()
 	cluster := "AdminTest_TestAddCluster" + now.Format("20060102150405")
 
-	a := Admin{zkSvr: testZkSvr}
+	a := NewZkHelixAdmin(testZkSvr)
 	err := a.AddCluster(cluster)
 	if err == nil {
 		defer a.DropCluster(cluster)
@@ -103,7 +103,7 @@ func TestSetConfig(t *testing.T) {
 	now := time.Now().Local()
 	cluster := "AdminTest_TestSetConfig_" + now.Format("20060102150405")
 
-	a := Admin{zkSvr: testZkSvr}
+	a := NewZkHelixAdmin(testZkSvr)
 	err := a.AddCluster(cluster)
 	if err == nil {
 		defer a.DropCluster(cluster)
@@ -129,7 +129,7 @@ func TestAddDropNode(t *testing.T) {
 	now := time.Now().Local()
 	cluster := "AdminTest_TestAddDropNode_" + now.Format("20060102150405")
 
-	a := Admin{zkSvr: testZkSvr}
+	a := NewZkHelixAdmin(testZkSvr)
 	node := "localhost_19932"
 
 	// add node before adding cluster, expect fail
@@ -181,7 +181,7 @@ func TestAddDropResource(t *testing.T) {
 	cluster := "AdminTest_TestAddResource_" + now.Format("20060102150405")
 	resource := "resource"
 
-	a := Admin{zkSvr: testZkSvr}
+	a := NewZkHelixAdmin(testZkSvr)
 
 	// expect error if cluster not setup
 	if err := a.AddResource(cluster, resource, helix.DefaultAddResourceOption(32, "MasterSlave")); err != helix.ErrClusterNotSetup {
@@ -233,7 +233,7 @@ func TestEnableDisableResource(t *testing.T) {
 	cluster := "AdminTest_TestEnableDisableResource_" + now.Format("20060102150405")
 	resource := "resource"
 
-	a := Admin{zkSvr: testZkSvr}
+	a := NewZkHelixAdmin(testZkSvr)
 
 	// expect error if cluster not setup
 	if err := a.EnableResource(cluster, resource); err != helix.ErrClusterNotSetup {

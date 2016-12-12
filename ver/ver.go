@@ -1,3 +1,6 @@
 package ver
 
-const Ver = "go-helix-0.1.alpha"
+var (
+	Ver     = "go-helix-0.1.alpha"
+	BuildID = "unkown"
+)
