@@ -52,6 +52,8 @@ func (s *Manager) startChangeNotificationLoop() {
 				return
 
 			case err = <-s.changeNotificationErrChan:
+				// e,g.
+				// zk: session has been expired by the server
 				log.Error("%s %v", s.shortID(), err)
 
 			case chg := <-s.changeNotificationChan:
