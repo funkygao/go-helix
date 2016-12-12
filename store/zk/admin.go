@@ -32,20 +32,16 @@ func NewZkHelixAdmin(zkSvr string, options ...zkConnOption) helix.HelixAdmin {
 	return admin
 }
 
-func newZkHelixAdminWithConn(c *connection) helix.HelixAdmin {
+func newZkHelixAdminWithConn(c *connection) *Admin {
 	return &Admin{
 		connection:       c,
 		helixInstallPath: "/opt/helix",
 	}
 }
 
-func (adm Admin) connected() bool {
-	return adm.connection.IsConnected()
-}
-
 func (adm *Admin) Connect() error {
 	adm.RLock()
-	if adm.connected {
+	if adm.connected() {
 		adm.RUnlock()
 		return nil
 	}
@@ -61,19 +57,21 @@ func (adm *Admin) Connect() error {
 		return err
 	}
 
-	adm.connected = true
-	return nil
+	return adm.connection.waitUntilConnected(0)
 }
 
 func (adm *Admin) Disconnect() {
 	adm.closeOnce.Do(func() {
 		adm.Lock()
-		if adm.connected {
+		if adm.connected() {
 			adm.Disconnect()
-			adm.connected = false
 		}
 		adm.Unlock()
 	})
+}
+
+func (adm *Admin) connected() bool {
+	return adm.connection.IsConnected()
 }
 
 func (adm *Admin) SetInstallPath(path string) {
@@ -82,7 +80,7 @@ func (adm *Admin) SetInstallPath(path string) {
 
 func (adm Admin) ControllerHistory(cluster string) ([]string, error) {
 	kb := keyBuilder{clusterID: cluster}
-	record, err := adm.GetRecordFromPath(kb.controllerHistory())
+	record, err := adm.GetRecord(kb.controllerHistory())
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +88,10 @@ func (adm Admin) ControllerHistory(cluster string) ([]string, error) {
 	return record.GetListField(cluster), nil
 }
 
-func (adm Admin) AddCluster(cluster string) error {
+func (adm *Admin) AddCluster(cluster string) error {
+	adm.Lock()
+	defer adm.Unlock()
+
 	kb := keyBuilder{clusterID: cluster}
 
 	// avoid dup cluster
@@ -102,34 +103,34 @@ func (adm Admin) AddCluster(cluster string) error {
 		return helix.ErrNodeAlreadyExists
 	}
 
-	adm.CreateEmptyNode(kb.cluster())
-	adm.CreateEmptyNode(kb.propertyStore())
-	adm.CreateEmptyNode(kb.instances())
-	adm.CreateEmptyNode(kb.idealStates())
-	adm.CreateEmptyNode(kb.externalView())
-	adm.CreateEmptyNode(kb.liveInstances())
+	adm.CreateEmptyPersistent(kb.cluster())
+	adm.CreateEmptyPersistent(kb.propertyStore())
+	adm.CreateEmptyPersistent(kb.instances())
+	adm.CreateEmptyPersistent(kb.idealStates())
+	adm.CreateEmptyPersistent(kb.externalView())
+	adm.CreateEmptyPersistent(kb.liveInstances())
 
-	adm.CreateEmptyNode(kb.stateModelDefs())
-	adm.CreateRecordWithData(kb.stateModelDef(helix.StateModelLeaderStandby), helix.HelixDefaultStateModels[helix.StateModelLeaderStandby])
-	adm.CreateRecordWithData(kb.stateModelDef(helix.StateModelMasterSlave), helix.HelixDefaultStateModels[helix.StateModelMasterSlave])
-	adm.CreateRecordWithData(kb.stateModelDef(helix.StateModelOnlineOffline), helix.HelixDefaultStateModels[helix.StateModelOnlineOffline])
-	adm.CreateRecordWithData(kb.stateModelDef(helix.StateModelDefaultSchemata), helix.HelixDefaultStateModels[helix.StateModelDefaultSchemata])
-	adm.CreateRecordWithData(kb.stateModelDef(helix.StateModelSchedulerTaskQueue), helix.HelixDefaultStateModels[helix.StateModelSchedulerTaskQueue])
-	adm.CreateRecordWithData(kb.stateModelDef(helix.StateModelTask), helix.HelixDefaultStateModels[helix.StateModelTask])
+	adm.CreateEmptyPersistent(kb.stateModelDefs())
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelLeaderStandby), helix.HelixDefaultStateModels[helix.StateModelLeaderStandby])
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelMasterSlave), helix.HelixDefaultStateModels[helix.StateModelMasterSlave])
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelOnlineOffline), helix.HelixDefaultStateModels[helix.StateModelOnlineOffline])
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelDefaultSchemata), helix.HelixDefaultStateModels[helix.StateModelDefaultSchemata])
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelSchedulerTaskQueue), helix.HelixDefaultStateModels[helix.StateModelSchedulerTaskQueue])
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelTask), helix.HelixDefaultStateModels[helix.StateModelTask])
 
-	adm.CreateEmptyNode(kb.configs())
-	adm.CreateEmptyNode(kb.participantConfigs())
-	adm.CreateEmptyNode(kb.resourceConfigs())
-	adm.CreateEmptyNode(kb.clusterConfigs())
+	adm.CreateEmptyPersistent(kb.configs())
+	adm.CreateEmptyPersistent(kb.participantConfigs())
+	adm.CreateEmptyPersistent(kb.resourceConfigs())
+	adm.CreateEmptyPersistent(kb.clusterConfigs())
 
 	clusterNode := model.NewRecord(cluster)
-	adm.CreateRecordWithPath(kb.clusterConfig(), clusterNode)
+	adm.CreatePersistentRecord(kb.clusterConfig(), clusterNode)
 
-	adm.CreateEmptyNode(kb.controller())
-	adm.CreateEmptyNode(kb.controllerErrors())
-	adm.CreateEmptyNode(kb.controllerHistory())
-	adm.CreateEmptyNode(kb.controllerMessages())
-	adm.CreateEmptyNode(kb.controllerStatusUpdates())
+	adm.CreateEmptyPersistent(kb.controller())
+	adm.CreateEmptyPersistent(kb.controllerErrors())
+	adm.CreateEmptyPersistent(kb.controllerHistory())
+	adm.CreateEmptyPersistent(kb.controllerMessages())
+	adm.CreateEmptyPersistent(kb.controllerStatusUpdates())
 
 	ok, err := adm.IsClusterSetup(cluster)
 	if err != nil {
@@ -254,13 +255,13 @@ func (adm Admin) AddNode(cluster string, node string) error {
 	n.SetSimpleField("HELIX_PORT", parts[1])
 	n.SetSimpleField("HELIX_ENABLED", "true")
 	return any(
-		adm.CreateRecordWithPath(participantConfig, n),
-		adm.CreateEmptyNode(kb.instance(node)),
-		adm.CreateEmptyNode(kb.messages(node)),
-		adm.CreateEmptyNode(kb.currentStates(node)),
-		adm.CreateEmptyNode(kb.errorsR(node)),
-		adm.CreateEmptyNode(kb.statusUpdates(node)),
-		adm.CreateEmptyNode(kb.healthReport(node)),
+		adm.CreatePersistentRecord(participantConfig, n),
+		adm.CreateEmptyPersistent(kb.instance(node)),
+		adm.CreateEmptyPersistent(kb.messages(node)),
+		adm.CreateEmptyPersistent(kb.currentStates(node)),
+		adm.CreateEmptyPersistent(kb.errorsR(node)),
+		adm.CreateEmptyPersistent(kb.statusUpdates(node)),
+		adm.CreateEmptyPersistent(kb.healthReport(node)),
 	)
 }
 
@@ -341,7 +342,7 @@ func (adm Admin) AddResource(cluster string, resource string, option helix.AddRe
 	case helix.RebalancerModeUserDefined:
 	}
 
-	return adm.CreateRecordWithPath(kb.idealStateForResource(resource), is)
+	return adm.CreatePersistentRecord(kb.idealStateForResource(resource), is)
 }
 
 func (adm Admin) DropResource(cluster string, resource string) error {
@@ -402,7 +403,7 @@ func (adm Admin) InstanceInfo(cluster string, ic model.InstanceConfig) (*model.R
 		return nil, err
 	}
 
-	return adm.GetRecordFromPath(instanceCfg)
+	return adm.GetRecord(instanceCfg)
 }
 
 // Instances returns lists of instances.
@@ -419,7 +420,7 @@ func (adm Admin) Instances(cluster string) ([]string, error) {
 // TODO model.StateModelDef
 func (adm Admin) AddStateModelDef(cluster string, stateModel string, definition *model.Record) error {
 	kb := keyBuilder{clusterID: cluster}
-	return adm.CreateRecordWithPath(kb.stateModelDef(stateModel), definition)
+	return adm.CreatePersistentRecord(kb.stateModelDef(stateModel), definition)
 }
 
 func (adm Admin) StateModelDefs(cluster string) ([]string, error) {

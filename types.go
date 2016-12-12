@@ -153,8 +153,8 @@ const (
 	StateModelTask               = "Task"
 )
 
-var HelixDefaultStateModels = map[string]string{
-	StateModelLeaderStandby: `
+var HelixDefaultStateModels = map[string][]byte{
+	StateModelLeaderStandby: []byte(`
 {
   "id" : "LeaderStandby",
   "mapFields" : {
@@ -194,9 +194,9 @@ var HelixDefaultStateModels = map[string]string{
     "INITIAL_STATE" : "OFFLINE"
   }
 }
-`,
+`),
 
-	StateModelMasterSlave: `
+	StateModelMasterSlave: []byte(`
 {
   "id" : "MasterSlave",
   "mapFields" : {
@@ -243,9 +243,9 @@ var HelixDefaultStateModels = map[string]string{
     "INITIAL_STATE" : "OFFLINE"
   }
 }
-`,
+`),
 
-	StateModelOnlineOffline: `
+	StateModelOnlineOffline: []byte(`
 {
   "id" : "OnlineOffline",
   "mapFields" : {
@@ -275,9 +275,9 @@ var HelixDefaultStateModels = map[string]string{
     "INITIAL_STATE" : "OFFLINE"
   }
 }	
-`,
+`),
 
-	StateModelDefaultSchemata: `
+	StateModelDefaultSchemata: []byte(`
 {
   "id" : "STORAGE_DEFAULT_SM_SCHEMATA",
   "mapFields" : {
@@ -314,9 +314,9 @@ var HelixDefaultStateModels = map[string]string{
     "INITIAL_STATE" : "OFFLINE"
   }
 }
-`,
+`),
 
-	StateModelSchedulerTaskQueue: `
+	StateModelSchedulerTaskQueue: []byte(`
 {
   "id" : "SchedulerTaskQueue",
   "mapFields" : {
@@ -350,9 +350,9 @@ var HelixDefaultStateModels = map[string]string{
     "INITIAL_STATE" : "OFFLINE"
   }
 }
-`,
+`),
 
-	StateModelTask: `
+	StateModelTask: []byte(`
 {
   "id" : "Task",
   "mapFields" : {
@@ -442,5 +442,5 @@ var HelixDefaultStateModels = map[string]string{
   "simpleFields" : {
     "INITIAL_STATE" : "INIT"
   }
-}`,
+}`),
 }

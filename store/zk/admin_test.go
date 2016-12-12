@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/funkygao/assert"
 	"github.com/funkygao/go-helix"
 	"github.com/yichen/go-zookeeper/zk"
 )
@@ -15,8 +16,21 @@ var (
 	testZkSvr = "localhost:2181"
 )
 
-func TestNewZKHelixAdminWithOptions(t *testing.T) {
+func TestZKHelixAdminBasics(t *testing.T) {
+	adm := NewZkHelixAdmin(testZkSvr)
+	clusters, err := adm.Clusters()
+	assert.Equal(t, nil, err)
+	assert.Equal(t, 0, len(clusters))
 
+	// cluster CRUD
+	err = adm.AddCluster("test_cluster")
+	assert.Equal(t, nil, err)
+}
+
+func TestNewZKHelixAdminWithOptions(t *testing.T) {
+	admin := NewZkHelixAdmin(testZkSvr, WithZkSessionTimeout(time.Second))
+	adminZk := admin.(*Admin)
+	assert.Equal(t, time.Second, adminZk.connection.sessionTimeout)
 }
 
 func TestAddAndDropCluster(t *testing.T) {

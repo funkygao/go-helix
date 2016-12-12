@@ -87,10 +87,10 @@ func (p *zkMessagingService) watchMessages() (chan []string, chan error) {
 // handler in the state model.
 // HelixTaskExecutor.onMessage
 func (p *zkMessagingService) processMessage(msgID string) error {
-	log.Debug("P[%s/%s] processing msg: %s", p.instanceID, p.conn.GetSessionID(), msgID)
+	log.Debug("P[%s/%s] processing msg: %s", p.instanceID, p.conn.SessionID(), msgID)
 
 	msgPath := p.kb.message(p.instanceID, msgID)
-	record, err := p.conn.GetRecordFromPath(msgPath)
+	record, err := p.conn.GetRecord(msgPath)
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func (p *zkMessagingService) processMessage(msgID string) error {
 	}
 
 	sessionID := message.TargetSessionID()
-	if sessionID != "*" && sessionID != p.conn.GetSessionID() {
+	if sessionID != "*" && sessionID != p.conn.SessionID() {
 		// message comes from expired session
 		log.Warn("%s got mismatched message: %s/%s, dropped", p.shortID(), msgID, sessionID)
 		return p.conn.DeleteTree(msgPath)
@@ -121,7 +121,7 @@ func (p *zkMessagingService) processMessage(msgID string) error {
 	// update msgState to read
 	message.SetMessageState(helix.MessageStateRead)
 	message.SetReadTimestamp(time.Now().Unix())
-	message.SetExecuteSessionID(p.conn.GetSessionID())
+	message.SetExecuteSessionID(p.conn.SessionID())
 
 	// create current state meta data
 	// do it for non-controller and state transition messages only
@@ -145,7 +145,7 @@ func (p *zkMessagingService) processMessage(msgID string) error {
 
 		if !exists {
 			// only set the current state to zookeeper when it is not present
-			if err = p.conn.SetRecordForPath(resourceCurrentStatePath, currentStateRecord); err != nil {
+			if err = p.conn.SetRecord(resourceCurrentStatePath, currentStateRecord); err != nil {
 				return err
 			}
 		}
@@ -171,12 +171,12 @@ func (p *zkMessagingService) handleStateTransition(message *model.Message) {
 	transition, present := p.sme.StateModel(message.StateModelDef())
 	if !present {
 		log.Error("P[%s/%s] has no transition defined for state model %s", p.instanceID,
-			p.conn.GetSessionID(), message.StateModelDef())
+			p.conn.SessionID(), message.StateModelDef())
 	} else {
 		handler := transition.Handler(message.FromState(), message.ToState())
 		if handler == nil {
 			log.Warn("P[%s/%s] state %s -> %s has no handler", p.instanceID,
-				p.conn.GetSessionID(), message.FromState(), message.ToState())
+				p.conn.SessionID(), message.FromState(), message.ToState())
 		} else {
 			context := helix.NewContext(p)
 			handler(message, context)
@@ -193,7 +193,7 @@ func (p *zkMessagingService) preHandleMessage(message *model.Message) {
 func (p *zkMessagingService) postHandleMessage(message *model.Message) error {
 	// sessionID might change when we update the state model
 	// skip if we are handling an expired session
-	sessionID := p.conn.GetSessionID()
+	sessionID := p.conn.SessionID()
 	targetSessionID := message.TargetSessionID()
 	toState := message.ToState()
 	partitionName := message.PartitionName()
@@ -212,7 +212,7 @@ func (p *zkMessagingService) postHandleMessage(message *model.Message) error {
 
 	// actually set the current state
 	currentStateForResourcePath := p.kb.currentStateForResource(p.instanceID,
-		p.conn.GetSessionID(), message.Resource())
+		p.conn.SessionID(), message.Resource())
 	return p.conn.UpdateMapField(currentStateForResourcePath, partitionName,
 		"CURRENT_STATE", toState)
 }

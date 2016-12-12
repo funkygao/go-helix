@@ -11,6 +11,7 @@ import (
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
 	"github.com/funkygao/go-zookeeper/zk"
+	"github.com/funkygao/golib/sync2"
 	log "github.com/funkygao/log4go"
 	"github.com/yichen/retry"
 )
@@ -35,15 +36,16 @@ type ZkStateListener interface {
 type connection struct {
 	sync.RWMutex
 
-	zkSvr          string
-	sessionTimeout time.Duration
+	zkSvr, chroot  string
 	servers        []string
-	chroot         string
-	isConnected    bool
-	close          chan struct{}
+	sessionTimeout time.Duration
+
+	isConnected sync2.AtomicBool
+	close       chan struct{}
+	wg          sync.WaitGroup
 
 	zkConn     *zk.Conn
-	stat       *zk.Stat // storage for the lastest zk query stat info
+	stat       *zk.Stat // storage for the lastest zk query stat info FIXME
 	stateEvtCh <-chan zk.Event
 
 	stateChangeListeners []ZkStateListener
@@ -58,17 +60,19 @@ func newConnection(zkSvr string) *connection {
 
 	conn := connection{
 		zkSvr:                zkSvr,
-		servers:              servers,
 		chroot:               chroot,
+		servers:              servers,
 		close:                make(chan struct{}),
 		sessionTimeout:       time.Second * 30,
 		stateChangeListeners: []ZkStateListener{},
 	}
+	conn.isConnected.Set(false)
 
 	return &conn
 }
 
 func (conn *connection) Connect() error {
+	t1 := time.Now()
 	zkConn, stateEvtCh, err := zk.Connect(conn.servers, conn.sessionTimeout)
 	if err != nil {
 		return err
@@ -78,51 +82,64 @@ func (conn *connection) Connect() error {
 	conn.stateEvtCh = stateEvtCh
 
 	if conn.chroot != "" {
-		conn.ensurePathExists(conn.chroot)
+		if err := conn.ensurePathExists(conn.chroot); err != nil {
+			return err
+		}
 	}
 
-	go func() {
-		for {
-			select {
-			case <-conn.close:
-				return
+	conn.wg.Add(1)
+	go conn.watchStateChanges()
 
-			case evt := <-conn.stateEvtCh:
-				conn.fireStateChangedEvent(evt.State)
-				if evt.State == zk.StateHasSession {
-					conn.fireNewSessionEvents()
-				}
-			}
-		}
-	}()
+	log.Debug("zk connection Connect %s", time.Since(t1))
 
-	conn.isConnected = true
 	return nil
 }
 
 func (conn *connection) Disconnect() {
+	t1 := time.Now()
 	if conn.zkConn != nil {
 		conn.zkConn.Close()
 	}
 	close(conn.close)
-	conn.isConnected = false
+	conn.wg.Wait()
+	conn.isConnected.Set(false)
+
+	log.Debug("zk connection Disconnect %s", time.Since(t1))
 }
 
+// SubscribeStateChanges MUST be called before Connect as we don't want
+// to labor to handle the thread-safe issue.
 func (conn *connection) SubscribeStateChanges(l ZkStateListener) {
-	conn.Lock()
 	conn.stateChangeListeners = append(conn.stateChangeListeners, l)
-	conn.Unlock()
 }
 
-func (conn *connection) fireStateChangedEvent(state zk.State) {
-	for _, l := range conn.stateChangeListeners {
-		l.HandleStateChanged(state)
-	}
-}
+func (conn *connection) watchStateChanges() {
+	defer conn.wg.Done()
 
-func (conn *connection) fireNewSessionEvents() {
-	for _, l := range conn.stateChangeListeners {
-		l.HandleNewSession()
+	var evt zk.Event
+	for {
+		select {
+		case <-conn.close:
+			log.Debug("zk connection got close signal, stopped ok")
+			return
+
+		case evt = <-conn.stateEvtCh:
+			// TODO lock? currently, SubscribeStateChanges must called before Connect
+			// what if handler blocks?
+			for _, l := range conn.stateChangeListeners {
+				l.HandleStateChanged(evt.State)
+			}
+
+			// extra handler for new session state
+			if evt.State == zk.StateHasSession {
+				conn.isConnected.Set(true)
+				for _, l := range conn.stateChangeListeners {
+					l.HandleNewSession()
+				}
+			} else if evt.State != zk.StateUnknown {
+				conn.isConnected.Set(false)
+			}
+		}
 	}
 }
 
@@ -134,7 +151,7 @@ func (conn connection) realPath(path string) string {
 	return strings.TrimRight(conn.chroot+path, "/")
 }
 
-func (conn *connection) waitUntilConnected(t time.Duration) (err error) {
+func (conn *connection) waitUntilConnected(d time.Duration) (err error) {
 	t1 := time.Now()
 	retries := 0
 	for {
@@ -145,47 +162,147 @@ func (conn *connection) waitUntilConnected(t time.Duration) (err error) {
 		retries++
 		log.Debug("waitUntilConnected: retry=%d %v", retries, err)
 
-		if t > 0 && time.Since(t1) > t {
+		if d > 0 && time.Since(t1) > d {
 			break
-		} else if t > 0 {
-			time.Sleep(t)
+		} else if d > 0 {
+			time.Sleep(d)
 		} else {
 			time.Sleep(conn.sessionTimeout)
 		}
 	}
 
-	log.Debug("waitUntilConnected elapsed %s", time.Since(t1))
+	log.Debug("zk connection waitUntilConnected %s", time.Since(t1))
 	return
 }
 
 func (conn *connection) IsConnected() bool {
-	return conn != nil && conn.isConnected
+	return conn != nil && conn.isConnected.Get()
 }
 
-func (conn *connection) GetSessionID() string {
+func (conn *connection) SessionID() string {
 	return strconv.FormatInt(conn.zkConn.SessionID(), 10)
 }
 
-func (conn *connection) CreateEmptyNode(path string) error {
-	return conn.CreateRecordWithData(path, "")
-}
-
-func (conn *connection) CreateRecordWithData(path string, data string) error {
-	flags := int32(0)
-	acl := zk.WorldACL(zk.PermAll)
-
-	_, err := conn.Create(path, []byte(data), flags, acl)
-	return err
-}
-
-func (conn *connection) CreateRecordWithPath(p string, r *model.Record) error {
+func (conn *connection) CreatePersistentRecord(p string, r *model.Record) error {
 	parent := path.Dir(p)
-	conn.ensurePathExists(conn.realPath(parent))
+	err := conn.ensurePathExists(conn.realPath(parent))
+	if err != nil {
+		return err
+	}
 
-	flags := int32(0)
-	acl := zk.WorldACL(zk.PermAll)
-	_, err := conn.Create(p, r.Marshal(), flags, acl)
-	return err
+	return conn.CreatePersistent(p, r.Marshal())
+}
+
+func (conn *connection) GetRecord(path string) (*model.Record, error) {
+	data, err := conn.Get(path)
+	if err != nil {
+		return nil, err
+	}
+	return model.NewRecordFromBytes(data)
+}
+
+func (conn *connection) SetRecord(path string, r *model.Record) error {
+	exists, err := conn.Exists(path)
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		if err = conn.ensurePathExists(conn.realPath(path)); err != nil {
+			return err
+		}
+	}
+
+	if _, err = conn.Get(path); err != nil {
+		return err
+	}
+
+	return conn.Set(path, r.Marshal())
+}
+
+func (conn *connection) RemoveMapFieldKey(path string, key string) error {
+	data, err := conn.Get(path)
+	if err != nil {
+		return err
+	}
+
+	record, err := model.NewRecordFromBytes(data)
+	if err != nil {
+		return err
+	}
+
+	record.RemoveMapField(key)
+	return conn.Set(path, record.Marshal())
+}
+
+// update a map field for the znode. path is the znode path. key is the top-level key in
+// the MapFields, mapProperty is the inner key, and value is the. For example:
+//
+// mapFields":{
+// "eat1-app993.stg.linkedin.com_11932,BizProfile,p31_1,SLAVE":{
+//   "CURRENT_STATE":"ONLINE"
+//   ,"INFO":""
+// }
+// if we want to set the CURRENT_STATE to ONLINE, we call
+// UpdateMapField("/RELAY/INSTANCES/{instance}/CURRENT_STATE/{sessionID}/{db}", "eat1-app993.stg.linkedin.com_11932,BizProfile,p31_1,SLAVE", "CURRENT_STATE", "ONLINE")
+func (conn *connection) UpdateMapField(path string, key string, property string, value string) error {
+	data, err := conn.Get(path)
+	if err != nil {
+		return err
+	}
+
+	// convert the result into Record
+	record, err := model.NewRecordFromBytes(data)
+	if err != nil {
+		return err
+	}
+
+	record.SetMapField(key, property, value)
+	return conn.Set(path, record.Marshal())
+}
+
+// TODO
+func (conn *connection) UpdateListField(path string, key string) error {
+	return nil
+}
+
+func (conn *connection) UpdateSimpleField(path string, key string, value string) error {
+	data, err := conn.Get(path)
+	if err != nil {
+		return err
+	}
+
+	// convert the result into Record
+	record, err := model.NewRecordFromBytes(data)
+	if err != nil {
+		return err
+	}
+
+	record.SetSimpleField(key, value)
+	return conn.Set(path, record.Marshal())
+}
+
+func (conn *connection) GetSimpleFieldValueByKey(path string, key string) (string, error) {
+	data, err := conn.Get(path)
+	if err != nil {
+		return "", err
+	}
+
+	record, err := model.NewRecordFromBytes(data)
+	if err != nil {
+		return "", err
+	}
+
+	v := record.GetSimpleField(key)
+	if v == nil {
+		return "", nil
+	}
+	return v.(string), nil
+}
+
+func (conn *connection) GetSimpleFieldBool(path string, key string) bool {
+	result, _ := conn.GetSimpleFieldValueByKey(path, key)
+	return strings.ToUpper(result) == "TRUE"
 }
 
 func (conn *connection) Exists(path string) (bool, error) {
@@ -201,6 +318,8 @@ func (conn *connection) Exists(path string) (bool, error) {
 		if err != nil {
 			return retry.RetryContinue, conn.wrapZkError(conn.realPath(path), err)
 		}
+
+		// ok
 		result = r
 		stat = s
 		return retry.RetryBreak, nil
@@ -232,6 +351,8 @@ func (conn *connection) Get(path string) ([]byte, error) {
 		if err != nil {
 			return retry.RetryContinue, conn.wrapZkError(conn.realPath(path), err)
 		}
+
+		// ok
 		data = d
 		conn.stat = s
 		return retry.RetryBreak, nil
@@ -253,6 +374,8 @@ func (conn *connection) GetW(path string) ([]byte, <-chan zk.Event, error) {
 		if err != nil {
 			return retry.RetryContinue, conn.wrapZkError(conn.realPath(path), err)
 		}
+
+		// ok
 		data = d
 		conn.stat = s
 		events = evts
@@ -279,6 +402,24 @@ func (conn *connection) Create(path string, data []byte, flags int32, acl []zk.A
 	return conn.zkConn.Create(conn.realPath(path), data, flags, acl)
 }
 
+func (conn *connection) CreatePersistent(path string, data []byte) error {
+	flags := int32(0)
+	acl := zk.WorldACL(zk.PermAll)
+	_, err := conn.Create(path, data, flags, acl)
+	return err
+}
+
+func (conn *connection) CreateEphemeral(path string, data []byte) error {
+	flags := int32(zk.FlagEphemeral)
+	acl := zk.WorldACL(zk.PermAll)
+	_, err := conn.Create(path, data, flags, acl)
+	return err
+}
+
+func (conn *connection) CreateEmptyPersistent(path string) error {
+	return conn.CreatePersistent(path, []byte{})
+}
+
 func (conn *connection) Children(path string) ([]string, error) {
 	if !conn.IsConnected() {
 		return nil, helix.ErrNotConnected
@@ -290,6 +431,8 @@ func (conn *connection) Children(path string) ([]string, error) {
 		if err != nil {
 			return retry.RetryContinue, conn.wrapZkError(conn.realPath(path), err)
 		}
+
+		// ok
 		children = c
 		conn.stat = s
 		return retry.RetryBreak, nil
@@ -318,78 +461,6 @@ func (conn *connection) ChildrenW(path string) ([]string, <-chan zk.Event, error
 	})
 
 	return children, eventChan, err
-}
-
-// update a map field for the znode. path is the znode path. key is the top-level key in
-// the MapFields, mapProperty is the inner key, and value is the. For example:
-//
-// mapFields":{
-// "eat1-app993.stg.linkedin.com_11932,BizProfile,p31_1,SLAVE":{
-//   "CURRENT_STATE":"ONLINE"
-//   ,"INFO":""
-// }
-// if we want to set the CURRENT_STATE to ONLINE, we call
-// UpdateMapField("/RELAY/INSTANCES/{instance}/CURRENT_STATE/{sessionID}/{db}", "eat1-app993.stg.linkedin.com_11932,BizProfile,p31_1,SLAVE", "CURRENT_STATE", "ONLINE")
-func (conn *connection) UpdateMapField(path string, key string, property string, value string) error {
-	data, err := conn.Get(path) // Get itself handles chroot
-	if err != nil {
-		return err
-	}
-
-	// convert the result into Record
-	node, err := model.NewRecordFromBytes(data)
-	if err != nil {
-		return err
-	}
-
-	// update the value
-	node.SetMapField(key, property, value)
-
-	// copy back to zookeeper
-	return conn.Set(path, node.Marshal())
-}
-
-func (conn *connection) UpdateSimpleField(path string, key string, value string) error {
-	// get the current node
-	data, err := conn.Get(path)
-	if err != nil {
-		return err
-	}
-
-	// convert the result into Record
-	node, err := model.NewRecordFromBytes(data)
-	if err != nil {
-		return err
-	}
-
-	// update the value
-	node.SetSimpleField(key, value)
-
-	// copy back to zookeeper
-	return conn.Set(path, node.Marshal())
-}
-
-func (conn *connection) GetSimpleFieldValueByKey(path string, key string) string {
-	data, err := conn.Get(path)
-	must(err) // FIXME
-
-	node, err := model.NewRecordFromBytes(data)
-	must(err) // FIXME
-
-	if node.SimpleFields == nil {
-		return ""
-	}
-
-	v := node.GetSimpleField(key)
-	if v == nil {
-		return ""
-	}
-	return v.(string)
-}
-
-func (conn *connection) GetSimpleFieldBool(path string, key string) bool {
-	result := conn.GetSimpleFieldValueByKey(path, key)
-	return strings.ToUpper(result) == "TRUE"
 }
 
 func (conn *connection) Delete(path string) error {
@@ -432,23 +503,6 @@ func (conn *connection) deleteTreeRealPath(path string) error {
 	}
 
 	return conn.zkConn.Delete(path, -1)
-}
-
-func (conn *connection) RemoveMapFieldKey(path string, key string) error {
-	data, err := conn.Get(path)
-	if err != nil {
-		return err
-	}
-
-	node, err := model.NewRecordFromBytes(data)
-	if err != nil {
-		return err
-	}
-
-	node.RemoveMapField(key)
-
-	// save the data back to zookeeper
-	return conn.Set(path, node.Marshal())
 }
 
 func (conn *connection) IsClusterSetup(cluster string) (bool, error) {
@@ -497,39 +551,6 @@ func (conn *connection) IsInstanceSetup(cluster, node string) (bool, error) {
 	)
 }
 
-func (conn *connection) GetRecordFromPath(path string) (*model.Record, error) {
-	data, err := conn.Get(path)
-	if err != nil {
-		return nil, err
-	}
-	return model.NewRecordFromBytes(data)
-}
-
-func (conn *connection) SetRecordForPath(path string, r *model.Record) error {
-	exists, err := conn.Exists(path)
-	if err != nil {
-		return err
-	}
-
-	if !exists {
-		conn.ensurePathExists(conn.realPath(path))
-	}
-
-	// need to get the stat.version before calling set
-	conn.Lock()
-	defer conn.Unlock()
-
-	if _, err := conn.Get(path); err != nil {
-		return err
-	}
-
-	if err := conn.Set(path, r.Marshal()); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (conn *connection) ensurePathExists(p string) error {
 	if exists, _, _ := conn.zkConn.Exists(p); exists {
 		return nil
@@ -542,7 +563,8 @@ func (conn *connection) ensurePathExists(p string) error {
 		}
 	}
 
-	conn.zkConn.Create(p, []byte{}, 0, zk.WorldACL(zk.PermAll))
+	flags := int32(0)
+	conn.zkConn.Create(p, []byte{}, flags, zk.WorldACL(zk.PermAll))
 	return nil
 }
 

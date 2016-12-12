@@ -26,7 +26,7 @@ func newParticipant(m *Manager) *participant {
 func (p *participant) createLiveInstance() error {
 	log.Debug("%s creating live instance...", p.shortID())
 
-	record := model.NewLiveInstanceRecord(p.instanceID, p.conn.GetSessionID())
+	record := model.NewLiveInstanceRecord(p.instanceID, p.conn.SessionID())
 	data := record.Marshal()
 
 	// it is possible the live instance still exists from last run
@@ -37,7 +37,7 @@ func (p *participant) createLiveInstance() error {
 		err     error
 	)
 	for retry := 0; retry < 10; retry++ {
-		_, err = p.conn.Create(p.kb.liveInstance(p.instanceID), data, zk.FlagEphemeral, zk.WorldACL(zk.PermAll))
+		err = p.conn.CreateEphemeral(p.kb.liveInstance(p.instanceID), data)
 		if err == nil {
 			break
 		} else if err == zk.ErrNodeExists {
@@ -46,13 +46,13 @@ func (p *participant) createLiveInstance() error {
 				continue // needn't sleep backoff
 			} else {
 				currentSessionID := strconv.FormatInt(p.conn.stat.EphemeralOwner, 10)
-				log.Debug("%s current session: %s, same: %+v", p.shortID(), currentSessionID, currentSessionID == p.conn.GetSessionID())
-				if currentSessionID == p.conn.GetSessionID() {
+				log.Debug("%s current session: %s, same: %+v", p.shortID(), currentSessionID, currentSessionID == p.conn.SessionID())
+				if currentSessionID == p.conn.SessionID() {
 					curLiveInstance, err := model.NewRecordFromBytes(c)
-					if err == nil && curLiveInstance.GetStringField("SESSION_ID", "") != p.conn.GetSessionID() {
+					if err == nil && curLiveInstance.GetStringField("SESSION_ID", "") != p.conn.SessionID() {
 						log.Trace("%s update session id field", p.shortID())
 
-						curLiveInstance.SetSimpleField("SESSION_ID", p.conn.GetSessionID())
+						curLiveInstance.SetSimpleField("SESSION_ID", p.conn.SessionID())
 						p.conn.Set(p.kb.liveInstance(p.instanceID), curLiveInstance.Marshal())
 					}
 				} else {
@@ -84,7 +84,7 @@ func (p *participant) carryOverPreviousCurrentState() error {
 	}
 
 	for _, sessionID := range sessions {
-		if sessionID == p.conn.GetSessionID() {
+		if sessionID == p.conn.SessionID() {
 			continue
 		}
 
@@ -150,25 +150,25 @@ func (p *participant) joinCluster() (bool, error) {
 	participant.SetSimpleField("HELIX_ENABLED", "true")
 	// TODO p.ClusterManagementTool().AddNode(p.clusterID, p.instanceID)
 	if err = any(
-		p.conn.CreateRecordWithPath(p.kb.participantConfig(p.instanceID), participant),
+		p.conn.CreatePersistentRecord(p.kb.participantConfig(p.instanceID), participant),
 
 		// /{cluster}/INSTANCES/localhost_12000
-		p.conn.CreateEmptyNode(p.kb.instance(p.instanceID)),
+		p.conn.CreateEmptyPersistent(p.kb.instance(p.instanceID)),
 
 		// /{cluster}/INSTANCES/localhost_12000/CURRENTSTATES
-		p.conn.CreateEmptyNode(p.kb.currentStates(p.instanceID)),
+		p.conn.CreateEmptyPersistent(p.kb.currentStates(p.instanceID)),
 
 		// /{cluster}/INSTANCES/localhost_12000/ERRORS
-		p.conn.CreateEmptyNode(p.kb.errorsR(p.instanceID)),
+		p.conn.CreateEmptyPersistent(p.kb.errorsR(p.instanceID)),
 
 		// /{cluster}/INSTANCES/localhost_12000/HEALTHREPORT
-		p.conn.CreateEmptyNode(p.kb.healthReport(p.instanceID)),
+		p.conn.CreateEmptyPersistent(p.kb.healthReport(p.instanceID)),
 
 		// /{cluster}/INSTANCES/localhost_12000/MESSAGES
-		p.conn.CreateEmptyNode(p.kb.messages(p.instanceID)),
+		p.conn.CreateEmptyPersistent(p.kb.messages(p.instanceID)),
 
 		// /{cluster}/INSTANCES/localhost_12000/STATUSUPDATES
-		p.conn.CreateEmptyNode(p.kb.statusUpdates(p.instanceID)),
+		p.conn.CreateEmptyPersistent(p.kb.statusUpdates(p.instanceID)),
 	); err != nil {
 		return false, err
 	}

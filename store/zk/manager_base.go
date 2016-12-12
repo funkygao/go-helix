@@ -27,7 +27,7 @@ func (m *Manager) Instance() string {
 }
 
 func (m *Manager) SessionID() string {
-	return m.conn.GetSessionID()
+	return m.conn.SessionID()
 }
 
 func (m *Manager) StateMachineEngine() helix.StateMachineEngine {
@@ -54,7 +54,7 @@ func (s *Manager) GetControllerMessages() ([]*model.Record, error) {
 
 	result := []*model.Record{}
 	for _, m := range messages {
-		record, err := s.conn.GetRecordFromPath(s.kb.controllerMessage(m))
+		record, err := s.conn.GetRecord(s.kb.controllerMessage(m))
 		if err != nil {
 			return result, err
 		}
@@ -74,7 +74,7 @@ func (s *Manager) GetInstanceMessages(instance string) ([]*model.Record, error) 
 
 	result := []*model.Record{}
 	for _, m := range messages {
-		record, err := s.conn.GetRecordFromPath(s.kb.message(instance, m))
+		record, err := s.conn.GetRecord(s.kb.message(instance, m))
 		if err != nil {
 			return result, nil
 		}
@@ -94,7 +94,7 @@ func (s *Manager) GetLiveInstances() ([]*model.Record, error) {
 
 	liveInstances := []*model.Record{}
 	for _, participantID := range instances {
-		r, err := s.conn.GetRecordFromPath(s.kb.liveInstance(participantID))
+		r, err := s.conn.GetRecord(s.kb.liveInstance(participantID))
 		if err != nil {
 			return liveInstances, err
 		}
@@ -114,7 +114,7 @@ func (s *Manager) GetExternalView() []*model.Record {
 			continue
 		}
 
-		record, err := s.conn.GetRecordFromPath(s.kb.externalViewForResource(resource))
+		record, err := s.conn.GetRecord(s.kb.externalViewForResource(resource))
 		if err != nil {
 			log.Error("%s %v", s.shortID(), err)
 			continue
@@ -134,7 +134,7 @@ func (s *Manager) GetIdealState() []*model.Record {
 			continue
 		}
 
-		record, err := s.conn.GetRecordFromPath(s.kb.idealStateForResource(resource))
+		record, err := s.conn.GetRecord(s.kb.idealStateForResource(resource))
 		if err != nil {
 			log.Error("%s %v", s.shortID(), err)
 			continue
@@ -155,7 +155,7 @@ func (s *Manager) GetCurrentState(instance string) []*model.Record {
 
 	result := []*model.Record{}
 	for _, r := range resources {
-		record, err := s.conn.GetRecordFromPath(s.kb.currentStateForResource(instance, s.conn.GetSessionID(), r))
+		record, err := s.conn.GetRecord(s.kb.currentStateForResource(instance, s.conn.SessionID(), r))
 		if err != nil {
 			log.Error("%s %v", s.shortID(), err)
 			continue
@@ -176,7 +176,7 @@ func (s *Manager) GetInstanceConfigs() []*model.Record {
 
 	result := []*model.Record{}
 	for _, i := range configs {
-		record, err := s.conn.GetRecordFromPath(s.kb.participantConfig(i))
+		record, err := s.conn.GetRecord(s.kb.participantConfig(i))
 		if err != nil {
 			log.Error("%s %v", s.shortID(), err)
 			continue

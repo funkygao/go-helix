@@ -220,7 +220,7 @@ func (m *Manager) Disconnect() {
 }
 
 func (m *Manager) shortID() string {
-	return fmt.Sprintf("%s[%s/%s@%s]", m.it, m.instanceID, m.conn.GetSessionID(), m.clusterID)
+	return fmt.Sprintf("%s[%s/%s@%s]", m.it, m.instanceID, m.conn.SessionID(), m.clusterID)
 }
 
 func (m *Manager) isConnected() bool {
@@ -228,12 +228,12 @@ func (m *Manager) isConnected() bool {
 }
 
 func (m *Manager) connectToZookeeper() (err error) {
+	// will trigger HandleStateChanged, HandleNewSession
+	m.conn.SubscribeStateChanges(m)
+
 	if err = m.conn.Connect(); err != nil {
 		return
 	}
-
-	// will trigger HandleStateChanged, HandleNewSession
-	m.conn.SubscribeStateChanges(m)
 
 	for retries := 0; retries < 3; retries++ {
 		if err = m.conn.waitUntilConnected(m.conn.sessionTimeout); err == nil {
