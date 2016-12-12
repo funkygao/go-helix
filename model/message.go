@@ -74,6 +74,10 @@ func (m Message) MessageType() string {
 	return m.GetStringField("MSG_TYPE", "")
 }
 
+func (m *Message) SetMessageType(t string) {
+	m.SetStringField("MSG_TYPE", t)
+}
+
 func (m Message) MessageSubType() string {
 	return m.GetStringField("MSG_SUBTYPE", "")
 }
@@ -130,8 +134,8 @@ func (m Message) TargetName() string {
 	return m.GetStringField("TGT_NAME", "")
 }
 
-// SrcSessionId returns the session identifier of the source node.
-func (m Message) SrcSessionId() string {
+// SrcSessionID returns the session identifier of the source node.
+func (m Message) SrcSessionID() string {
 	return m.GetStringField("SRC_SESSION_ID", "")
 }
 
@@ -157,6 +161,14 @@ func (m Message) RetryCount() int {
 // ExecutionTimeout returns the time to wait before stopping execution of this message.
 func (m Message) ExecutionTimeout() int {
 	return m.GetIntField("TIMEOUT", -1)
+}
+
+func (m Message) ClusterEventName() string {
+	return m.GetStringField("ClusterEventName", "")
+}
+
+func (m Message) StateModelFactory() string {
+	return m.GetStringField("STATE_MODEL_FACTORY_NAME", "DEFAULT")
 }
 
 // SetReadTimestamp sets the time that this message was read.

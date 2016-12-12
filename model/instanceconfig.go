@@ -4,7 +4,7 @@ type InstanceConfig struct {
 	*Record
 }
 
-func NewInstanceConfig(record *Record) *InstanceConfig {
+func NewInstanceConfigFromRecord(record *Record) *InstanceConfig {
 	return &InstanceConfig{
 		Record: record,
 	}
@@ -51,11 +51,11 @@ func (ic InstanceConfig) DisabledPartitions() []string {
 }
 
 // TODO
-func (ic InstanceConfig) DisablePartition(partition string, enabled bool) {
+func (ic InstanceConfig) EnablePartition(partition string, yes bool) {
 
 }
 
+// TODO
 func (ic InstanceConfig) Validate() error {
-	// TODO
 	return nil
 }

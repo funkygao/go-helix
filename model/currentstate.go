@@ -4,6 +4,6 @@ type CurrentState struct {
 	*Record
 }
 
-func NewCurrentState(r *Record) *CurrentState {
+func NewCurrentStateFromRecord(r *Record) *CurrentState {
 	return &CurrentState{Record: r}
 }
