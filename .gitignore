@@ -23,5 +23,12 @@ _testmain.go
 *.test
 *.prof
 
+*.cpu
+*.swp
+*.log
+.idea/
+*.iml
+.DS_Store
+
 schema/
 apps/fedis/fedis

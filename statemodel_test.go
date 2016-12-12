@@ -2,21 +2,23 @@ package helix
 
 import (
 	"testing"
+
+	"github.com/funkygao/go-helix/model"
 )
 
 func TestNewStateModel(t *testing.T) {
 	t.Parallel()
 
-	sm1 := NewStateModel(nil)
-
+	sm1 := NewStateModel()
 	if len(sm1.transitions) != 0 {
 		t.Error("The Statemodel should be empty")
 	}
 
-	fromOfflineToOnline := func(partition string) {}
-	fromOnlineToOffline := func(partition string) {}
+	fromOfflineToOnline := func(*model.Message, *Context) {}
+	fromOnlineToOffline := func(*model.Message, *Context) {}
 
-	sm2 := NewStateModel([]Transition{
+	sm2 := NewStateModel()
+	sm2.AddTransitions([]Transition{
 		{"OFFLINE", "ONLINE", fromOfflineToOnline},
 	})
 

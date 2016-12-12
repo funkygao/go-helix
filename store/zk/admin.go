@@ -1,6 +1,7 @@
 package zk
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,21 +14,34 @@ type Admin struct {
 	sync.RWMutex
 	closeOnce sync.Once
 
-	zkSvr string
 	*connection
 	connected bool
+
+	helixInstallPath string
 }
 
-// NewZKHelixAdmin creates a HelixAdmin implementation with zk as storage.
-func NewZKHelixAdmin(zkSvr string, options ...zkConnOption) helix.HelixAdmin {
+// NewZkHelixAdmin creates a HelixAdmin implementation with zk as storage.
+func NewZkHelixAdmin(zkSvr string, options ...zkConnOption) helix.HelixAdmin {
 	admin := &Admin{
-		zkSvr:      zkSvr,
-		connected:  false,
-		connection: newConnection(zkSvr),
+		connected:        false,
+		connection:       newConnection(zkSvr),
+		helixInstallPath: "/opt/helix",
 	}
+
+	// apply additional options over the default
 	for _, option := range options {
 		option(admin.connection)
 	}
+
+	return admin
+}
+
+func newZkHelixAdminWithConn(c *connection) helix.HelixAdmin {
+	admin := &Admin{
+		connection:       c,
+		helixInstallPath: "/opt/helix",
+	}
+	admin.connected = admin.connection.IsConnected()
 	return admin
 }
 
@@ -62,6 +76,20 @@ func (adm *Admin) Close() {
 		}
 		adm.Unlock()
 	})
+}
+
+func (adm *Admin) SetInstallPath(path string) {
+	adm.helixInstallPath = path
+}
+
+func (adm Admin) ControllerHistory(cluster string) ([]string, error) {
+	kb := keyBuilder{clusterID: cluster}
+	record, err := adm.GetRecordFromPath(kb.controllerHistory())
+	if err != nil {
+		return nil, err
+	}
+
+	return record.GetListField(cluster), nil
 }
 
 func (adm Admin) AddCluster(cluster string) error {
@@ -212,8 +240,8 @@ func (adm Admin) AddNode(cluster string, node string) error {
 
 	// check if node already exists under /<cluster>/CONFIGS/PARTICIPANT/<NODE>
 	kb := keyBuilder{clusterID: cluster}
-	path := kb.participantConfig(node)
-	exists, err := adm.Exists(path)
+	participantConfig := kb.participantConfig(node)
+	exists, err := adm.Exists(participantConfig)
 	if err != nil {
 		return err
 	}
@@ -226,10 +254,9 @@ func (adm Admin) AddNode(cluster string, node string) error {
 	n := model.NewRecord(node)
 	n.SetSimpleField("HELIX_HOST", parts[0])
 	n.SetSimpleField("HELIX_PORT", parts[1])
-	// HELIX_ENABLED not set yet
-
+	n.SetSimpleField("HELIX_ENABLED", "true")
 	return any(
-		adm.CreateRecordWithPath(path, n),
+		adm.CreateRecordWithPath(participantConfig, n),
 		adm.CreateEmptyNode(kb.instance(node)),
 		adm.CreateEmptyNode(kb.messages(node)),
 		adm.CreateEmptyNode(kb.currentStates(node)),
@@ -300,7 +327,7 @@ func (adm Admin) AddResource(cluster string, resource string, option helix.AddRe
 		is.SetIntField("MAX_PARTITIONS_PER_INSTANCE", option.MaxPartitionsPerInstance)
 	}
 	if option.BucketSize > 0 {
-		is.SetSimpleField("BUCKET_SIZE", strconv.Itoa(option.BucketSize))
+		is.SetBucketSize(option.BucketSize)
 	}
 	switch option.RebalancerMode {
 	case helix.RebalancerModeFullAuto:
@@ -415,11 +442,23 @@ func (adm Admin) StateModelDefs(cluster string) ([]string, error) {
 	return adm.Children(kb.stateModelDefs())
 }
 
-// Rebalance not implemented yet TODO
+// TODO
+func (adm Admin) EnableInstance(cluster, instanceName string, yes bool) error {
+	return nil
+}
+
+// TODO
+func (adm Admin) SetResourceIdealState(cluster, instanceName string, is *model.IdealState) error {
+	return nil
+}
+
+// TODO just set ideal state of the resource
 func (adm Admin) Rebalance(cluster string, resource string, replica int) error {
-	if !adm.connected {
-		return helix.ErrNotConnected
+	err, errCh := execCommand(fmt.Sprintf("%s/bin/helix-admin.sh", adm.helixInstallPath),
+		"--zkSvr", adm.zkSvr, "--rebalance", cluster, resource, strconv.Itoa(replica))
+	if err != nil {
+		return err
 	}
 
-	return helix.ErrNotImplemented
+	return <-errCh
 }

@@ -14,12 +14,13 @@ import (
 )
 
 type redisNode struct {
-	cluster, zkSvr                 string
-	resource, stateModel, replicas string
-	host, port                     string
+	cluster, zkSvr       string
+	resource, stateModel string
+	replicas             int
+	host, port           string
 }
 
-func NewNode(zkSvr, cluster, resource, stateModel, replicas, host, port string) *redisNode {
+func NewNode(zkSvr, cluster, resource, stateModel string, replicas int, host, port string) *redisNode {
 	return &redisNode{
 		zkSvr:      zkSvr,
 		cluster:    cluster,
@@ -33,13 +34,23 @@ func NewNode(zkSvr, cluster, resource, stateModel, replicas, host, port string) 
 
 func (r *redisNode) Start() {
 	// create the manager instance and connect
-	manager := zk.NewZKHelixManager(r.zkSvr, zk.WithSessionTimeout(time.Second*10))
-	must(manager.Connect())
+	manager, _ := zk.NewZkHelixManager(r.cluster, r.host, r.port, r.zkSvr,
+		helix.InstanceTypeParticipant,
+		zk.WithManagerZkSessionTimeout(time.Second*5),
+		zk.WithPprofPort(10001))
 
-	// the actual task executor
-	participant := manager.NewParticipant(r.cluster, r.host, r.port)
+	manager.AddPreConnectCallback(func() {
+		log.Info("will be connecting...")
+	})
 
-	// register state model
+	manager.AddExternalViewChangeListener(func(externalViews []*model.Record, context *helix.Context) {
+		log.Info(color.Red("external view changed: %+v %+v", externalViews, context))
+	})
+	manager.AddIdealStateChangeListener(func(idealState []*model.Record, context *helix.Context) {
+		log.Info(color.Yellow("ideal state changed: %+v %+v", idealState, context))
+	})
+
+	// register state model before connecting
 	sm := helix.NewStateModel()
 	must(sm.AddTransitions([]helix.Transition{
 		{"MASTER", "SLAVE", func(message *model.Message, context *helix.Context) {
@@ -62,15 +73,17 @@ func (r *redisNode) Start() {
 				message.PartitionName(), message.FromState(), message.ToState()))
 		}},
 	}))
-	participant.RegisterStateModel(r.stateModel, sm)
+	manager.StateMachineEngine().RegisterStateModel(r.stateModel, sm)
 
-	// start the participant
-	must(participant.Start())
-	log.Info("participant started")
+	must(manager.Connect())
 
-	log.Info("start rebalancing...")
-	helix.Rebalance(r.zkSvr, r.cluster, r.resource, r.replicas)
-	log.Info("rebalanced done")
+	log.Info("start rebalancing %s/%d ...", r.resource, r.replicas)
+	admin := manager.ClusterManagementTool()
+	if err := admin.Rebalance(r.cluster, r.resource, r.replicas); err != nil {
+		log.Error("rebalance: %v", err)
+	} else {
+		log.Info("rebalance: ok")
+	}
 
 	log.Info("waiting Ctrl-C...")
 

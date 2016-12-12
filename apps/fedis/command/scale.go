@@ -22,7 +22,7 @@ func (this *Scale) Run(args []string) (exitCode int) {
 	}
 
 	// create the admin instance and connect
-	admin := zk.NewZKHelixAdmin(zkSvr)
+	admin := zk.NewZkHelixAdmin(zkSvr)
 	must(admin.Connect())
 
 	instances, err := admin.Instances(cluster)

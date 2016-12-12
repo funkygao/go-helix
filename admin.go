@@ -35,6 +35,9 @@ type HelixAdmin interface {
 	// GetConfig obtains the configuration value of a property, defined by a config scope.
 	GetConfig(cluster string, scope HelixConfigScope, keys []string) (map[string]interface{}, error)
 
+	// ControllerHistory returns all controller instance names in history.
+	ControllerHistory(cluster string) ([]string, error)
+
 	// Add a node to a cluster.
 	// node has the form of host_port.
 	AddNode(cluster string, node string) error
@@ -49,6 +52,12 @@ type HelixAdmin interface {
 	Instances(cluster string) ([]string, error)
 
 	InstanceInfo(cluster string, ic model.InstanceConfig) (*model.Record, error)
+
+	// Enable or disable an instance.
+	EnableInstance(cluster, instanceName string, yes bool) error
+
+	//
+	SetResourceIdealState(cluster, instanceName string, is *model.IdealState) error
 
 	// Add a resource to a cluster.
 	AddResource(cluster string, resource string, option AddResourceOption) error
@@ -76,6 +85,9 @@ type HelixAdmin interface {
 
 	// Rebalance a resource in cluster.
 	Rebalance(cluster string, resource string, replica int) error
+
+	// SetInstallPath will setup the local helix installation base path.
+	SetInstallPath(path string)
 
 	// TODO
 	//setConstraint(String clusterName, ConstraintType constraintType, String constraintId, ConstraintItem constraintItem)

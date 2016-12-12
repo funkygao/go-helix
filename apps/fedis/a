@@ -1,0 +1,2 @@
+go install
+fedis redis -node localhost_10001 -log info

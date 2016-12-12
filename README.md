@@ -10,4 +10,8 @@ Originally based on https://github.com/yichen/gohelix
 - [ ] super cluster, tag
 - [ ] metrics
 - [ ] constraint
-- [ ] HelixMultiClusterController, HelixStateTransitionHandler
+- [ ] HelixMultiClusterController, HelixStateTransitionHandler, HelixTaskExecutor.onMessage
+
+### Codebase
+
+- helix.Context

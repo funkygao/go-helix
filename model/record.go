@@ -35,6 +35,25 @@ func NewRecord(id string) *Record {
 	}
 }
 
+func (r Record) BucketSize() int {
+	return r.GetIntField("BUCKET_SIZE", 0)
+}
+
+func (r *Record) SetBucketSize(size int) {
+	if size < 0 {
+		size = 0
+	}
+	r.SetIntField("BUCKET_SIZE", size)
+}
+
+func (r Record) BatchMessageMode() bool {
+	return r.GetBooleanField("BATCH_MESSAGE_MODE", false)
+}
+
+func (r *Record) SetBatchMessageMode(yes bool) {
+	r.SetBooleanField("BATCH_MESSAGE_MODE", yes)
+}
+
 // GetSimpleField returns a value of a key in SimpleField structure
 func (r Record) GetSimpleField(key string) interface{} {
 	if r.SimpleFields == nil {
@@ -42,20 +61,6 @@ func (r Record) GetSimpleField(key string) interface{} {
 	}
 
 	return r.SimpleFields[key]
-}
-
-// GetIntField returns the integer value of a field in the SimpleField
-func (r Record) GetIntField(key string, defaultValue int) int {
-	value := r.GetSimpleField(key)
-	if value == nil {
-		return defaultValue
-	}
-
-	intVal, err := strconv.Atoi(value.(string))
-	if err != nil {
-		return defaultValue
-	}
-	return intVal
 }
 
 // GetStringField returns the string value of a field in the SimpleField
@@ -74,6 +79,20 @@ func (r Record) GetStringField(key string, defaultValue string) string {
 
 func (r Record) SetStringField(key string, value string) {
 	r.SetSimpleField(key, value)
+}
+
+// GetIntField returns the integer value of a field in the SimpleField
+func (r Record) GetIntField(key string, defaultValue int) int {
+	value := r.GetSimpleField(key)
+	if value == nil {
+		return defaultValue
+	}
+
+	intVal, err := strconv.Atoi(value.(string))
+	if err != nil {
+		return defaultValue
+	}
+	return intVal
 }
 
 // SetIntField sets the integer value of a key under SimpleField.
@@ -123,6 +142,15 @@ func (r *Record) SetSimpleField(key string, value interface{}) {
 	r.SimpleFields[key] = value
 }
 
+// GetMapField returns the string value of the property of a key under MapField.
+func (r Record) GetMapField(key string, property string) string {
+	if r.MapFields == nil || r.MapFields[key] == nil || r.MapFields[key][property] == "" {
+		return ""
+	}
+
+	return r.MapFields[key][property]
+}
+
 // SetMapField sets the value of a key under MapField. Both key and
 // value are string format.
 func (r *Record) SetMapField(key string, property string, value string) {
@@ -146,25 +174,41 @@ func (r *Record) RemoveMapField(key string) {
 	delete(r.MapFields, key)
 }
 
-// GetMapField returns the string value of the property of a key
-// under MapField.
-func (r Record) GetMapField(key string, property string) string {
-	if r.MapFields == nil || r.MapFields[key] == nil || r.MapFields[key][property] == "" {
-		return ""
-	}
-
-	return r.MapFields[key][property]
+// Marshal generates the beautified json in byte array format
+func (r Record) Marshal() []byte {
+	b, _ := json.MarshalIndent(r, "", "    ") // ignore the err, should never happen
+	return b
 }
 
-// Marshal generates the beautified json in byte array format
-func (r Record) Marshal() ([]byte, error) {
-	return json.MarshalIndent(r, "", "    ")
+// FIXME
+func (r1 Record) Equals(r2 *Record) bool {
+	if len(r1.SimpleFields) != len(r2.SimpleFields) {
+		return false
+	}
+	if len(r1.ListFields) != len(r2.ListFields) {
+		return false
+	}
+	if len(r1.MapFields) != len(r2.MapFields) {
+		return false
+	}
+
+	/*
+		if r1.SimpleFields != r2.SimpleFields {
+			return false
+		}
+		if r1.ListFields != r2.ListFields {
+			return false
+		}
+		if r1.MapFields != r2.MapFields {
+			return false
+		}*/
+
+	return true
 }
 
 // String returns the beautified JSON string for the Record
 func (r Record) String() string {
-	s, _ := r.Marshal()
-	return string(s)
+	return string(r.Marshal())
 }
 
 // NewRecordFromBytes creates a new znode instance from a byte array

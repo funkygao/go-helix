@@ -3,18 +3,59 @@ package helix
 // HelixManager is a common component that connects each system component with the controller.
 type HelixManager interface {
 
-	// Connect the participant to storage and start housekeeping.
+	// Connect will connect manager to storage and start housekeeping.
 	Connect() error
 
-	// Close will disconnect the participant from storage and Helix controller.
-	Close()
+	// Disconnect will disconnect manager from storage.
+	Disconnect()
 
-	// NewSpectator creates a new HelixSpectator instance.
-	// This role handles most "read-only" operations of a Helix client.
-	NewSpectator(clusterID string) HelixSpectator
+	// Cluster returns the cluster name associated with this cluster manager.
+	Cluster() string
 
-	// NewParticipant creates a new HelixParticipant instance.
-	// This instance will act as a live instance of the Helix cluster when connected, and
-	// will participate the state model transition.
-	NewParticipant(clusterID string, host string, port string) HelixParticipant
+	//
+	IsLeader() bool
+
+	// Instance returns the instance name used to connect to the cluster.
+	Instance() string
+
+	// InstanceType returns the manager instance type.
+	InstanceType() InstanceType
+
+	// SessionID returns the session id associated with the connection to cluster data store.
+	SessionID() string
+
+	// AddPreConnectCallback adds a callback that is invoked before a participant joins the cluster.
+	AddPreConnectCallback(PreConnectCallback)
+
+	// StateMachineEngine returns the sme of the participant.
+	StateMachineEngine() StateMachineEngine
+
+	// AddExternalViewChangeListener add a listener to external view changes.
+	AddExternalViewChangeListener(ExternalViewChangeListener)
+
+	// AddLiveInstanceChangeListener add a listener to live instance changes.
+	AddLiveInstanceChangeListener(LiveInstanceChangeListener)
+
+	// AddCurrentStateChangeListener add a listener to current state changes of the specified instance.
+	AddCurrentStateChangeListener(instance string, listener CurrentStateChangeListener)
+
+	// AddMessageListener adds a listener to the messages of an instance.
+	AddMessageListener(instance string, listener MessageListener)
+
+	// AddControllerMessageListener add a listener to controller messages.
+	AddControllerMessageListener(ControllerMessageListener)
+
+	// AddIdealStateChangeListener add a listener to the cluster ideal state changes.
+	AddIdealStateChangeListener(IdealStateChangeListener)
+
+	// AddInstanceConfigChangeListener add a listener to instance config changes.
+	AddInstanceConfigChangeListener(InstanceConfigChangeListener)
+
+	// MessagingService returns ClusterMessagingService which can be used to send cluster wide messages.
+	MessagingService() ClusterMessagingService
+
+	// ClusterManagementTool provides admin interface to setup and modify cluster.
+	ClusterManagementTool() HelixAdmin
+
+	// RemoveListener()
 }
