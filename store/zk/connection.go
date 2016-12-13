@@ -90,6 +90,7 @@ func (conn *connection) UpdateSimpleField(path string, key string, value string)
 	return conn.Set(path, record.Marshal())
 }
 
+// TODO discard it
 func (conn *connection) GetSimpleFieldValueByKey(path string, key string) (string, error) {
 	data, err := conn.Get(path)
 	if err != nil {
@@ -108,6 +109,7 @@ func (conn *connection) GetSimpleFieldValueByKey(path string, key string) (strin
 	return v.(string), nil
 }
 
+// TODO kill this
 func (conn *connection) GetSimpleFieldBool(path string, key string) bool {
 	result, _ := conn.GetSimpleFieldValueByKey(path, key)
 	return strings.ToUpper(result) == "TRUE"
@@ -115,7 +117,7 @@ func (conn *connection) GetSimpleFieldBool(path string, key string) bool {
 
 func (conn *connection) IsClusterSetup(cluster string) (bool, error) {
 	if cluster == "" {
-		return false, helix.ErrInvalidClusterName
+		return false, helix.ErrInvalidArgument
 	}
 	if !conn.IsConnected() {
 		return false, helix.ErrNotConnected
@@ -140,8 +142,8 @@ func (conn *connection) IsClusterSetup(cluster string) (bool, error) {
 }
 
 func (conn *connection) IsInstanceSetup(cluster, node string) (bool, error) {
-	if cluster == "" {
-		return false, helix.ErrInvalidClusterName
+	if cluster == "" || node == "" {
+		return false, helix.ErrInvalidArgument
 	}
 	if !conn.IsConnected() {
 		return false, helix.ErrNotConnected

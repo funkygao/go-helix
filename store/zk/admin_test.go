@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	glog "log"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,6 +25,31 @@ var (
 func init() {
 	log.Disable()
 	glog.SetOutput(ioutil.Discard)
+}
+
+// TODO the test fails
+func TestAdminMultipleConnect(t *testing.T) {
+	adm := NewZkHelixAdmin(testZkSvr, zkclient.WithSessionTimeout(time.Second),
+		zkclient.WithoutRetry())
+	var wg sync.WaitGroup
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
+
+			assert.Equal(t, nil, adm.Connect())
+		}(&wg)
+	}
+	//wg.Wait()
+
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
+
+			adm.Disconnect()
+		}(&wg)
+	}
 }
 
 func TestZKHelixAdminBasics(t *testing.T) {
@@ -82,10 +108,83 @@ func TestZKHelixAdminBasics(t *testing.T) {
 	ins, err := adm.InstancesWithTag(cluster, "tag")
 	assert.Equal(t, nil, err)
 	assert.Equal(t, ic.InstanceName(), ins[0])
+	// RemoveIntanceTag
+	assert.Equal(t, nil, adm.RemoveInstanceTag(cluster, ic.Node(), "tag"))
+	ins, err = adm.InstancesWithTag(cluster, "tag")
+	assert.Equal(t, nil, err)
+	assert.Equal(t, 0, len(ins))
+
 	// DropInstance
 	assert.Equal(t, nil, adm.DropInstance(cluster, ic))
 
+	// state model defs
+	sms, err := adm.StateModelDefs(cluster)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, true, len(sms) > 1)
+	t.Logf("%+v", sms)
+	for _, sm := range sms {
+		smd, err := adm.StateModelDef(cluster, sm)
+		assert.Equal(t, nil, err)
+		t.Logf("%+v", smd)
+	}
+}
+
+func TestAdminResourceRelated(t *testing.T) {
+	adm := NewZkHelixAdmin(testZkSvr,
+		zkclient.WithRetryAttempts(2),
+		zkclient.WithRetryBackoff(time.Millisecond),
+		zkclient.WithoutRetry())
+	assert.Equal(t, nil, adm.Connect())
+
+	now := time.Now()
+	cluster := "test_resource" + now.Format("20060102150405")
+
+	resource := "redis_cluster"
+
+	// prepare the cluster
+	err := adm.AddCluster(cluster)
+	assert.Equal(t, nil, err)
+	//defer adm.DropCluster(cluster)
+
+	// AddResource
+	err = adm.AddResource(cluster, resource, helix.DefaultAddResourceOption(19, helix.StateModelLeaderStandby))
+	assert.Equal(t, nil, err)
+
 	// Resources
+	resources, err := adm.Resources(cluster)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, 1, len(resources))
+	assert.Equal(t, resource, resources[0])
+
+	// ResourcesWithTag
+	resources, err = adm.ResourcesWithTag(cluster, "tag")
+	assert.Equal(t, nil, err)
+	assert.Equal(t, 0, len(resources))
+
+	// ResourceExternalView
+	view, err := adm.ResourceExternalView(cluster, resource)
+	// the external view might not exist
+	t.Logf("%+v %+v", view, err)
+
+	// ResourceIdealState
+	is, err := adm.ResourceIdealState(cluster, resource)
+	assert.Equal(t, nil, err)
+	t.Logf("%+v", is)
+
+	// SetResourceIdealState
+	err = adm.SetResourceIdealState(cluster, resource, is)
+	assert.Equal(t, nil, err)
+
+	// EnableResource
+	err = adm.EnableResource(cluster, resource, true)
+	assert.Equal(t, nil, err)
+	err = adm.EnableResource(cluster, resource, false)
+	assert.Equal(t, nil, err)
+
+	// DropResource
+	err = adm.DropResource(cluster, resource)
+	assert.Equal(t, nil, err)
+
 }
 
 func TestControllerHistory(t *testing.T) {
