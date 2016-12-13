@@ -1,4 +1,3 @@
-// +build admin
 package zk
 
 import (

@@ -174,7 +174,10 @@ func (s *Manager) watchCurrentStateOfInstanceForResource(instance string, resour
 
 			select {
 			case <-events:
-				s.changeNotificationChan <- helix.ChangeNotification{helix.CurrentStateChanged, instance}
+				s.changeNotificationChan <- helix.ChangeNotification{
+					ChangeType: helix.CurrentStateChanged,
+					ChangeData: instance,
+				}
 
 			case <-s.stopCurrentStateWatch[watchPath]:
 				delete(s.stopCurrentStateWatch, watchPath)
@@ -194,7 +197,10 @@ func (s *Manager) watchLiveInstances() {
 			}
 
 			// notify the live instance update
-			s.changeNotificationChan <- helix.ChangeNotification{helix.LiveInstanceChanged, nil}
+			s.changeNotificationChan <- helix.ChangeNotification{
+				ChangeType: helix.LiveInstanceChanged,
+				ChangeData: nil,
+			}
 
 			// block the loop to wait for the live instance change
 			evt := <-events
@@ -234,7 +240,10 @@ func (s *Manager) watchInstanceConfig() {
 			}
 
 			// Notify an update of external view if there are new resources added.
-			s.changeNotificationChan <- helix.ChangeNotification{helix.InstanceConfigChanged, nil}
+			s.changeNotificationChan <- helix.ChangeNotification{
+				ChangeType: helix.InstanceConfigChanged,
+				ChangeData: nil,
+			}
 
 			// now need to block the loop to wait for the next update event
 			evt := <-events
@@ -259,7 +268,10 @@ func (s *Manager) watchInstanceConfigForParticipant(instance string) {
 			}
 
 			<-events
-			s.changeNotificationChan <- helix.ChangeNotification{helix.InstanceConfigChanged, instance}
+			s.changeNotificationChan <- helix.ChangeNotification{
+				ChangeType: helix.InstanceConfigChanged,
+				ChangeData: instance,
+			}
 		}
 	}()
 
@@ -292,7 +304,10 @@ func (s *Manager) watchIdealState() {
 			}
 
 			// Notify an update of external view if there are new resources added.
-			s.changeNotificationChan <- helix.ChangeNotification{helix.IdealStateChanged, nil}
+			s.changeNotificationChan <- helix.ChangeNotification{
+				ChangeType: helix.IdealStateChanged,
+				ChangeData: nil,
+			}
 
 			// now need to block the loop to wait for the next update event
 			evt := <-events
@@ -316,7 +331,10 @@ func (s *Manager) watchIdealStateResource(resource string) {
 			}
 
 			<-events
-			s.changeNotificationChan <- helix.ChangeNotification{helix.IdealStateChanged, resource}
+			s.changeNotificationChan <- helix.ChangeNotification{
+				ChangeType: helix.IdealStateChanged,
+				ChangeData: resource,
+			}
 		}
 	}()
 }
@@ -349,7 +367,10 @@ func (s *Manager) watchExternalView() {
 			}
 
 			// Notify an update of external view if there are new resources added.
-			s.changeNotificationChan <- helix.ChangeNotification{helix.ExternalViewChanged, ""}
+			s.changeNotificationChan <- helix.ChangeNotification{
+				ChangeType: helix.ExternalViewChanged,
+				ChangeData: "",
+			}
 
 			// now need to block the loop to wait for the next update event
 			evt := <-events
@@ -369,7 +390,10 @@ func (s *Manager) watchExternalViewResource(resource string) {
 			}
 
 			<-events
-			s.changeNotificationChan <- helix.ChangeNotification{helix.ExternalViewChanged, resource}
+			s.changeNotificationChan <- helix.ChangeNotification{
+				ChangeType: helix.ExternalViewChanged,
+				ChangeData: resource,
+			}
 		}
 	}()
 }
@@ -384,7 +408,10 @@ func (s *Manager) watchControllerMessages() {
 		}
 
 		// send the INIT update
-		s.changeNotificationChan <- helix.ChangeNotification{helix.ControllerMessagesChanged, nil}
+		s.changeNotificationChan <- helix.ChangeNotification{
+			ChangeType: helix.ControllerMessagesChanged,
+			ChangeData: nil,
+		}
 
 		// block to wait for CALLBACK
 		<-events

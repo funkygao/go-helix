@@ -15,3 +15,9 @@ Originally based on https://github.com/yichen/gohelix
 ### Codebase
 
 - helix.Context
+
+### Roadmap
+
+- [ ] Full HelixAdmin
+- [ ] Full HelixManager
+- [ ] Controller

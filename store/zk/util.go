@@ -14,14 +14,14 @@ func any(errors ...error) error {
 	return nil
 }
 
-func execCommand(name string, args ...string) (err error, exitCh chan error) {
+func execCommand(name string, args ...string) (exitCh chan error, err error) {
 	exitCh = make(chan error)
 	cmd := exec.Command(name, args...)
 	waitStart := make(chan struct{})
 	go func() {
 		<-waitStart
-		if err := cmd.Wait(); err != nil {
-			exitCh <- err
+		if e := cmd.Wait(); e != nil {
+			exitCh <- e
 		} else {
 			close(exitCh)
 		}

@@ -3,7 +3,7 @@ package zk
 import (
 	"fmt"
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" // pprof runtime
 	"sync"
 
 	"github.com/funkygao/go-helix"

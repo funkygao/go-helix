@@ -16,6 +16,7 @@ func (s *Manager) AddLiveInstanceChangeListener(listener helix.LiveInstanceChang
 	s.Unlock()
 }
 
+// AddCurrentStateChangeListener.
 // FIXME sessionID
 func (s *Manager) AddCurrentStateChangeListener(instance string, sessionID string, listener helix.CurrentStateChangeListener) {
 	s.Lock()
