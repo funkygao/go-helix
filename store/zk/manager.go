@@ -11,11 +11,12 @@ import (
 	"github.com/funkygao/go-zookeeper/zk"
 	"github.com/funkygao/golib/sync2"
 	log "github.com/funkygao/log4go"
+	"github.com/funkygao/zkclient"
 	lru "github.com/hashicorp/golang-lru"
 )
 
 var _ helix.HelixManager = &Manager{}
-var _ ZkStateListener = &Manager{}
+var _ zkclient.ZkStateListener = &Manager{}
 
 type Manager struct {
 	sync.RWMutex
@@ -236,7 +237,7 @@ func (m *Manager) connectToZookeeper() (err error) {
 	}
 
 	for retries := 0; retries < 3; retries++ {
-		if err = m.conn.waitUntilConnected(m.conn.sessionTimeout); err == nil {
+		if err = m.conn.WaitUntilConnected(m.conn.SessionTimeout()); err == nil {
 			break
 		}
 
@@ -272,7 +273,7 @@ func (m *Manager) HandleStateChanged(state zk.State) (err error) {
 func (m *Manager) HandleNewSession() (err error) {
 	log.Trace("%s handling new session", m.shortID())
 
-	if err = m.conn.waitUntilConnected(0); err != nil {
+	if err = m.conn.WaitUntilConnected(0); err != nil {
 		return
 	}
 

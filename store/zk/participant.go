@@ -33,7 +33,7 @@ func (p *participant) createLiveInstance() error {
 	// retry 5 seconds to wait for the zookeeper to remove the live instance
 	// from previous session
 	var (
-		backoff = p.conn.sessionTimeout + time.Millisecond*50
+		backoff = p.conn.SessionTimeout() + time.Millisecond*50
 		err     error
 	)
 	for retry := 0; retry < 10; retry++ {
@@ -45,7 +45,7 @@ func (p *participant) createLiveInstance() error {
 				log.Trace("%s live instance is gone as we check it, retry create live instance", p.shortID())
 				continue // needn't sleep backoff
 			} else {
-				currentSessionID := strconv.FormatInt(p.conn.stat.EphemeralOwner, 10)
+				currentSessionID := strconv.FormatInt(p.conn.LastStat().EphemeralOwner, 10)
 				log.Debug("%s current session: %s, same: %+v", p.shortID(), currentSessionID, currentSessionID == p.conn.SessionID())
 				if currentSessionID == p.conn.SessionID() {
 					curLiveInstance, err := model.NewRecordFromBytes(c)
