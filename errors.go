@@ -58,4 +58,6 @@ var (
 	ErrNotEmpty = errors.New("Not empty")
 
 	ErrInvalidArgument = errors.New("Invalid arguments")
+
+	ErrDupOperation = errors.New("Duplicated operation")
 )

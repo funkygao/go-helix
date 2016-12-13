@@ -30,6 +30,29 @@ func init() {
 	go http.ListenAndServe(":10008", nil)
 }
 
+func TestAdminBadAddClusterOrResource(t *testing.T) {
+	adm := NewZkHelixAdmin(testZkSvr)
+	assert.Equal(t, nil, adm.Connect())
+
+	err := adm.AddCluster("")
+	assert.Equal(t, helix.ErrInvalidArgument, err)
+
+	cluster := "xyzymmdf"
+	err = adm.AddCluster(cluster)
+	assert.Equal(t, nil, err)
+	defer adm.DropCluster(cluster)
+
+	// same cluster dup added
+	err = adm.AddCluster(cluster)
+	assert.Equal(t, helix.ErrDupOperation, err)
+
+	err = adm.AddNode(cluster, "")
+	assert.Equal(t, helix.ErrInvalidArgument, err)
+
+	err = adm.AddNode(cluster, "adf_df_adf")
+	assert.Equal(t, helix.ErrInvalidArgument, err)
+}
+
 func TestAdminMultipleConnect(t *testing.T) {
 	t.Parallel()
 
@@ -119,17 +142,25 @@ func TestZKHelixAdminBasics(t *testing.T) {
 	assert.Equal(t, ic.Port(), ic1.Port())
 
 	// InstanceInfo
+	_, err = adm.InstanceInfo("non-exist-cluster", ic)
+	assert.Equal(t, helix.ErrClusterNotSetup, err)
 	inf, err := adm.InstanceInfo(cluster, ic)
 	assert.Equal(t, nil, err)
 	t.Logf("instance info: %+v", inf)
 
 	// AddInstanceTag
+	assert.Equal(t, helix.ErrClusterNotSetup, adm.AddInstanceTag("non-exist-cluster", ic.Node(), "tag"))
+	assert.Equal(t, helix.ErrClusterNotSetup, adm.AddInstanceTag(cluster, "non-exist-instance", "tag"))
+
 	assert.Equal(t, nil, adm.AddInstanceTag(cluster, ic.Node(), "tag"))
 	// InstancesWithTag
 	ins, err := adm.InstancesWithTag(cluster, "tag")
 	assert.Equal(t, nil, err)
 	assert.Equal(t, ic.InstanceName(), ins[0])
 	// RemoveIntanceTag
+	assert.Equal(t, helix.ErrClusterNotSetup, adm.RemoveInstanceTag("non-exist-cluster", ic.Node(), "tag"))
+	assert.Equal(t, helix.ErrClusterNotSetup, adm.RemoveInstanceTag(cluster, "non-exist-instance", "tag"))
+
 	assert.Equal(t, nil, adm.RemoveInstanceTag(cluster, ic.Node(), "tag"))
 	ins, err = adm.InstancesWithTag(cluster, "tag")
 	assert.Equal(t, nil, err)
@@ -168,9 +199,15 @@ func TestAdminResourceRelated(t *testing.T) {
 
 	// AddResource
 	// partitions can't less than 1
+	err = adm.AddResource("non-exist-cluster", resource, helix.DefaultAddResourceOption(3, helix.StateModelLeaderStandby))
+	assert.Equal(t, helix.ErrClusterNotSetup, err)
 	err = adm.AddResource(cluster, resource, helix.DefaultAddResourceOption(0, helix.StateModelLeaderStandby))
 	assert.Equal(t, helix.ErrInvalidAddResourceOption, err)
-	err = adm.AddResource(cluster, resource, helix.DefaultAddResourceOption(19, helix.StateModelLeaderStandby))
+	ado := helix.DefaultAddResourceOption(19, helix.StateModelLeaderStandby)
+	ado.MaxPartitionsPerInstance = 2
+	ado.BucketSize = 4
+	ado.RebalancerMode = helix.RebalancerModeCustomized
+	err = adm.AddResource(cluster, resource, ado)
 	assert.Equal(t, nil, err)
 
 	// Resources
@@ -199,12 +236,20 @@ func TestAdminResourceRelated(t *testing.T) {
 	assert.Equal(t, nil, err)
 
 	// EnableResource
+	err = adm.EnableResource("bad-cluster", resource, true)
+	assert.Equal(t, helix.ErrClusterNotSetup, err)
+	err = adm.EnableResource(cluster, "bad-resource", true)
+	assert.Equal(t, helix.ErrResourceNotExists, err)
 	err = adm.EnableResource(cluster, resource, true)
 	assert.Equal(t, nil, err)
 	err = adm.EnableResource(cluster, resource, false)
 	assert.Equal(t, nil, err)
 
 	// DropResource
+	err = adm.DropResource("non-exist-cluster", resource)
+	assert.Equal(t, helix.ErrClusterNotSetup, err)
+	err = adm.DropResource(cluster, "invalid-resource")
+	assert.Equal(t, nil, err)
 	err = adm.DropResource(cluster, resource)
 	assert.Equal(t, nil, err)
 
@@ -243,7 +288,7 @@ func TestAddAndDropCluster(t *testing.T) {
 
 	// if cluster is already added, add it again and it should return ErrNodeAlreadyExists
 	err = a.AddCluster(cluster)
-	if err != helix.ErrNodeAlreadyExists {
+	if err != helix.ErrDupOperation {
 		t.Error(err)
 	}
 
@@ -255,6 +300,8 @@ func TestAddAndDropCluster(t *testing.T) {
 	if !strSliceContains(clusters, cluster) {
 		t.Error("Expect OK")
 	}
+
+	assert.Equal(t, helix.ErrClusterNotSetup, a.DropCluster("non-exist-cluster"))
 
 	err = a.DropCluster(cluster)
 	assert.Equal(t, nil, err)
@@ -272,6 +319,7 @@ func TestAddCluster(t *testing.T) {
 
 	a := NewZkHelixAdmin(testZkSvr)
 	err := a.AddCluster(cluster)
+	// connect before any op
 	assert.Equal(t, zkclient.ErrNotConnected, err)
 	assert.Equal(t, nil, a.Connect())
 
@@ -347,6 +395,7 @@ func TestAddDropNode(t *testing.T) {
 	node := "localhost_19932"
 
 	// add node before adding cluster, expect fail
+	assert.Equal(t, helix.ErrClusterNotSetup, a.AddNode(cluster, "invalid node"))
 	if err := a.AddNode(cluster, node); err != helix.ErrClusterNotSetup {
 		t.Error("Must error out for AddNode if cluster not setup")
 	}

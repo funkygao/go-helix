@@ -4,7 +4,7 @@ test:
 cover:test
 	go tool cover -func=cover.out
 
-report:testv
+report:test
 	go tool cover -html=cover.out 
 
 testv:

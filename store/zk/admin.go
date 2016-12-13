@@ -93,8 +93,25 @@ func (adm *Admin) ControllerHistory(cluster string) ([]string, error) {
 }
 
 func (adm *Admin) AddCluster(cluster string) error {
+	if cluster == "" {
+		// TODO more strict validation
+		return helix.ErrInvalidArgument
+	}
+
+	if !adm.IsConnected() {
+		//return helix.ErrNotConnected FIXME
+	}
+
 	adm.Lock()
 	defer adm.Unlock()
+
+	dup, err := adm.IsClusterSetup(cluster)
+	if dup {
+		return helix.ErrDupOperation
+	}
+	if err != nil {
+		//return err FIXME
+	}
 
 	kb := adm.getKeyBuilder(cluster)
 
@@ -148,6 +165,10 @@ func (adm *Admin) AddCluster(cluster string) error {
 }
 
 func (adm *Admin) DropCluster(cluster string) error {
+	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
+		return helix.ErrClusterNotSetup
+	}
+
 	kb := adm.getKeyBuilder(cluster)
 
 	// cannot drop cluster if there is live instances running
@@ -375,6 +396,11 @@ func (adm *Admin) InstancesWithTag(cluster, tag string) ([]string, error) {
 // ./helix-admin.sh --zkSvr <ZookeeperServerAddress> --addNode <clusterName instanceId>
 // node is in the form of host_port
 func (adm *Admin) AddNode(cluster string, node string) error {
+	if node == "" {
+		// TODO more strict validation
+		return helix.ErrInvalidArgument
+	}
+
 	if ok, err := adm.IsClusterSetup(cluster); ok == false || err != nil {
 		return helix.ErrClusterNotSetup
 	}
@@ -438,6 +464,11 @@ func (adm *Admin) DropNode(cluster string, node string) error {
 }
 
 func (adm *Admin) AddResource(cluster string, resource string, option helix.AddResourceOption) error {
+	if resource == "" {
+		// TODO add more strict validation
+		return helix.ErrInvalidArgument
+	}
+
 	if !option.Valid() {
 		return helix.ErrInvalidAddResourceOption
 	}
