@@ -68,7 +68,7 @@ func (adm *Admin) Disconnect() {
 	adm.closeOnce.Do(func() {
 		adm.Lock()
 		if adm.IsConnected() {
-			adm.Disconnect()
+			adm.connection.Disconnect()
 		}
 		adm.Unlock()
 	})
