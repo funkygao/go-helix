@@ -164,9 +164,12 @@ func TestAdminResourceRelated(t *testing.T) {
 	// prepare the cluster
 	err := adm.AddCluster(cluster)
 	assert.Equal(t, nil, err)
-	//defer adm.DropCluster(cluster)
+	defer adm.DropCluster(cluster)
 
 	// AddResource
+	// partitions can't less than 1
+	err = adm.AddResource(cluster, resource, helix.DefaultAddResourceOption(0, helix.StateModelLeaderStandby))
+	assert.Equal(t, helix.ErrInvalidAddResourceOption, err)
 	err = adm.AddResource(cluster, resource, helix.DefaultAddResourceOption(19, helix.StateModelLeaderStandby))
 	assert.Equal(t, nil, err)
 
