@@ -32,6 +32,9 @@ type HelixAdmin interface {
 	// By default this feature is off.
 	AllowParticipantAutoJoin(cluster string, yes bool) error
 
+	// ControllerLeader returns the active controller leader of a cluster.
+	ControllerLeader(cluster string) string
+
 	// ControllerHistory returns all controller instance names in history.
 	ControllerHistory(cluster string) ([]string, error)
 
@@ -117,9 +120,6 @@ type HelixAdmin interface {
 	// GetConfig obtains the configuration value of a property, defined by a config scope.
 	// TODO
 	GetConfig(cluster string, scope HelixConfigScope, keys []string) (map[string]interface{}, error)
-
-	// ControllerLeader returns the active controller leader of a cluster.
-	ControllerLeader(cluster string) string
 
 	AddConstaint()
 	RemoveConstaint()
