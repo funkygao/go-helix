@@ -159,15 +159,25 @@ func (adm Admin) DropCluster(cluster string) error {
 	}
 
 	// cannot drop cluster if there is controller running
-	leader, err := adm.Get(kb.controllerLeader())
-	if err != nil {
-		return err
-	}
-	if len(leader) > 0 {
+	if leader := adm.ControllerLeader(cluster); leader != "" {
 		return helix.ErrNotEmpty
 	}
 
 	return adm.DeleteTree(kb.cluster())
+}
+
+func (adm Admin) ControllerLeader(cluster string) string {
+	kb := adm.getKeyBuilder(cluster)
+
+	leader, err := adm.Get(kb.controllerLeader())
+	if err == zk.ErrNoNode {
+		// no controller running
+		return ""
+	} else if err != nil {
+		return ""
+	}
+
+	return string(leader)
 }
 
 func (adm Admin) EnableCluster(cluster string, yes bool) error {
@@ -277,20 +287,14 @@ func (adm Admin) AddInstanceTag(cluster, instance, tag string) error {
 	}
 
 	kb := adm.getKeyBuilder(cluster)
-	data, err := adm.Get(kb.participantConfig(instance))
+	record, err := adm.GetRecord(kb.participantConfig(instance))
 	if err != nil {
 		return err
 	}
 
-	r, err := model.NewRecordFromBytes(data)
-	if err != nil {
-		return err
-	}
-
-	ic := model.NewInstanceConfigFromRecord(r)
+	ic := model.NewInstanceConfigFromRecord(record)
 	ic.AddTag(tag)
 	return adm.SetRecord(kb.participantConfig(instance), ic)
-	//return adm.Set(kb.participantConfig(instance), ic.Marshal())
 }
 
 func (adm Admin) RemoveInstanceTag(cluster, instance, tag string) error {
@@ -302,18 +306,14 @@ func (adm Admin) RemoveInstanceTag(cluster, instance, tag string) error {
 	}
 
 	kb := adm.getKeyBuilder(cluster)
-	data, err := adm.Get(kb.participantConfig(instance))
+	record, err := adm.GetRecord(kb.participantConfig(instance))
 	if err != nil {
 		return err
 	}
 
-	r, err := model.NewRecordFromBytes(data)
-	if err != nil {
-		return err
-	}
-	ic := model.NewInstanceConfigFromRecord(r)
+	ic := model.NewInstanceConfigFromRecord(record)
 	ic.RemoveTag(tag)
-	return adm.Set(kb.participantConfig(instance), ic.Marshal())
+	return adm.SetRecord(kb.participantConfig(instance), ic)
 }
 
 func (adm Admin) Instances(cluster string) ([]string, error) {
@@ -339,11 +339,35 @@ func (adm Admin) InstanceInfo(cluster string, ic *model.InstanceConfig) (*model.
 }
 
 func (adm Admin) InstanceConfig(cluster, instance string) (*model.InstanceConfig, error) {
-	return nil, helix.ErrNotImplemented
+	kb := adm.getKeyBuilder(cluster)
+	kb.participantConfig(instance)
+	record, err := adm.GetRecord(kb.participantConfig(instance))
+	if err != nil {
+		return nil, err
+	}
+
+	return model.NewInstanceConfigFromRecord(record), err
 }
 
 func (adm Admin) InstancesWithTag(cluster, tag string) ([]string, error) {
-	return nil, helix.ErrNotImplemented
+	instances, err := adm.Instances(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]string, 0)
+	for _, ins := range instances {
+		ic, err := adm.InstanceConfig(cluster, ins)
+		if err != nil {
+			return result, err
+		}
+
+		if ic.ContainsTag(tag) {
+			result = append(result, ins)
+		}
+	}
+
+	return result, nil
 }
 
 // AddNode is the internal implementation corresponding to command
@@ -367,6 +391,9 @@ func (adm Admin) AddNode(cluster string, node string) error {
 
 	// create new node for the participant
 	parts := strings.Split(node, "_")
+	if len(parts) != 2 {
+		return helix.ErrInvalidArgument
+	}
 	n := model.NewRecord(node)
 	n.SetSimpleField("HELIX_HOST", parts[0])
 	n.SetSimpleField("HELIX_PORT", parts[1])
@@ -508,7 +535,6 @@ func (adm Admin) Resources(cluster string) ([]string, error) {
 }
 
 func (adm Admin) ResourcesWithTag(cluster, tag string) ([]string, error) {
-	kb := adm.getKeyBuilder(cluster)
 	resources, err := adm.Resources(cluster)
 	if err != nil {
 		return nil, err

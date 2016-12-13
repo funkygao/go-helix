@@ -56,4 +56,6 @@ var (
 	ErrDupStateTransition = errors.New("Register a state model transition over once")
 
 	ErrNotEmpty = errors.New("Not empty")
+
+	ErrInvalidArgument = errors.New("Invalid arguments")
 )

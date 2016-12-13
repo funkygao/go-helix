@@ -118,6 +118,9 @@ type HelixAdmin interface {
 	// TODO
 	GetConfig(cluster string, scope HelixConfigScope, keys []string) (map[string]interface{}, error)
 
+	// ControllerLeader returns the active controller leader of a cluster.
+	ControllerLeader(cluster string) string
+
 	AddConstaint()
 	RemoveConstaint()
 	Constraints()

@@ -3,6 +3,8 @@ package zk
 
 import (
 	"fmt"
+	"io/ioutil"
+	glog "log"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +24,7 @@ var (
 
 func init() {
 	log.Disable()
+	glog.SetOutput(ioutil.Discard)
 }
 
 func TestZKHelixAdminBasics(t *testing.T) {
@@ -52,7 +55,8 @@ func TestZKHelixAdminBasics(t *testing.T) {
 	assert.Equal(t, nil, adm.EnableCluster(cluster, false))
 
 	// AddInstance
-	ic := &model.InstanceConfig{}
+	record := model.NewRecord("localhost_10965")
+	ic := model.NewInstanceConfigFromRecord(record)
 	ic.SetHost("localhost")
 	ic.SetPort("10965")
 	assert.Equal(t, nil, adm.AddInstance(cluster, ic))
@@ -80,7 +84,7 @@ func TestZKHelixAdminBasics(t *testing.T) {
 	assert.Equal(t, nil, err)
 	assert.Equal(t, ic.InstanceName(), ins[0])
 	// DropInstance
-	assert.Equal(t, nil, adm.DropInstance(cluster, ic))
+	//assert.Equal(t, nil, adm.DropInstance(cluster, ic))
 
 	// Resources
 }
@@ -131,10 +135,11 @@ func TestAddAndDropCluster(t *testing.T) {
 		t.Error("Expect OK")
 	}
 
-	a.DropCluster(cluster)
+	err = a.DropCluster(cluster)
+	assert.Equal(t, nil, err)
 	clusters, err = a.Clusters()
 	if err != nil || strSliceContains(clusters, cluster) {
-		t.Error("Expect dropped")
+		t.Errorf("err=%v %+v %v", err, clusters, cluster)
 	}
 }
 
@@ -146,9 +151,12 @@ func TestAddCluster(t *testing.T) {
 
 	a := NewZkHelixAdmin(testZkSvr)
 	err := a.AddCluster(cluster)
-	if err == nil {
-		defer a.DropCluster(cluster)
-	}
+	assert.Equal(t, zkclient.ErrNotConnected, err)
+	assert.Equal(t, nil, a.Connect())
+
+	err = a.AddCluster(cluster)
+	assert.Equal(t, nil, err)
+	defer a.DropCluster(cluster)
 
 	// verify the data structure in zookeeper
 	propertyStore := fmt.Sprintf("/%s/PROPERTYSTORE", cluster)
@@ -241,7 +249,7 @@ func connectLocalZk(t *testing.T) *zk.Conn {
 	zkServers := strings.Split(testZkSvr, ",")
 	conn, _, err := zk.Connect(zkServers, time.Second)
 	if err != nil {
-		t.FailNow()
+		t.Errorf("%v", err)
 	}
 
 	return conn
@@ -252,7 +260,7 @@ func verifyNodeExist(t *testing.T, path string) {
 	defer conn.Close()
 
 	if exists, _, err := conn.Exists(path); err != nil || !exists {
-		t.Error("failed verifyNodeExist")
+		t.Errorf("failed verifyNodeExist: %s", path)
 	}
 }
 
@@ -261,8 +269,7 @@ func verifyNodeNotExist(t *testing.T, path string) {
 	defer conn.Close()
 
 	if exists, _, err := conn.Exists(path); err != nil || exists {
-		t.Error("failed verifyNotNotExist")
-		t.FailNow()
+		t.Errorf("failed verifyNotNotExist: %s", path)
 	}
 }
 
@@ -272,7 +279,7 @@ func verifyChildrenCount(t *testing.T, path string, count int32) {
 
 	_, stat, err := conn.Get(path)
 	if err != nil {
-		t.FailNow()
+		t.Errorf("%v", err)
 	}
 
 	if stat.NumChildren != count {

@@ -54,6 +54,15 @@ func (ic *InstanceConfig) RemoveTag(tag string) {
 	ic.RemoveListField("TAG_LIST", tag)
 }
 
+func (ic *InstanceConfig) ContainsTag(tag string) bool {
+	for _, t := range ic.Tags() {
+		if t == tag {
+			return true
+		}
+	}
+	return false
+}
+
 func (ic InstanceConfig) DisabledPartitions() []string {
 	return ic.GetListField("HELIX_DISABLED_PARTITION")
 }
