@@ -11,8 +11,9 @@ import (
 	"github.com/funkygao/zkclient"
 )
 
+var _ helix.HelixAdmin = &Admin{}
+
 type Admin struct {
-	sync.RWMutex
 	closeOnce sync.Once
 
 	*connection
@@ -22,7 +23,7 @@ type Admin struct {
 }
 
 // NewZkHelixAdmin creates a HelixAdmin implementation with zk as storage.
-func NewZkHelixAdmin(zkSvr string, options ...zkclient.Option) helix.HelixAdmin {
+func NewZkHelixAdmin(zkSvr string, options ...zkclient.Option) *Admin {
 	admin := newZkHelixAdminWithConn(newConnection(zkSvr))
 
 	// apply additional options over the default
