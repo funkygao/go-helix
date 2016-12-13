@@ -410,11 +410,6 @@ func (adm *Admin) AddNode(cluster string, node string) error {
 }
 
 func (adm *Admin) DropInstance(cluster string, ic *model.InstanceConfig) error {
-	kb := adm.getKeyBuilder(cluster)
-	if err := adm.Delete(kb.participantConfig(ic.Node())); err != nil {
-		return err
-	}
-
 	return adm.DropNode(cluster, ic.Node())
 }
 

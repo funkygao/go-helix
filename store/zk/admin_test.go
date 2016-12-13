@@ -83,7 +83,7 @@ func TestZKHelixAdminBasics(t *testing.T) {
 	assert.Equal(t, nil, err)
 	assert.Equal(t, ic.InstanceName(), ins[0])
 	// DropInstance
-	//assert.Equal(t, nil, adm.DropInstance(cluster, ic))
+	assert.Equal(t, nil, adm.DropInstance(cluster, ic))
 
 	// Resources
 }
