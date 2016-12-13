@@ -1,5 +1,9 @@
 package zk
 
+import (
+	"time"
+)
+
 type managerOption func(*Manager)
 
 func WithoutPprof() managerOption {
@@ -17,5 +21,11 @@ func WithPprofPort(port int) managerOption {
 func WithParticipantID(id string) managerOption {
 	return func(m *Manager) {
 		m.instanceID = id
+	}
+}
+
+func WithZkSessionTimeout(d time.Duration) managerOption {
+	return func(m *Manager) {
+		m.conn.SetSessionTimeout(d)
 	}
 }

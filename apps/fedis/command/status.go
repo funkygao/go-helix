@@ -27,7 +27,9 @@ func (this *Status) Run(args []string) (exitCode int) {
 	admin := zk.NewZkHelixAdmin(zkSvr)
 	must(admin.Connect())
 
-	instances, resources, err := admin.ClusterInfo(cluster)
+	instances, err := admin.Instances(cluster)
+	must(err)
+	resources, err := admin.Resources(cluster)
 	must(err)
 
 	this.Ui.Output(fmt.Sprintf("resources: %+v", resources))

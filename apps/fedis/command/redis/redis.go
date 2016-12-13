@@ -36,7 +36,7 @@ func (r *redisNode) Start() {
 	// create the manager instance and connect
 	manager, _ := zk.NewZkHelixManager(r.cluster, r.host, r.port, r.zkSvr,
 		helix.InstanceTypeParticipant,
-		zk.WithManagerZkSessionTimeout(time.Second*5),
+		zk.WithZkSessionTimeout(time.Second*5),
 		zk.WithPprofPort(10001))
 
 	manager.AddPreConnectCallback(func() {
