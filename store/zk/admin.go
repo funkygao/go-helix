@@ -52,6 +52,7 @@ func (adm *Admin) Connect() error {
 
 	adm.Lock()
 	defer adm.Unlock()
+
 	if adm.IsConnected() {
 		return nil
 	}

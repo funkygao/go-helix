@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	glog "log"
+	"net/http"
+	_ "net/http/pprof"
 	"strings"
 	"sync"
 	"testing"
@@ -25,31 +27,45 @@ var (
 func init() {
 	log.Disable()
 	glog.SetOutput(ioutil.Discard)
+	go http.ListenAndServe(":10008", nil)
 }
 
-// TODO the test fails
 func TestAdminMultipleConnect(t *testing.T) {
+	t.Parallel()
+
 	adm := NewZkHelixAdmin(testZkSvr, zkclient.WithSessionTimeout(time.Second),
 		zkclient.WithoutRetry())
+
+	// parallel connect
 	var wg sync.WaitGroup
 	for i := 0; i < 5; i++ {
 		wg.Add(1)
-		go func(wg *sync.WaitGroup) {
+		go func(wg *sync.WaitGroup, i int) {
 			defer wg.Done()
 
 			assert.Equal(t, nil, adm.Connect())
-		}(&wg)
+		}(&wg, i)
 	}
-	//wg.Wait()
+	wg.Wait()
 
+	// parallel disconnect
 	for i := 0; i < 5; i++ {
 		wg.Add(1)
-		go func(wg *sync.WaitGroup) {
+		go func(wg *sync.WaitGroup, i int) {
 			defer wg.Done()
 
 			adm.Disconnect()
-		}(&wg)
+		}(&wg, i)
 	}
+	wg.Wait()
+}
+
+func TestAdminRebalance(t *testing.T) {
+	adm := NewZkHelixAdmin(testZkSvr)
+	assert.Equal(t, nil, adm.Connect())
+
+	adm.Rebalance(testCluster, "resource", 3)
+	t.SkipNow()
 }
 
 func TestZKHelixAdminBasics(t *testing.T) {
@@ -74,6 +90,11 @@ func TestZKHelixAdminBasics(t *testing.T) {
 	err = adm.AddCluster(cluster)
 	assert.Equal(t, nil, err)
 	defer adm.DropCluster(cluster)
+
+	err = adm.AllowParticipantAutoJoin(cluster, true)
+	assert.Equal(t, nil, err)
+	err = adm.AllowParticipantAutoJoin(cluster, false)
+	assert.Equal(t, nil, err)
 
 	// EnableCluster
 	assert.Equal(t, nil, adm.EnableCluster(cluster, true))
@@ -123,9 +144,8 @@ func TestZKHelixAdminBasics(t *testing.T) {
 	assert.Equal(t, true, len(sms) > 1)
 	t.Logf("%+v", sms)
 	for _, sm := range sms {
-		smd, err := adm.StateModelDef(cluster, sm)
+		_, err := adm.StateModelDef(cluster, sm)
 		assert.Equal(t, nil, err)
-		t.Logf("%+v", smd)
 	}
 }
 
