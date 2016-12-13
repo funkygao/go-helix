@@ -4,6 +4,10 @@ type StateModelDef struct {
 	*Record
 }
 
+func NewStateModelDefFromRecord(r *Record) *StateModelDef {
+	return &StateModelDef{Record: r}
+}
+
 func NewStateModelDef(stateModel string) *StateModelDef {
 	return &StateModelDef{Record: NewRecord(stateModel)}
 }

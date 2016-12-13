@@ -137,6 +137,14 @@ func (is IdealState) SetNumPartitions(n int) {
 	is.SetStringField("NUM_PARTITIONS", strconv.Itoa(n))
 }
 
+func (is IdealState) InstanceGroupTag() string {
+	return is.GetStringField("INSTANCE_GROUP_TAG", "")
+}
+
+func (is *IdealState) SetInstanceGroupTag(tag string) {
+	is.SetStringField("INSTANCE_GROUP_TAG", tag)
+}
+
 func (is IdealState) Valid() bool {
 	isInvalid := is.NumPartitions() < 0 ||
 		is.StateModelDefRef() == ""

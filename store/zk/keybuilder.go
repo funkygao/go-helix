@@ -176,3 +176,11 @@ func (k *keyBuilder) messages(participantID string) string {
 func (k *keyBuilder) message(participantID string, messageID string) string {
 	return fmt.Sprintf("/%s/INSTANCES/%s/MESSAGES/%s", k.clusterID, participantID, messageID)
 }
+
+func (k *keyBuilder) constraints() string {
+	return "TODO"
+}
+
+func (k *keyBuilder) constraint(typ string) string {
+	return "TODO"
+}

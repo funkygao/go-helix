@@ -72,7 +72,7 @@ type HelixAdmin interface {
 	ResourceIdealState(cluster, resource string) (*model.IdealState, error)
 
 	// SetResourceIdealState sets ideal state for a resource.
-	SetResourceIdealState(cluster, instance string, is *model.IdealState) error
+	SetResourceIdealState(cluster, resource string, is *model.IdealState) error
 
 	// Add a resource to a cluster.
 	AddResource(cluster string, resource string, option AddResourceOption) error
