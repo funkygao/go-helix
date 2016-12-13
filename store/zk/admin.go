@@ -43,7 +43,7 @@ func newZkHelixAdminWithConn(c *connection) *Admin {
 
 func (adm *Admin) Connect() error {
 	adm.RLock()
-	if adm.connected() {
+	if adm.IsConnected() {
 		adm.RUnlock()
 		return nil
 	}
@@ -51,7 +51,7 @@ func (adm *Admin) Connect() error {
 
 	adm.Lock()
 	defer adm.Unlock()
-	if adm.connected() {
+	if adm.IsConnected() {
 		return nil
 	}
 
@@ -65,15 +65,11 @@ func (adm *Admin) Connect() error {
 func (adm *Admin) Disconnect() {
 	adm.closeOnce.Do(func() {
 		adm.Lock()
-		if adm.connected() {
+		if adm.IsConnected() {
 			adm.Disconnect()
 		}
 		adm.Unlock()
 	})
-}
-
-func (adm *Admin) connected() bool {
-	return adm.connection.IsConnected()
 }
 
 func (adm *Admin) SetInstallPath(path string) {
@@ -157,7 +153,7 @@ func (adm Admin) DropCluster(cluster string) error {
 		return helix.ErrNotEmpty
 	}
 
-	// cannot dro cluster if there is controller running
+	// cannot drop cluster if there is controller running
 	leader, err := adm.Get(kb.controllerLeader())
 	if err == nil && len(leader) > 0 {
 		return helix.ErrNotEmpty
@@ -256,7 +252,7 @@ func (adm Admin) AllowParticipantAutoJoin(cluster string, yes bool) error {
 	return adm.SetConfig(cluster, "CLUSTER", properties)
 }
 
-func (adm Admin) AddInstance(cluster string, config model.InstanceConfig) error {
+func (adm Admin) AddInstance(cluster string, config *model.InstanceConfig) error {
 	return adm.AddNode(cluster, config.Node())
 }
 
@@ -304,6 +300,28 @@ func (adm Admin) RemoveInstanceTag(cluster, instance, tag string) error {
 	ic := model.NewInstanceConfigFromRecord(r)
 	ic.RemoveTag(tag)
 	return adm.Set(kb.participantConfig(instance), ic.Marshal())
+}
+
+func (adm Admin) Instances(cluster string) ([]string, error) {
+	kb := keyBuilder{clusterID: cluster}
+	return adm.Children(kb.instances())
+}
+
+func (adm Admin) InstanceInfo(cluster string, ic *model.InstanceConfig) (*model.Record, error) {
+	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
+		return nil, helix.ErrClusterNotSetup
+	}
+
+	kb := keyBuilder{clusterID: cluster}
+	instanceCfg := kb.participantConfig(ic.Node())
+	if exists, err := adm.Exists(instanceCfg); !exists || err != nil {
+		if !exists {
+			return nil, helix.ErrNodeNotExist
+		}
+		return nil, err
+	}
+
+	return adm.GetRecord(instanceCfg)
 }
 
 func (adm Admin) InstanceConfig(cluster, instance string) (*model.InstanceConfig, error) {
@@ -485,28 +503,6 @@ func (adm Admin) EnableResource(cluster string, resource string, enabled bool) e
 func (adm Admin) Resources(cluster string) ([]string, error) {
 	kb := keyBuilder{clusterID: cluster}
 	return adm.Children(kb.idealStates())
-}
-
-func (adm Admin) InstanceInfo(cluster string, ic model.InstanceConfig) (*model.Record, error) {
-	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
-		return nil, helix.ErrClusterNotSetup
-	}
-
-	kb := keyBuilder{clusterID: cluster}
-	instanceCfg := kb.participantConfig(ic.Node())
-	if exists, err := adm.Exists(instanceCfg); !exists || err != nil {
-		if !exists {
-			return nil, helix.ErrNodeNotExist
-		}
-		return nil, err
-	}
-
-	return adm.GetRecord(instanceCfg)
-}
-
-func (adm Admin) Instances(cluster string) ([]string, error) {
-	kb := keyBuilder{clusterID: cluster}
-	return adm.Children(kb.instances())
 }
 
 func (adm Admin) AddStateModelDef(cluster string, stateModel string, definition *model.StateModelDef) error {

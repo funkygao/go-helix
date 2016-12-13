@@ -34,6 +34,10 @@ func (ic *InstanceConfig) IsEnabled() bool {
 	return ic.GetBooleanField("HELIX_ENABLED", true)
 }
 
+func (ic InstanceConfig) InstanceName() string {
+	return ic.Node()
+}
+
 func (ic InstanceConfig) Node() string {
 	return ic.Host() + "_" + ic.Port()
 }

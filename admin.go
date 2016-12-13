@@ -43,7 +43,7 @@ type HelixAdmin interface {
 	DropNode(cluster string, node string) error
 
 	// Add an instance to a cluster.
-	AddInstance(cluster string, ic model.InstanceConfig) error
+	AddInstance(cluster string, ic *model.InstanceConfig) error
 
 	// AddInstanceTag adds a tag to an instance.
 	AddInstanceTag(cluster, instance, tag string) error
@@ -63,7 +63,7 @@ type HelixAdmin interface {
 	// InstanceConfig returns configuration information of an instance in a cluster.
 	InstanceConfig(cluster, instance string) (*model.InstanceConfig, error)
 
-	InstanceInfo(cluster string, ic model.InstanceConfig) (*model.Record, error)
+	InstanceInfo(cluster string, ic *model.InstanceConfig) (*model.Record, error)
 
 	// Enable or disable an instance.
 	EnableInstance(cluster, instance string, yes bool) error
@@ -107,10 +107,6 @@ type HelixAdmin interface {
 	// Rebalance a resource in cluster.
 	Rebalance(cluster string, resource string, replica int) error
 
-	// SetInstallPath will setup the local helix installation base path.
-	// TODO kill this
-	SetInstallPath(path string)
-
 	// SetConfig set the configuration values for the cluster, defined by the config scope.
 	// TODO
 	SetConfig(cluster string, scope HelixConfigScope, properties map[string]string) error
@@ -125,4 +121,8 @@ type HelixAdmin interface {
 	AddConstaint()
 	RemoveConstaint()
 	Constraints()
+
+	// SetInstallPath will setup the local helix installation base path.
+	// TODO kill this
+	SetInstallPath(path string)
 }

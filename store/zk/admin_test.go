@@ -9,28 +9,85 @@ import (
 
 	"github.com/funkygao/assert"
 	"github.com/funkygao/go-helix"
+	"github.com/funkygao/go-helix/model"
+	"github.com/funkygao/zkclient"
 	"github.com/yichen/go-zookeeper/zk"
 )
 
 var (
-	testZkSvr = "localhost:2181"
+	testZkSvr   = "localhost:2181"
+	testCluster = "foobar"
 )
 
 func TestZKHelixAdminBasics(t *testing.T) {
+	t.Parallel()
+
 	adm := NewZkHelixAdmin(testZkSvr)
+
 	clusters, err := adm.Clusters()
 	assert.Equal(t, nil, err)
-	assert.Equal(t, 0, len(clusters))
+	t.Logf("clusters: %+v", clusters)
+
+	now := time.Now()
+	cluster := "test_cluster" + now.Format("20060102150405")
 
 	// cluster CRUD
-	err = adm.AddCluster("test_cluster")
+	err = adm.AddCluster(cluster)
 	assert.Equal(t, nil, err)
+	assert.Equal(t, nil, adm.DropCluster(cluster))
+
+	// prepare the cluster
+	err = adm.AddCluster(cluster)
+	assert.Equal(t, nil, err)
+	defer adm.DropCluster(cluster)
+
+	// EnableCluster
+	assert.Equal(t, nil, adm.EnableCluster(cluster, true))
+	assert.Equal(t, nil, adm.EnableCluster(cluster, false))
+
+	// AddInstance
+	ic := &model.InstanceConfig{}
+	ic.SetHost("localhost")
+	ic.SetPort("10965")
+	assert.Equal(t, nil, adm.AddInstance(cluster, ic))
+
+	// Instances
+	instances, err := adm.Instances(cluster)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, 1, len(instances))
+	t.Logf("instances: %+v", instances)
+
+	// InstanceConfig
+	ic1, err := adm.InstanceConfig(cluster, ic.InstanceName())
+	assert.Equal(t, ic.Host(), ic1.Host())
+	assert.Equal(t, ic.Port(), ic1.Port())
+
+	// InstanceInfo
+	inf, err := adm.InstanceInfo(cluster, ic)
+	assert.Equal(t, nil, err)
+	t.Logf("instance info: %+v", inf)
+
+	// AddInstanceTag
+	assert.Equal(t, nil, adm.AddInstanceTag(cluster, ic.Node(), "tag"))
+	// InstancesWithTag
+	ins, err := adm.InstancesWithTag(cluster, "tag")
+	assert.Equal(t, nil, err)
+	assert.Equal(t, ic.InstanceName(), ins[0])
+
+}
+
+func TestControllerHistory(t *testing.T) {
+	adm := NewZkHelixAdmin(testZkSvr)
+	history, err := adm.ControllerHistory(testCluster)
+	assert.Equal(t, nil, err)
+	for _, h := range history {
+		t.Logf("%s", h)
+	}
 }
 
 func TestNewZKHelixAdminWithOptions(t *testing.T) {
-	admin := NewZkHelixAdmin(testZkSvr, WithZkSessionTimeout(time.Second))
-	adminZk := admin.(*Admin)
-	assert.Equal(t, time.Second, adminZk.connection.sessionTimeout)
+	admin := NewZkHelixAdmin(testZkSvr, zkclient.WithSessionTimeout(time.Second))
+	assert.Equal(t, time.Second, admin.SessionTimeout())
 }
 
 func TestAddAndDropCluster(t *testing.T) {
@@ -52,9 +109,8 @@ func TestAddAndDropCluster(t *testing.T) {
 		t.Error(err)
 	}
 
-	// listClusters
 	clusters, err := a.Clusters()
-	t.Logf("%+v%+v", clusters, err)
+	t.Logf("%+v %+v", clusters, err)
 	if err != nil {
 		t.Error("Expect OK")
 	}
@@ -164,139 +220,6 @@ func TestAddDropNode(t *testing.T) {
 		t.Error("should not be able to add the same node")
 	}
 
-	// listInstanceInfo
-	if info, err := a.ListInstanceInfo(cluster, node); err != nil || info == "" || !strings.Contains(info, node) {
-		t.Error("expect OK")
-	}
-
-	// drop the node
-	if err := a.DropNode(cluster, node); err != nil {
-		t.Error("failed to drop cluster node")
-	}
-	// listInstanceInfo
-	if _, err := a.ListInstanceInfo(cluster, node); err != helix.ErrNodeNotExist {
-		t.Error("expect OK")
-	}
-
-	// drop node again and we should see an error ErrNodeNotExist
-	if err := a.DropNode(cluster, node); err != helix.ErrNodeNotExist {
-		t.Error("failed to see expected error ErrNodeNotExist")
-	}
-
-	// make sure the path does not exist in zookeeper
-	verifyNodeNotExist(t, fmt.Sprintf("/%s/INSTANCES/%s", cluster, node))
-	verifyNodeNotExist(t, fmt.Sprintf("/%s/CONFIGS/PARTICIPANT/%s", cluster, node))
-}
-
-func TestAddDropResource(t *testing.T) {
-	t.Parallel()
-
-	now := time.Now().Local()
-	cluster := "AdminTest_TestAddResource_" + now.Format("20060102150405")
-	resource := "resource"
-
-	a := NewZkHelixAdmin(testZkSvr)
-
-	// expect error if cluster not setup
-	if err := a.AddResource(cluster, resource, helix.DefaultAddResourceOption(32, "MasterSlave")); err != helix.ErrClusterNotSetup {
-		t.Error("must setup cluster before addResource")
-	}
-	if err := a.DropResource(cluster, resource); err != helix.ErrClusterNotSetup {
-		t.Error("must setup cluster before addResource")
-	}
-	if _, err := a.ListResources(cluster); err != helix.ErrClusterNotSetup {
-		t.Error("must setup cluster")
-	}
-
-	a.AddCluster(cluster)
-	defer a.DropCluster(cluster)
-
-	// it is ok to dropResource before resource exists
-	if err := a.DropResource(cluster, resource); err != nil {
-		t.Error("expect OK")
-	}
-
-	// expect error if state model does not exist
-	if err := a.AddResource(cluster, resource, helix.DefaultAddResourceOption(32, "NotExistStateModel")); err != helix.ErrStateModelDefNotExist {
-		t.Error("must use valid state model")
-	}
-
-	// expect pass
-	if err := a.AddResource(cluster, resource, helix.DefaultAddResourceOption(32, "MasterSlave")); err != nil {
-		t.Error("fail addResource")
-	}
-	if info, err := a.ListResources(cluster); err != nil || info == "" {
-		t.Error("expect OK")
-	}
-
-	kb := keyBuilder{cluster}
-	isPath := kb.idealStates() + "/resource"
-	verifyNodeExist(t, isPath)
-
-	if err := a.DropResource(cluster, resource); err != nil {
-		t.Error("expect OK")
-	}
-
-	verifyNodeNotExist(t, isPath)
-}
-
-func TestEnableDisableResource(t *testing.T) {
-	t.Parallel()
-
-	now := time.Now().Local()
-	cluster := "AdminTest_TestEnableDisableResource_" + now.Format("20060102150405")
-	resource := "resource"
-
-	a := NewZkHelixAdmin(testZkSvr)
-
-	// expect error if cluster not setup
-	if err := a.EnableResource(cluster, resource); err != helix.ErrClusterNotSetup {
-		t.Error("must setup cluster before enableResource")
-	}
-	if err := a.DisableResource(cluster, resource); err != helix.ErrClusterNotSetup {
-		t.Error("must setup cluster before enableResource")
-	}
-
-	a.AddCluster(cluster)
-	defer a.DropCluster(cluster)
-
-	// expect error if resource not exist
-	if err := a.EnableResource(cluster, resource); err != helix.ErrResourceNotExists {
-		t.Error("expect ErrResourceNotExists")
-	}
-	if err := a.DisableResource(cluster, resource); err != helix.ErrResourceNotExists {
-		t.Error("expect ErrResourceNotExists")
-	}
-	if err := a.AddResource(cluster, "resource", helix.DefaultAddResourceOption(32, "MasterSlave")); err != nil {
-		t.Error("fail addResource")
-	}
-	if err := a.EnableResource(cluster, resource); err != nil {
-		// expect error if resource not exist
-		t.Error("expect OK")
-	}
-
-	kb := keyBuilder{cluster}
-	path := kb.idealStates() + "/resource"
-
-	conn := newConnection(testZkSvr)
-	err := conn.Connect()
-	if err != nil {
-		t.Error("Failed to connect to test zookeeper")
-	}
-	defer conn.Disconnect()
-
-	if enabled := conn.GetSimpleFieldBool(path, "HELIX_ENABLED"); !enabled {
-		t.Error("resource not enabled")
-	}
-
-	// disable resource
-	if err := a.DisableResource(cluster, resource); err != nil {
-		t.Error("expect OK")
-	}
-
-	if enabled := conn.GetSimpleFieldBool(path, "HELIX_ENABLED"); enabled {
-		t.Error("resource not disabled")
-	}
 }
 
 func connectLocalZk(t *testing.T) *zk.Conn {
