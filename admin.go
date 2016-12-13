@@ -52,7 +52,7 @@ type HelixAdmin interface {
 	RemoveInstanceTag(cluster, instance, tag string) error
 
 	// DropInstance drops an instance from a cluster.
-	DropInstance(cluster string, ic model.InstanceConfig) error
+	DropInstance(cluster string, ic *model.InstanceConfig) error
 
 	// Instances returns a list of instances participating under a cluster.
 	Instances(cluster string) ([]string, error)

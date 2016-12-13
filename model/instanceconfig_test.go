@@ -16,6 +16,7 @@ func TestInstanceConfig(t *testing.T) {
 
 	// node=host_port
 	assert.Equal(t, "host_10009", ic.Node())
+	assert.Equal(t, "host_10009", ic.InstanceName())
 
 	// enabled by default
 	assert.Equal(t, true, ic.IsEnabled())

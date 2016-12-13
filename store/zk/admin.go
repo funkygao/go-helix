@@ -8,6 +8,7 @@ import (
 
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
+	"github.com/funkygao/go-zookeeper/zk"
 	"github.com/funkygao/zkclient"
 )
 
@@ -155,7 +156,10 @@ func (adm Admin) DropCluster(cluster string) error {
 
 	// cannot drop cluster if there is controller running
 	leader, err := adm.Get(kb.controllerLeader())
-	if err == nil && len(leader) > 0 {
+	if err != nil {
+		return err
+	}
+	if len(leader) > 0 {
 		return helix.ErrNotEmpty
 	}
 
@@ -165,7 +169,11 @@ func (adm Admin) DropCluster(cluster string) error {
 func (adm Admin) EnableCluster(cluster string, yes bool) error {
 	kb := keyBuilder{clusterID: cluster}
 	if yes {
-		return adm.Delete(kb.pause())
+		err := adm.Delete(kb.pause())
+		if err != nil && err != zk.ErrNoNode {
+			return err
+		}
+		return nil
 	} else {
 		return adm.CreatePersistent(kb.pause(), []byte("pause"))
 	}
@@ -249,7 +257,7 @@ func (adm Admin) AllowParticipantAutoJoin(cluster string, yes bool) error {
 	if yes {
 		properties["allowParticipantAutoJoin"] = "true"
 	}
-	return adm.SetConfig(cluster, "CLUSTER", properties)
+	return adm.SetConfig(cluster, helix.ConfigScopeCluster, properties)
 }
 
 func (adm Admin) AddInstance(cluster string, config *model.InstanceConfig) error {
@@ -274,9 +282,11 @@ func (adm Admin) AddInstanceTag(cluster, instance, tag string) error {
 	if err != nil {
 		return err
 	}
+
 	ic := model.NewInstanceConfigFromRecord(r)
 	ic.AddTag(tag)
-	return adm.Set(kb.participantConfig(instance), ic.Marshal())
+	return adm.SetRecord(kb.participantConfig(instance), ic)
+	//return adm.Set(kb.participantConfig(instance), ic.Marshal())
 }
 
 func (adm Admin) RemoveInstanceTag(cluster, instance, tag string) error {
@@ -380,7 +390,7 @@ func (adm Admin) AddNode(cluster string, node string) error {
 	)
 }
 
-func (adm Admin) DropInstance(cluster string, ic model.InstanceConfig) error {
+func (adm Admin) DropInstance(cluster string, ic *model.InstanceConfig) error {
 	kb := keyBuilder{clusterID: cluster}
 	if err := adm.Delete(kb.participantConfig(ic.Node())); err != nil {
 		return err

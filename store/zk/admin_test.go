@@ -10,6 +10,7 @@ import (
 	"github.com/funkygao/assert"
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
+	log "github.com/funkygao/log4go"
 	"github.com/funkygao/zkclient"
 	"github.com/yichen/go-zookeeper/zk"
 )
@@ -19,10 +20,15 @@ var (
 	testCluster = "foobar"
 )
 
+func init() {
+	log.Disable()
+}
+
 func TestZKHelixAdminBasics(t *testing.T) {
 	t.Parallel()
 
 	adm := NewZkHelixAdmin(testZkSvr)
+	assert.Equal(t, nil, adm.Connect())
 
 	clusters, err := adm.Clusters()
 	assert.Equal(t, nil, err)
@@ -73,11 +79,16 @@ func TestZKHelixAdminBasics(t *testing.T) {
 	ins, err := adm.InstancesWithTag(cluster, "tag")
 	assert.Equal(t, nil, err)
 	assert.Equal(t, ic.InstanceName(), ins[0])
+	// DropInstance
+	assert.Equal(t, nil, adm.DropInstance(cluster, ic))
 
+	// Resources
 }
 
 func TestControllerHistory(t *testing.T) {
 	adm := NewZkHelixAdmin(testZkSvr)
+	assert.Equal(t, nil, adm.Connect())
+
 	history, err := adm.ControllerHistory(testCluster)
 	assert.Equal(t, nil, err)
 	for _, h := range history {
@@ -98,6 +109,8 @@ func TestAddAndDropCluster(t *testing.T) {
 	cluster := "AdminTest_TestAddAndDropCluster_" + now.Format("20060102150405")
 
 	a := NewZkHelixAdmin(testZkSvr)
+	assert.Equal(t, nil, a.Connect())
+
 	err := a.AddCluster(cluster)
 	if err != nil {
 		t.Error(err)
@@ -174,6 +187,7 @@ func TestSetConfig(t *testing.T) {
 	cluster := "AdminTest_TestSetConfig_" + now.Format("20060102150405")
 
 	a := NewZkHelixAdmin(testZkSvr)
+	assert.Equal(t, nil, a.Connect())
 	err := a.AddCluster(cluster)
 	if err == nil {
 		defer a.DropCluster(cluster)
@@ -183,12 +197,12 @@ func TestSetConfig(t *testing.T) {
 		"allowParticipantAutoJoin": "true",
 	}
 
-	a.SetConfig(cluster, "CLUSTER", property)
+	a.SetConfig(cluster, helix.ConfigScopeCluster, property)
 
-	prop, _ := a.GetConfig(cluster, "CLUSTER", []string{"allowParticipantAutoJoin"})
+	prop, _ := a.GetConfig(cluster, helix.ConfigScopeCluster, []string{"allowParticipantAutoJoin"})
 
 	if prop["allowParticipantAutoJoin"] != "true" {
-		t.Error("allowParticipantAutoJoin config set/get failed")
+		t.Errorf("allowParticipantAutoJoin config set/get failed %+v", prop)
 	}
 }
 
@@ -200,6 +214,7 @@ func TestAddDropNode(t *testing.T) {
 	cluster := "AdminTest_TestAddDropNode_" + now.Format("20060102150405")
 
 	a := NewZkHelixAdmin(testZkSvr)
+	assert.Equal(t, nil, a.Connect())
 	node := "localhost_19932"
 
 	// add node before adding cluster, expect fail
