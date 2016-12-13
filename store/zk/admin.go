@@ -8,6 +8,7 @@ import (
 
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
+	"github.com/funkygao/zkclient"
 )
 
 type Admin struct {
@@ -21,12 +22,12 @@ type Admin struct {
 }
 
 // NewZkHelixAdmin creates a HelixAdmin implementation with zk as storage.
-func NewZkHelixAdmin(zkSvr string, options ...zkConnOption) helix.HelixAdmin {
+func NewZkHelixAdmin(zkSvr string, options ...zkclient.Option) helix.HelixAdmin {
 	admin := newZkHelixAdminWithConn(newConnection(zkSvr))
 
 	// apply additional options over the default
 	for _, option := range options {
-		option(admin.connection)
+		option(admin.connection.Client)
 	}
 
 	return admin
@@ -57,7 +58,7 @@ func (adm *Admin) Connect() error {
 		return err
 	}
 
-	return adm.connection.waitUntilConnected(0)
+	return adm.connection.WaitUntilConnected(0)
 }
 
 func (adm *Admin) Disconnect() {
@@ -534,7 +535,7 @@ func (adm Admin) SetResourceIdealState(cluster, instanceName string, is *model.I
 // TODO just set ideal state of the resource
 func (adm Admin) Rebalance(cluster string, resource string, replica int) error {
 	err, errCh := execCommand(fmt.Sprintf("%s/bin/helix-admin.sh", adm.helixInstallPath),
-		"--zkSvr", adm.zkSvr, "--rebalance", cluster, resource, strconv.Itoa(replica))
+		"--zkSvr", adm.ZkSvr(), "--rebalance", cluster, resource, strconv.Itoa(replica))
 	if err != nil {
 		return err
 	}
