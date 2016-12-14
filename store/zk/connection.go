@@ -1,8 +1,6 @@
 package zk
 
 import (
-	"strings"
-
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
 	"github.com/funkygao/zkclient"
@@ -88,31 +86,6 @@ func (conn *connection) UpdateSimpleField(path string, key string, value string)
 
 	record.SetSimpleField(key, value)
 	return conn.Set(path, record.Marshal())
-}
-
-// TODO discard it
-func (conn *connection) GetSimpleFieldValueByKey(path string, key string) (string, error) {
-	data, err := conn.Get(path)
-	if err != nil {
-		return "", err
-	}
-
-	record, err := model.NewRecordFromBytes(data)
-	if err != nil {
-		return "", err
-	}
-
-	v := record.GetSimpleField(key)
-	if v == nil {
-		return "", nil
-	}
-	return v.(string), nil
-}
-
-// TODO kill this
-func (conn *connection) GetSimpleFieldBool(path string, key string) bool {
-	result, _ := conn.GetSimpleFieldValueByKey(path, key)
-	return strings.ToUpper(result) == "TRUE"
 }
 
 func (conn *connection) IsClusterSetup(cluster string) (bool, error) {

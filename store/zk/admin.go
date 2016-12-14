@@ -273,8 +273,13 @@ func (adm *Admin) GetConfig(cluster string, scope helix.HelixConfigScope, keys [
 	switch scope {
 	case helix.ConfigScopeCluster:
 		kb := adm.getKeyBuilder(cluster)
+		record, err := adm.GetRecord(kb.clusterConfig())
+		if err != nil {
+			return result, err
+		}
+
 		for _, k := range keys {
-			result[k], _ = adm.GetSimpleFieldValueByKey(kb.clusterConfig(), k)
+			result[k] = record.GetSimpleField(k)
 		}
 
 	case helix.ConfigScopeConstraint:
