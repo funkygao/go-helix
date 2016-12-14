@@ -67,11 +67,6 @@ func (conn *connection) UpdateMapField(path string, key string, property string,
 	return conn.Set(path, record.Marshal())
 }
 
-// TODO
-func (conn *connection) UpdateListField(path string, key string) error {
-	return nil
-}
-
 func (conn *connection) UpdateSimpleField(path string, key string, value string) error {
 	data, err := conn.Get(path)
 	if err != nil {
