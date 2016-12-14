@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
@@ -15,8 +14,6 @@ import (
 var _ helix.HelixAdmin = &Admin{}
 
 type Admin struct {
-	closeOnce sync.Once
-
 	*connection
 
 	// TODO kill this
@@ -65,13 +62,7 @@ func (adm *Admin) Connect() error {
 }
 
 func (adm *Admin) Disconnect() {
-	adm.closeOnce.Do(func() {
-		adm.Lock()
-		if adm.IsConnected() {
-			adm.connection.Disconnect()
-		}
-		adm.Unlock()
-	})
+	adm.connection.Disconnect()
 }
 
 func (adm *Admin) SetInstallPath(path string) {

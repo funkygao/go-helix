@@ -3,7 +3,7 @@ package zk
 import (
 	"fmt"
 	"net/http"
-	_ "net/http/pprof" // pprof runtime
+	_ "net/http/pprof" // pprof runtime for debugging
 	"sync"
 
 	"github.com/funkygao/go-helix"
@@ -21,10 +21,8 @@ var _ zkclient.ZkStateListener = &Manager{}
 type Manager struct {
 	sync.RWMutex
 
-	closeOnce sync.Once
-	wg        sync.WaitGroup
+	wg sync.WaitGroup
 
-	zkSvr     string
 	conn      *connection
 	connected sync2.AtomicBool
 	stop      chan struct{}
@@ -48,6 +46,7 @@ type Manager struct {
 	// ClusterMessagingService cache
 	messaging *zkMessagingService
 
+	// metrics reporter
 	metrics *metricsReporter
 
 	// host of this participant
@@ -119,18 +118,17 @@ func NewZkDistributedController(clusterID, host, port, zkSvr string, options ...
 func newZkHelixManager(clusterID, host, port, zkSvr string,
 	it helix.InstanceType, options ...ManagerOption) (mgr *Manager, err error) {
 	mgr = &Manager{
-		zkSvr:               zkSvr,
 		clusterID:           clusterID,
 		conn:                newConnection(zkSvr),
 		stop:                make(chan struct{}),
 		metrics:             newMetricsReporter(),
 		it:                  it,
-		kb:                  keyBuilder{clusterID: clusterID},
+		kb:                  newKeyBuilder(clusterID),
 		preConnectCallbacks: []helix.PreConnectCallback{},
 		pprofPort:           10001,
 		host:                host,
 		port:                port,
-		instanceID:          fmt.Sprintf("%s_%s", host, port), // node id
+		instanceID:          fmt.Sprintf("%s_%s", host, port),
 
 		// listeners
 		externalViewListeners:       []helix.ExternalViewChangeListener{},
@@ -178,7 +176,7 @@ func newZkHelixManager(clusterID, host, port, zkSvr string,
 		err = helix.ErrNotImplemented
 
 	default:
-		err = helix.ErrNotImplemented
+		err = helix.ErrInvalidArgument
 	}
 
 	return
@@ -199,7 +197,7 @@ func (m *Manager) Connect() error {
 	}
 
 	log.Trace("manager{cluster:%s, instance:%s, type:%s, zk:%s} connecting...",
-		m.clusterID, m.instanceID, m.it, m.zkSvr)
+		m.clusterID, m.instanceID, m.it, m.conn.ZkSvr())
 
 	if m.pprofPort > 0 {
 		addr := fmt.Sprintf("localhost:%d", m.pprofPort)
@@ -227,20 +225,13 @@ func (m *Manager) Connect() error {
 
 	m.connected.Set(true)
 	log.Trace("manager{cluster:%s, instance:%s, type:%s, zk:%s} connected",
-		m.clusterID, m.instanceID, m.it, m.zkSvr)
+		m.clusterID, m.instanceID, m.it, m.conn.ZkSvr())
 
 	return nil
 }
 
 func (m *Manager) Disconnect() {
-	m.closeOnce.Do(func() {
-		m.Lock()
-		if m.connected.Get() {
-			m.conn.Disconnect()
-			m.connected.Set(false)
-		}
-		m.Unlock()
-	})
+	m.conn.Disconnect()
 }
 
 func (m *Manager) shortID() string {

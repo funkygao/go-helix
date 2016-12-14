@@ -1,6 +1,8 @@
 package zk
 
 import (
+	"sync"
+
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
 	"github.com/funkygao/zkclient"
@@ -8,6 +10,8 @@ import (
 
 type connection struct {
 	*zkclient.Client
+
+	closeOnce sync.Once
 }
 
 func newConnection(zkSvr string) *connection {
@@ -16,6 +20,12 @@ func newConnection(zkSvr string) *connection {
 	}
 
 	return conn
+}
+
+func (conn *connection) Disconnect() {
+	conn.closeOnce.Do(func() {
+		conn.Client.Disconnect()
+	})
 }
 
 func (conn *connection) GetRecord(path string) (*model.Record, error) {
@@ -91,7 +101,7 @@ func (conn *connection) IsClusterSetup(cluster string) (bool, error) {
 		return false, helix.ErrNotConnected
 	}
 
-	kb := keyBuilder{clusterID: cluster}
+	kb := newKeyBuilder(cluster)
 	return conn.ExistsAll(
 		kb.cluster(),
 		kb.idealStates(),
@@ -117,7 +127,7 @@ func (conn *connection) IsInstanceSetup(cluster, node string) (bool, error) {
 		return false, helix.ErrNotConnected
 	}
 
-	kb := keyBuilder{clusterID: cluster}
+	kb := newKeyBuilder(cluster)
 	return conn.ExistsAll(
 		kb.participantConfig(node),
 		kb.instance(node),
