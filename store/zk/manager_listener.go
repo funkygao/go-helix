@@ -16,7 +16,6 @@ func (s *Manager) AddLiveInstanceChangeListener(listener helix.LiveInstanceChang
 	s.Unlock()
 }
 
-// AddCurrentStateChangeListener.
 // FIXME sessionID
 func (s *Manager) AddCurrentStateChangeListener(instance string, sessionID string, listener helix.CurrentStateChangeListener) {
 	s.Lock()
@@ -35,6 +34,7 @@ func (s *Manager) AddCurrentStateChangeListener(instance string, sessionID strin
 	}
 }
 
+// TODO Decide if do we still need this since we are exposing ClusterMessagingService
 func (s *Manager) AddMessageListener(instance string, listener helix.MessageListener) {
 	s.Lock()
 	defer s.Unlock()

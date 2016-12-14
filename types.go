@@ -54,6 +54,10 @@ func (it InstanceType) IsSpectator() bool {
 	return it == InstanceTypeSpectator
 }
 
+func (it InstanceType) IsController() bool {
+	return it.IsControllerStandalone() || it.IsControllerDistributed()
+}
+
 func (it InstanceType) IsControllerStandalone() bool {
 	return it == InstanceTypeControllerStandalone
 }

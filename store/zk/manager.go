@@ -6,8 +6,10 @@ import (
 	_ "net/http/pprof" // pprof runtime for debugging
 	"sync"
 
+	"github.com/funkygao/gafka/ctx"
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/controller"
+	"github.com/funkygao/go-helix/store/zk/healthcheck"
 	"github.com/funkygao/go-zookeeper/zk"
 	"github.com/funkygao/golib/sync2"
 	log "github.com/funkygao/log4go"
@@ -33,15 +35,16 @@ type Manager struct {
 	pprofPort           int
 	preConnectCallbacks []helix.PreConnectCallback
 
-	// only participant holds a state machine engine
+	// participant fields
 	sme        *stateMachineEngine
 	timerTasks []helix.HelixTimerTask
 
 	// ClusterManagementTool cache
 	admin helix.HelixAdmin
 
-	// GenericHelixController cache
-	controller *controller.GenericHelixController
+	// controller fields
+	controller           *controller.GenericHelixController
+	controllerTimerTasks []helix.HelixTimerTask
 
 	// ClusterMessagingService cache
 	messaging *zkMessagingService
@@ -151,12 +154,25 @@ func newZkHelixManager(clusterID, host, port, zkSvr string,
 		instanceMessageChannel: make(chan string, 100),
 	}
 
+	if mgr.instanceID == "_" {
+		ip, err := ctx.LocalIP()
+		if err != nil {
+			return nil, err
+		}
+
+		mgr.host = ip.String()
+		mgr.instanceID = fmt.Sprintf("%s-%s", mgr.host, mgr.it)
+	}
+
 	if !mgr.Valid() {
 		return nil, helix.ErrInvalidArgument
 	}
+
 	if mgr.receivedMessages, err = lru.New(10 << 10); err != nil {
 		return
 	}
+
+	// all instance type need messaging service
 	mgr.messaging = newZkMessagingService(mgr)
 
 	// apply additional options over the default
@@ -167,13 +183,20 @@ func newZkHelixManager(clusterID, host, port, zkSvr string,
 	switch it {
 	case helix.InstanceTypeParticipant:
 		mgr.sme = newStateMachineEngine(mgr)
-		mgr.timerTasks = []helix.HelixTimerTask{}
-		// ParticipantHealthReportTask
+		mgr.timerTasks = []helix.HelixTimerTask{healthcheck.NewParticipanthealthcheckTask()}
 
 	case helix.InstanceTypeSpectator:
+		// do nothing
 
-	case helix.InstanceTypeControllerStandalone, helix.InstanceTypeControllerDistributed:
+	case helix.InstanceTypeControllerDistributed:
+		mgr.sme = newStateMachineEngine(mgr)
 		err = helix.ErrNotImplemented
+
+	case helix.InstanceTypeControllerStandalone:
+		mgr.controllerTimerTasks = []helix.HelixTimerTask{}
+		err = helix.ErrNotImplemented
+
+	case helix.InstanceTypeAdministrator:
 
 	default:
 		err = helix.ErrInvalidArgument
@@ -196,8 +219,7 @@ func (m *Manager) Connect() error {
 		return nil
 	}
 
-	log.Trace("manager{cluster:%s, instance:%s, type:%s, zk:%s} connecting...",
-		m.clusterID, m.instanceID, m.it, m.conn.ZkSvr())
+	log.Trace("%s connecting...", m.shortID())
 
 	if m.pprofPort > 0 {
 		addr := fmt.Sprintf("localhost:%d", m.pprofPort)
@@ -205,7 +227,7 @@ func (m *Manager) Connect() error {
 		log.Trace("pprof ready on http://%s/debug/pprof", addr)
 	}
 
-	if m.it.IsControllerStandalone() || m.it.IsControllerDistributed() {
+	if m.it.IsController() {
 		if m.controller == nil {
 			m.controller = controller.NewGenericHelixController()
 		}
@@ -217,21 +239,26 @@ func (m *Manager) Connect() error {
 
 	m.messaging.onConnected()
 
-	log.Debug("zk connected")
-
 	if ok, err := m.conn.IsClusterSetup(m.clusterID); !ok || err != nil {
 		return helix.ErrClusterNotSetup
 	}
 
 	m.connected.Set(true)
-	log.Trace("manager{cluster:%s, instance:%s, type:%s, zk:%s} connected",
-		m.clusterID, m.instanceID, m.it, m.conn.ZkSvr())
+	log.Trace("%s connected", m.shortID())
 
 	return nil
 }
 
 func (m *Manager) Disconnect() {
+	close(m.stop)
+	m.wg.Wait()
+
 	m.conn.Disconnect()
+
+	m.conn = nil
+	m.connected.Set(false)
+
+	log.Trace("%s disconnected", m.shortID())
 }
 
 func (m *Manager) shortID() string {

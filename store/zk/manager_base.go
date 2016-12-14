@@ -24,7 +24,11 @@ func (m *Manager) InstanceType() helix.InstanceType {
 }
 
 func (m *Manager) IsLeader() bool {
-	return false
+	if !m.it.IsController() || !m.IsConnected() {
+		return false
+	}
+
+	return m.ClusterManagementTool().ControllerLeader(m.clusterID) == m.instanceID
 }
 
 func (m *Manager) Instance() string {
@@ -44,6 +48,9 @@ func (m *Manager) MessagingService() helix.ClusterMessagingService {
 }
 
 func (m *Manager) ClusterManagementTool() helix.HelixAdmin {
+	m.Lock()
+	defer m.Unlock()
+
 	if m.admin == nil {
 		m.admin = newZkHelixAdminWithConn(m.conn)
 	}

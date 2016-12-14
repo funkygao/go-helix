@@ -31,7 +31,11 @@ func (p *zkMessagingService) onConnected() {
 	log.Trace("%s starting messaging main loop...", p.shortID())
 
 	messagesChan, errChan := p.watchMessages()
+
+	p.wg.Add(1)
 	go func() {
+		defer p.wg.Done()
+
 		for {
 			select {
 			case m := <-messagesChan:
