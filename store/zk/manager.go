@@ -68,7 +68,7 @@ type Manager struct {
 	currentStateChangeListeners map[string][]helix.CurrentStateChangeListener // key is instance
 	messageListeners            map[string][]helix.MessageListener            // key is instance
 
-	// not implemented
+	// not implemented TODO
 	controllerMessageListeners    []helix.ControllerMessageListener
 	instanceConfigChangeListeners []helix.InstanceConfigChangeListener
 
@@ -95,8 +95,28 @@ type Manager struct {
 	stopCurrentStateWatch map[string]chan interface{}
 }
 
-// NewZkHelixManager creates a HelixManager implementation with zk as storage.
-func NewZkHelixManager(clusterID, host, port, zkSvr string,
+// NewZkParticipant creates a Participant implementation with zk as storage.
+func NewZkParticipant(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
+	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeParticipant, options...)
+}
+
+// NewZkSpectator creates a Spectator implementation with zk as storage.
+func NewZkSpectator(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
+	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeSpectator, options...)
+}
+
+// NewZkStandaloneController creates a Standalone Controller implementation with zk as storage.
+func NewZkStandaloneController(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
+	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeControllerStandalone, options...)
+}
+
+// NewZkDistributedController creates a Distributed Controller implementation with zk as storage.
+func NewZkDistributedController(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
+	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeControllerDistributed, options...)
+}
+
+// newZkHelixManager creates a HelixManager implementation with zk as storage.
+func newZkHelixManager(clusterID, host, port, zkSvr string,
 	it helix.InstanceType, options ...ManagerOption) (mgr *Manager, err error) {
 	mgr = &Manager{
 		zkSvr:               zkSvr,
@@ -133,6 +153,9 @@ func NewZkHelixManager(clusterID, host, port, zkSvr string,
 		instanceMessageChannel: make(chan string, 100),
 	}
 
+	if !mgr.Valid() {
+		return nil, helix.ErrInvalidArgument
+	}
 	if mgr.receivedMessages, err = lru.New(10 << 10); err != nil {
 		return
 	}

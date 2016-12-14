@@ -6,6 +6,11 @@ import (
 	log "github.com/funkygao/log4go"
 )
 
+func (m *Manager) Valid() bool {
+	// TODO
+	return true
+}
+
 func (m *Manager) AddPreConnectCallback(cb helix.PreConnectCallback) {
 	m.preConnectCallbacks = append(m.preConnectCallbacks, cb)
 }
