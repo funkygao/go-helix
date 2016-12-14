@@ -20,4 +20,5 @@ Originally based on https://github.com/yichen/gohelix
 
 - [ ] Full HelixAdmin
 - [ ] Full HelixManager
+- [ ] Full Spectator
 - [ ] Controller
