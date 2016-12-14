@@ -97,7 +97,7 @@ type Manager struct {
 
 // NewZkHelixManager creates a HelixManager implementation with zk as storage.
 func NewZkHelixManager(clusterID, host, port, zkSvr string,
-	it helix.InstanceType, options ...managerOption) (mgr *Manager, err error) {
+	it helix.InstanceType, options ...ManagerOption) (mgr *Manager, err error) {
 	mgr = &Manager{
 		zkSvr:               zkSvr,
 		clusterID:           clusterID,
