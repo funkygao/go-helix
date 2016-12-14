@@ -33,6 +33,10 @@ type keyBuilder struct {
 	clusterID string
 }
 
+func newKeyBuilder(cluster string) keyBuilder {
+	return keyBuilder{clusterID: cluster}
+}
+
 func (k *keyBuilder) cluster() string {
 	return fmt.Sprintf("/%s", k.clusterID)
 }

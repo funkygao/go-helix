@@ -74,16 +74,12 @@ func (adm *Admin) Disconnect() {
 	})
 }
 
-func (adm *Admin) getKeyBuilder(cluster string) keyBuilder {
-	return keyBuilder{clusterID: cluster}
-}
-
 func (adm *Admin) SetInstallPath(path string) {
 	adm.helixInstallPath = path
 }
 
 func (adm *Admin) ControllerHistory(cluster string) ([]string, error) {
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	record, err := adm.GetRecord(kb.controllerHistory())
 	if err != nil {
 		return nil, err
@@ -113,7 +109,7 @@ func (adm *Admin) AddCluster(cluster string) error {
 		//return err FIXME
 	}
 
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 
 	// avoid dup cluster
 	exists, err := adm.Exists(kb.cluster())
@@ -169,7 +165,7 @@ func (adm *Admin) DropCluster(cluster string) error {
 		return helix.ErrClusterNotSetup
 	}
 
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 
 	// cannot drop cluster if there is live instances running
 	liveInstances, err := adm.Children(kb.liveInstances())
@@ -189,7 +185,7 @@ func (adm *Admin) DropCluster(cluster string) error {
 }
 
 func (adm *Admin) ControllerLeader(cluster string) string {
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 
 	leader, err := adm.Get(kb.controllerLeader())
 	if err == zk.ErrNoNode {
@@ -203,7 +199,7 @@ func (adm *Admin) ControllerLeader(cluster string) string {
 }
 
 func (adm *Admin) EnableCluster(cluster string, yes bool) error {
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	if yes {
 		err := adm.Delete(kb.pause())
 		if err != nil && err != zk.ErrNoNode {
@@ -249,7 +245,7 @@ func (adm *Admin) SetConfig(cluster string, scope helix.HelixConfigScope, proper
 	switch scope {
 	case helix.ConfigScopeCluster:
 		if allow, ok := properties["allowParticipantAutoJoin"]; ok {
-			kb := adm.getKeyBuilder(cluster)
+			kb := newKeyBuilder(cluster)
 			if strings.ToLower(allow) == "true" {
 				// false by default
 				adm.UpdateSimpleField(kb.clusterConfig(), "allowParticipantAutoJoin", "true")
@@ -272,7 +268,7 @@ func (adm *Admin) GetConfig(cluster string, scope helix.HelixConfigScope, keys [
 	result := make(map[string]interface{})
 	switch scope {
 	case helix.ConfigScopeCluster:
-		kb := adm.getKeyBuilder(cluster)
+		kb := newKeyBuilder(cluster)
 		record, err := adm.GetRecord(kb.clusterConfig())
 		if err != nil {
 			return result, err
@@ -313,7 +309,7 @@ func (adm *Admin) AddInstanceTag(cluster, instance, tag string) error {
 		return helix.ErrClusterNotSetup
 	}
 
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	record, err := adm.GetRecord(kb.participantConfig(instance))
 	if err != nil {
 		return err
@@ -332,7 +328,7 @@ func (adm *Admin) RemoveInstanceTag(cluster, instance, tag string) error {
 		return helix.ErrClusterNotSetup
 	}
 
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	record, err := adm.GetRecord(kb.participantConfig(instance))
 	if err != nil {
 		return err
@@ -344,7 +340,7 @@ func (adm *Admin) RemoveInstanceTag(cluster, instance, tag string) error {
 }
 
 func (adm *Admin) Instances(cluster string) ([]string, error) {
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	return adm.Children(kb.instances())
 }
 
@@ -353,7 +349,7 @@ func (adm *Admin) InstanceInfo(cluster string, ic *model.InstanceConfig) (*model
 		return nil, helix.ErrClusterNotSetup
 	}
 
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	instanceCfg := kb.participantConfig(ic.Node())
 	if exists, err := adm.Exists(instanceCfg); !exists || err != nil {
 		if !exists {
@@ -366,7 +362,7 @@ func (adm *Admin) InstanceInfo(cluster string, ic *model.InstanceConfig) (*model
 }
 
 func (adm *Admin) InstanceConfig(cluster, instance string) (*model.InstanceConfig, error) {
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	kb.participantConfig(instance)
 	record, err := adm.GetRecord(kb.participantConfig(instance))
 	if err != nil {
@@ -411,7 +407,7 @@ func (adm *Admin) AddNode(cluster string, node string) error {
 	}
 
 	// check if node already exists under /<cluster>/CONFIGS/PARTICIPANT/<NODE>
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	participantConfig := kb.participantConfig(node)
 	exists, err := adm.Exists(participantConfig)
 	if err != nil {
@@ -449,7 +445,7 @@ func (adm *Admin) DropInstance(cluster string, ic *model.InstanceConfig) error {
 // in zookeeper will be removed.
 func (adm *Admin) DropNode(cluster string, node string) error {
 	// check if node already exists under /<cluster>/CONFIGS/PARTICIPANT/<node>
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	if exists, err := adm.Exists(kb.participantConfig(node)); !exists || err != nil {
 		return helix.ErrNodeNotExist
 	}
@@ -482,7 +478,7 @@ func (adm *Admin) AddResource(cluster string, resource string, option helix.AddR
 		return helix.ErrClusterNotSetup
 	}
 
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 
 	// make sure the state model def exists
 	if exists, err := adm.Exists(kb.stateModelDef(option.StateModel)); !exists || err != nil {
@@ -533,7 +529,7 @@ func (adm *Admin) DropResource(cluster string, resource string) error {
 	}
 
 	// make sure the path for the ideal state does not exit
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	if err := adm.DeleteTree(kb.idealStateForResource(resource)); err != nil {
 		return err
 	}
@@ -545,7 +541,7 @@ func (adm *Admin) EnableResource(cluster string, resource string, enabled bool) 
 		return helix.ErrClusterNotSetup
 	}
 
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	isPath := kb.idealStateForResource(resource)
 	if exists, err := adm.Exists(isPath); !exists || err != nil {
 		if !exists {
@@ -562,7 +558,7 @@ func (adm *Admin) EnableResource(cluster string, resource string, enabled bool) 
 }
 
 func (adm *Admin) Resources(cluster string) ([]string, error) {
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	return adm.Children(kb.idealStates())
 }
 
@@ -588,7 +584,7 @@ func (adm *Admin) ResourcesWithTag(cluster, tag string) ([]string, error) {
 }
 
 func (adm *Admin) ResourceExternalView(cluster string, resource string) (*model.ExternalView, error) {
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	record, err := adm.GetRecord(kb.externalViewForResource(resource))
 	if err != nil {
 		return nil, err
@@ -598,7 +594,7 @@ func (adm *Admin) ResourceExternalView(cluster string, resource string) (*model.
 }
 
 func (adm *Admin) ResourceIdealState(cluster, resource string) (*model.IdealState, error) {
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	record, err := adm.GetRecord(kb.idealStateForResource(resource))
 	if err != nil {
 		return nil, err
@@ -608,22 +604,22 @@ func (adm *Admin) ResourceIdealState(cluster, resource string) (*model.IdealStat
 }
 
 func (adm *Admin) SetResourceIdealState(cluster, resource string, is *model.IdealState) error {
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	return adm.SetRecord(kb.idealStateForResource(resource), is)
 }
 
 func (adm *Admin) AddStateModelDef(cluster string, stateModel string, definition *model.StateModelDef) error {
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	return adm.CreatePersistentRecord(kb.stateModelDef(stateModel), definition)
 }
 
 func (adm *Admin) StateModelDefs(cluster string) ([]string, error) {
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	return adm.Children(kb.stateModelDefs())
 }
 
 func (adm *Admin) StateModelDef(cluster, stateModel string) (*model.StateModelDef, error) {
-	kb := adm.getKeyBuilder(cluster)
+	kb := newKeyBuilder(cluster)
 	record, err := adm.GetRecord(kb.stateModelDef(stateModel))
 	if err != nil {
 		return nil, err
