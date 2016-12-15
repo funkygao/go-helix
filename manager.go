@@ -6,12 +6,12 @@ type HelixManager interface {
 	// Connect will connect manager to storage and start housekeeping.
 	Connect() error
 
+	// Disconnect will disconnect manager from storage.
+	Disconnect()
+
 	// IsConnected checks if the connection is alive.
 	// There is no need to invoke Connect again if IsConnected return false.
 	IsConnected() bool
-
-	// Disconnect will disconnect manager from storage.
-	Disconnect()
 
 	// Cluster returns the cluster name associated with this cluster manager.
 	Cluster() string
@@ -62,7 +62,7 @@ type HelixManager interface {
 	StateMachineEngine() StateMachineEngine
 
 	// StartTimerTasks start timer tasks when becomes leader.
-	StartTimerTasks()
+	StartTimerTasks() []error
 
 	// StopTimerTasks stop timer tasks when becomes standby.
 	StopTimerTasks()

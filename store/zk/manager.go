@@ -5,6 +5,7 @@ import (
 	"net/http"
 	_ "net/http/pprof" // pprof runtime for debugging
 	"sync"
+	"time"
 
 	"github.com/funkygao/gafka/ctx"
 	"github.com/funkygao/go-helix"
@@ -219,7 +220,8 @@ func (m *Manager) Connect() error {
 		return nil
 	}
 
-	log.Trace("%s connecting...", m.shortID())
+	t1 := time.Now()
+	log.Info("%s connecting...", m.shortID())
 
 	if m.pprofPort > 0 {
 		addr := fmt.Sprintf("localhost:%d", m.pprofPort)
@@ -237,14 +239,14 @@ func (m *Manager) Connect() error {
 		return err
 	}
 
-	m.messaging.onConnected()
+	m.messaging.onConnected() // if participant, call twice
 
 	if ok, err := m.conn.IsClusterSetup(m.clusterID); !ok || err != nil {
 		return helix.ErrClusterNotSetup
 	}
 
 	m.connected.Set(true)
-	log.Trace("%s connected", m.shortID())
+	log.Info("%s connected in %s", m.shortID(), time.Since(t1))
 
 	return nil
 }
@@ -258,11 +260,15 @@ func (m *Manager) Disconnect() {
 	m.conn = nil
 	m.connected.Set(false)
 
-	log.Trace("%s disconnected", m.shortID())
+	log.Info("%s disconnected", m.shortID())
 }
 
 func (m *Manager) shortID() string {
-	return fmt.Sprintf("%s[%s/%s@%s]", m.it, m.instanceID, m.conn.SessionID(), m.clusterID)
+	if m.IsConnected() {
+		return fmt.Sprintf("%s[%s/%s@%s]", m.it, m.instanceID, m.conn.SessionID(), m.clusterID)
+	}
+
+	return fmt.Sprintf("%s[%s/-@%s]", m.it, m.instanceID, m.clusterID)
 }
 
 func (m *Manager) IsConnected() bool {
@@ -320,24 +326,38 @@ func (m *Manager) HandleNewSession() (err error) {
 
 	m.connected.Set(true)
 
+	m.StopTimerTasks()
+	m.stopChangeNotificationLoop()
+
 	switch m.it {
 	case helix.InstanceTypeParticipant:
 		err = m.handleNewSessionAsParticipant()
 
-	case helix.InstanceTypeSpectator:
+	case helix.InstanceTypeControllerDistributed:
+		if err = m.handleNewSessionAsParticipant(); err != nil {
+			return
+		}
+		err = m.handleNewSessionAsController()
 
-	case helix.InstanceTypeControllerStandalone, helix.InstanceTypeControllerDistributed:
-		return helix.ErrNotImplemented
+	case helix.InstanceTypeControllerStandalone:
+		err = m.handleNewSessionAsController()
+
+	case helix.InstanceTypeSpectator:
+	case helix.InstanceTypeAdministrator:
+	}
+
+	if errs := m.StartTimerTasks(); len(errs) > 0 {
+		for _, e := range errs {
+			log.Error("%s %v", m.shortID(), e)
+		}
 	}
 
 	m.startChangeNotificationLoop()
-
 	return
 }
 
 func (m *Manager) handleNewSessionAsParticipant() error {
 	p := newParticipant(m)
-
 	if ok, err := p.joinCluster(); !ok || err != nil {
 		if err != nil {
 			return err
@@ -345,7 +365,7 @@ func (m *Manager) handleNewSessionAsParticipant() error {
 		return helix.ErrEnsureParticipantConfig
 	}
 
-	// invoke preconnection callbacks
+	// only participant has pre connection callbacks
 	for _, cb := range m.preConnectCallbacks {
 		cb()
 	}
@@ -364,5 +384,6 @@ func (m *Manager) handleNewSessionAsParticipant() error {
 }
 
 func (m *Manager) handleNewSessionAsController() error {
+	// DistributedLeaderElection
 	return helix.ErrNotImplemented
 }

@@ -65,6 +65,10 @@ func (s *Manager) startChangeNotificationLoop() {
 	log.Trace("%s started change notification main loop", s.shortID())
 }
 
+func (m *Manager) stopChangeNotificationLoop() {
+
+}
+
 func (s *Manager) handleChangeNotification(chg helix.ChangeNotification) {
 	log.Debug("%s handle change notification: %s", s.shortID(),
 		helix.ChangeNotificationText(chg.ChangeType))
