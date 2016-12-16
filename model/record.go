@@ -2,12 +2,8 @@ package model
 
 import (
 	"encoding/json"
-	"fmt"
-	"os"
 	"strconv"
 	"strings"
-
-	"github.com/funkygao/go-helix/ver"
 )
 
 // Generic Record Format to store data at a storage Node.
@@ -231,19 +227,4 @@ func NewRecordFromBytes(data []byte) (*Record, error) {
 	var zn Record
 	err := json.Unmarshal(data, &zn)
 	return &zn, err
-}
-
-// NewLiveInstanceRecord creates a new instance of Record for representing a live instance.
-func NewLiveInstanceRecord(participantID string, sessionID string) *Record {
-	hostname, err := os.Hostname()
-	if err != nil {
-		panic(err)
-	}
-
-	node := NewRecord(participantID)
-	node.SetSimpleField("HELIX_VERSION", ver.Ver)
-	node.SetSimpleField("SESSION_ID", sessionID)
-	node.SetSimpleField("LIVE_INSTANCE", fmt.Sprintf("%d@%s", os.Getpid(), hostname))
-
-	return node
 }
