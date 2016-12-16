@@ -130,7 +130,7 @@ const (
 	StateModelTask               = "Task"
 )
 
-var HelixDefaultStateModels = map[string][]byte{
+var HelixBuiltinStateModels = map[string][]byte{
 	StateModelLeaderStandby: []byte(`
 {
   "id" : "LeaderStandby",

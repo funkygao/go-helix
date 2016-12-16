@@ -120,12 +120,12 @@ func (adm *Admin) AddCluster(cluster string) error {
 
 	// create all the default state mode definitions
 	adm.CreateEmptyPersistent(kb.stateModelDefs())
-	adm.CreatePersistent(kb.stateModelDef(helix.StateModelLeaderStandby), helix.HelixDefaultStateModels[helix.StateModelLeaderStandby])
-	adm.CreatePersistent(kb.stateModelDef(helix.StateModelMasterSlave), helix.HelixDefaultStateModels[helix.StateModelMasterSlave])
-	adm.CreatePersistent(kb.stateModelDef(helix.StateModelOnlineOffline), helix.HelixDefaultStateModels[helix.StateModelOnlineOffline])
-	adm.CreatePersistent(kb.stateModelDef(helix.StateModelDefaultSchemata), helix.HelixDefaultStateModels[helix.StateModelDefaultSchemata])
-	adm.CreatePersistent(kb.stateModelDef(helix.StateModelSchedulerTaskQueue), helix.HelixDefaultStateModels[helix.StateModelSchedulerTaskQueue])
-	adm.CreatePersistent(kb.stateModelDef(helix.StateModelTask), helix.HelixDefaultStateModels[helix.StateModelTask])
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelLeaderStandby), helix.HelixBuiltinStateModels[helix.StateModelLeaderStandby])
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelMasterSlave), helix.HelixBuiltinStateModels[helix.StateModelMasterSlave])
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelOnlineOffline), helix.HelixBuiltinStateModels[helix.StateModelOnlineOffline])
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelDefaultSchemata), helix.HelixBuiltinStateModels[helix.StateModelDefaultSchemata])
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelSchedulerTaskQueue), helix.HelixBuiltinStateModels[helix.StateModelSchedulerTaskQueue])
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelTask), helix.HelixBuiltinStateModels[helix.StateModelTask])
 
 	adm.CreateEmptyPersistent(kb.configs())
 	adm.CreateEmptyPersistent(kb.participantConfigs())
