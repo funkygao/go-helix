@@ -65,6 +65,8 @@ type Manager struct {
 	// context of the specator, accessible from the ExternalViewChangeListener
 	context *helix.Context
 
+	handlers []CallbackHandler
+
 	externalViewListeners       []helix.ExternalViewChangeListener
 	liveInstanceChangeListeners []helix.LiveInstanceChangeListener
 	idealStateChangeListeners   []helix.IdealStateChangeListener
@@ -129,6 +131,7 @@ func newZkHelixManager(clusterID, host, port, zkSvr string,
 		it:                  it,
 		kb:                  newKeyBuilder(clusterID),
 		preConnectCallbacks: []helix.PreConnectCallback{},
+		handlers:            []CallbackHandler{},
 		pprofPort:           10001,
 		host:                host,
 		port:                port,
@@ -327,6 +330,7 @@ func (m *Manager) HandleNewSession() (err error) {
 	m.connected.Set(true)
 
 	m.StopTimerTasks()
+	m.resetHandlers()
 	m.stopChangeNotificationLoop()
 
 	switch m.it {
@@ -352,6 +356,7 @@ func (m *Manager) HandleNewSession() (err error) {
 		}
 	}
 
+	m.initHandlers()
 	m.startChangeNotificationLoop()
 	return
 }
@@ -386,4 +391,12 @@ func (m *Manager) handleNewSessionAsParticipant() error {
 func (m *Manager) handleNewSessionAsController() error {
 	// DistributedLeaderElection
 	return helix.ErrNotImplemented
+}
+
+func (m *Manager) initHandlers() {
+	log.Trace("%s init handlers", m.shortID())
+}
+
+func (m *Manager) resetHandlers() {
+	log.Trace("%s reset handlers", m.shortID())
 }

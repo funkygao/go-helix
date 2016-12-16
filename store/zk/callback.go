@@ -7,6 +7,17 @@ type CallbackHandler struct {
 	listener interface{}
 }
 
+func newCallbackHandler(mgr *Manager, listener interface{}) *CallbackHandler {
+	return &CallbackHandler{
+		Manager:  mgr,
+		listener: listener,
+	}
+}
+
 func (cb *CallbackHandler) Init() {
+
+}
+
+func (cb *CallbackHandler) Reset() {
 
 }
