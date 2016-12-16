@@ -15,6 +15,8 @@ var _ helix.ClusterMessagingService = &zkMessagingService{}
 // TODO support other types of message besides STATE_TRANSITION
 type zkMessagingService struct {
 	*Manager
+
+	typ string
 }
 
 func newZkMessagingService(m *Manager) *zkMessagingService {
@@ -25,6 +27,14 @@ func newZkMessagingService(m *Manager) *zkMessagingService {
 
 func (m *zkMessagingService) Send(msg *model.Message) error {
 	return nil
+}
+
+func (m *zkMessagingService) registerMessageHandler(typ string) {
+
+}
+
+func (m *zkMessagingService) recvMessages(instance string, messages []*model.Record, context *helix.Context) {
+
 }
 
 func (p *zkMessagingService) onConnected() {

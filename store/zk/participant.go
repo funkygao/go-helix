@@ -1,11 +1,8 @@
 package zk
 
 import (
-	"strconv"
-	"time"
-
+	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
-	"github.com/funkygao/go-zookeeper/zk"
 	log "github.com/funkygao/log4go"
 )
 
@@ -26,45 +23,7 @@ func (p *participant) createLiveInstance() (err error) {
 	log.Trace("%s creating live instance...", p.shortID())
 
 	record := model.NewLiveInstanceRecord(p.instanceID, p.conn.SessionID())
-	data := record.Marshal()
-
-	// it is possible the live instance still exists from last run
-	// retry to wait for the zookeeper to remove the live instance
-	// from previous session
-	backoff := p.conn.SessionTimeout() + time.Millisecond*50
-	for retry := 0; retry < p.liveRetry; retry++ {
-		err = p.conn.CreateEphemeral(p.kb.liveInstance(p.instanceID), data)
-		if err == nil {
-			break
-		} else if err == zk.ErrNodeExists {
-			if cur, e := p.conn.Get(p.kb.liveInstance(p.instanceID)); e == zk.ErrNoNode {
-				log.Trace("%s live instance is gone as we check it, retry creating live instance", p.shortID())
-				continue // needn't sleep backoff
-			} else {
-				// FIXME LastStat race condition, p.conn.SessionID might be changing
-				currentSessionID := strconv.FormatInt(p.conn.LastStat().EphemeralOwner, 10)
-				if currentSessionID == p.conn.SessionID() {
-					if r, e1 := model.NewRecordFromBytes(cur); e1 == nil {
-						curLiveInstance := model.NewLiveInstanceFromRecord(r)
-						if curLiveInstance.SessionID() != p.conn.SessionID() {
-							log.Trace("%s update session id field", p.shortID())
-
-							curLiveInstance.SetSessionID(p.conn.SessionID())
-							p.conn.SetRecord(p.kb.liveInstance(p.instanceID), curLiveInstance)
-						}
-					}
-				} else {
-					log.Warn("%s await previous session expire...", p.shortID())
-				}
-			}
-		}
-
-		// wait for zookeeper remove the last run's ephemeral znode
-		log.Debug("%s retry=%d backoff: %s", p.shortID(), retry, backoff)
-		time.Sleep(backoff)
-	}
-
-	if err == nil {
+	if err = p.conn.CreateLiveNode(p.kb.liveInstance(p.instanceID), record.Marshal(), p.liveRetry); err == nil {
 		log.Trace("%s created live instance", p.shortID())
 	}
 
@@ -126,6 +85,10 @@ func (p *participant) joinCluster() (bool, error) {
 
 func (p *participant) setupMsgHandler() {
 	// TODO register messaging STATE_TRANSITION
+
+	p.messaging.registerMessageHandler(helix.MessageTypeStateTransition)
+
+	p.AddMessageListener(p.instanceID, p.messaging.recvMessages)
 
 	p.messaging.onConnected()
 }

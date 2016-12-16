@@ -1,6 +1,6 @@
 package zk
 
-func (m *Manager) StartTimerTasks() []error {
+func (m *Manager) startTimerTasks() []error {
 	var errs []error
 	for _, t := range m.timerTasks {
 		if err := t.Start(); err != nil {
@@ -11,7 +11,7 @@ func (m *Manager) StartTimerTasks() []error {
 	return errs
 }
 
-func (m *Manager) StopTimerTasks() {
+func (m *Manager) stopTimerTasks() {
 	for _, t := range m.timerTasks {
 		t.Stop()
 	}

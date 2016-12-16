@@ -82,6 +82,7 @@ const (
 	InstanceConfigChanged     ChangeNotificationType = 4
 	ControllerMessagesChanged ChangeNotificationType = 5
 	InstanceMessagesChanged   ChangeNotificationType = 6
+	ControllerChanged         ChangeNotificationType = 7
 )
 
 var changeNotificationText = map[ChangeNotificationType]string{
@@ -92,6 +93,7 @@ var changeNotificationText = map[ChangeNotificationType]string{
 	InstanceConfigChanged:     "InstanceConfig",
 	ControllerMessagesChanged: "ControllerMessage",
 	InstanceMessagesChanged:   "InstanceMessage",
+	ControllerChanged:         "Controller",
 }
 
 func ChangeNotificationText(t ChangeNotificationType) string {

@@ -32,25 +32,34 @@ type HelixManager interface {
 	AddPreConnectCallback(PreConnectCallback)
 
 	// AddExternalViewChangeListener add a listener to external view changes.
-	AddExternalViewChangeListener(ExternalViewChangeListener)
+	AddExternalViewChangeListener(ExternalViewChangeListener) error
 
 	// AddLiveInstanceChangeListener add a listener to live instance changes.
-	AddLiveInstanceChangeListener(LiveInstanceChangeListener)
+	AddLiveInstanceChangeListener(LiveInstanceChangeListener) error
 
 	// AddCurrentStateChangeListener add a listener to current state changes of the specified instance.
-	AddCurrentStateChangeListener(instance, sessionID string, listener CurrentStateChangeListener)
+	AddCurrentStateChangeListener(instance, sessionID string, listener CurrentStateChangeListener) error
 
 	// AddMessageListener adds a listener to the messages of an instance.
-	AddMessageListener(instance string, listener MessageListener)
+	AddMessageListener(instance string, listener MessageListener) error
 
 	// AddControllerMessageListener add a listener to controller messages.
-	AddControllerMessageListener(ControllerMessageListener)
+	AddControllerMessageListener(ControllerMessageListener) error
+
+	// AddControllerListener add a listener to respond to controller changes.
+	AddControllerListener(ControllerChangeListener) error
 
 	// AddIdealStateChangeListener add a listener to the cluster ideal state changes.
-	AddIdealStateChangeListener(IdealStateChangeListener)
+	AddIdealStateChangeListener(IdealStateChangeListener) error
+
+	// AddConfigChangeListener() error TODO
 
 	// AddInstanceConfigChangeListener add a listener to instance config changes.
-	AddInstanceConfigChangeListener(InstanceConfigChangeListener)
+	AddInstanceConfigChangeListener(InstanceConfigChangeListener) error
+
+	// RemoveListener removes the listener.
+	// If the same listener was used for multiple changes, all change notifications will be removed.
+	RemoveListener(path string, lisenter interface{}) error
 
 	// MessagingService returns ClusterMessagingService which can be used to send cluster wide messages.
 	MessagingService() ClusterMessagingService
@@ -60,12 +69,4 @@ type HelixManager interface {
 
 	// StateMachineEngine returns the sme of the participant.
 	StateMachineEngine() StateMachineEngine
-
-	// StartTimerTasks start timer tasks when becomes leader.
-	StartTimerTasks() []error
-
-	// StopTimerTasks stop timer tasks when becomes standby.
-	StopTimerTasks()
-
-	RemoveListener()
 }

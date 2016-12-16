@@ -21,6 +21,26 @@ import (
 var _ helix.HelixManager = &Manager{}
 var _ zkclient.ZkStateListener = &Manager{}
 
+// NewZkParticipant creates a Participant implementation with zk as storage.
+func NewZkParticipant(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
+	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeParticipant, options...)
+}
+
+// NewZkSpectator creates a Spectator implementation with zk as storage.
+func NewZkSpectator(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
+	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeSpectator, options...)
+}
+
+// NewZkStandaloneController creates a Standalone Controller implementation with zk as storage.
+func NewZkStandaloneController(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
+	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeControllerStandalone, options...)
+}
+
+// NewZkDistributedController creates a Distributed Controller implementation with zk as storage.
+func NewZkDistributedController(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
+	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeControllerDistributed, options...)
+}
+
 type Manager struct {
 	sync.RWMutex
 
@@ -40,12 +60,12 @@ type Manager struct {
 	sme        *stateMachineEngine
 	timerTasks []helix.HelixTimerTask
 
-	// ClusterManagementTool cache
-	admin helix.HelixAdmin
-
 	// controller fields
 	controller           *controller.GenericHelixController
 	controllerTimerTasks []helix.HelixTimerTask
+
+	// ClusterManagementTool cache
+	admin helix.HelixAdmin
 
 	// ClusterMessagingService cache
 	messaging *zkMessagingService
@@ -53,19 +73,13 @@ type Manager struct {
 	// metrics reporter
 	metrics *metricsReporter
 
-	// host of this participant
-	host string
-
-	// port of this participant
-	port string
-
-	// instanceID is the optional identifier of this participant, by default to host_port
-	instanceID string
+	// identification of the instance
+	host, port, instanceID string
 
 	// context of the specator, accessible from the ExternalViewChangeListener
-	context *helix.Context
+	context *helix.Context // TODO
 
-	handlers []CallbackHandler
+	handlers []*CallbackHandler
 
 	externalViewListeners       []helix.ExternalViewChangeListener
 	liveInstanceChangeListeners []helix.LiveInstanceChangeListener
@@ -100,26 +114,6 @@ type Manager struct {
 	stopCurrentStateWatch map[string]chan interface{}
 }
 
-// NewZkParticipant creates a Participant implementation with zk as storage.
-func NewZkParticipant(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
-	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeParticipant, options...)
-}
-
-// NewZkSpectator creates a Spectator implementation with zk as storage.
-func NewZkSpectator(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
-	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeSpectator, options...)
-}
-
-// NewZkStandaloneController creates a Standalone Controller implementation with zk as storage.
-func NewZkStandaloneController(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
-	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeControllerStandalone, options...)
-}
-
-// NewZkDistributedController creates a Distributed Controller implementation with zk as storage.
-func NewZkDistributedController(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
-	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeControllerDistributed, options...)
-}
-
 // newZkHelixManager creates a HelixManager implementation with zk as storage.
 func newZkHelixManager(clusterID, host, port, zkSvr string,
 	it helix.InstanceType, options ...ManagerOption) (mgr *Manager, err error) {
@@ -131,7 +125,7 @@ func newZkHelixManager(clusterID, host, port, zkSvr string,
 		it:                  it,
 		kb:                  newKeyBuilder(clusterID),
 		preConnectCallbacks: []helix.PreConnectCallback{},
-		handlers:            []CallbackHandler{},
+		handlers:            []*CallbackHandler{},
 		pprofPort:           10001,
 		host:                host,
 		port:                port,
@@ -242,6 +236,9 @@ func (m *Manager) Connect() error {
 		return err
 	}
 
+	m.wg.Add(1)
+	go m.handleListenerErrors()
+
 	m.messaging.onConnected() // if participant, call twice
 
 	if ok, err := m.conn.IsClusterSetup(m.clusterID); !ok || err != nil {
@@ -266,18 +263,6 @@ func (m *Manager) Disconnect() {
 	log.Info("%s disconnected", m.shortID())
 }
 
-func (m *Manager) shortID() string {
-	if m.IsConnected() {
-		return fmt.Sprintf("%s[%s/%s@%s]", m.it, m.instanceID, m.conn.SessionID(), m.clusterID)
-	}
-
-	return fmt.Sprintf("%s[%s/-@%s]", m.it, m.instanceID, m.clusterID)
-}
-
-func (m *Manager) IsConnected() bool {
-	return m.connected.Get()
-}
-
 func (m *Manager) connectToZookeeper() (err error) {
 	// will trigger HandleStateChanged, HandleNewSession
 	m.conn.SubscribeStateChanges(m)
@@ -297,6 +282,18 @@ func (m *Manager) connectToZookeeper() (err error) {
 	return
 }
 
+func (m *Manager) shortID() string {
+	if m.IsConnected() {
+		return fmt.Sprintf("%s[%s/%s@%s]", m.it, m.instanceID, m.conn.SessionID(), m.clusterID)
+	}
+
+	return fmt.Sprintf("%s[%s/-@%s]", m.it, m.instanceID, m.clusterID)
+}
+
+func (m *Manager) IsConnected() bool {
+	return m.connected.Get()
+}
+
 func (m *Manager) HandleStateChanged(state zk.State) (err error) {
 	log.Debug("new state: %s", state)
 
@@ -305,16 +302,11 @@ func (m *Manager) HandleStateChanged(state zk.State) (err error) {
 	// StateHasSession will be handled by HandleNewSession
 	switch state {
 	case zk.StateConnecting:
-
 	case zk.StateConnected:
-
+	case zk.StateConnectedReadOnly:
 	case zk.StateDisconnected:
-
 	case zk.StateExpired:
-
-	case zk.StateUnknown:
-		// e,g. EventNodeChildrenChanged
-
+	case zk.StateUnknown: // e,g. EventNodeChildrenChanged
 	}
 
 	return
@@ -329,7 +321,7 @@ func (m *Manager) HandleNewSession() (err error) {
 
 	m.connected.Set(true)
 
-	m.StopTimerTasks()
+	m.stopTimerTasks()
 	m.resetHandlers()
 	m.stopChangeNotificationLoop()
 
@@ -350,7 +342,7 @@ func (m *Manager) HandleNewSession() (err error) {
 	case helix.InstanceTypeAdministrator:
 	}
 
-	if errs := m.StartTimerTasks(); len(errs) > 0 {
+	if errs := m.startTimerTasks(); len(errs) > 0 {
 		for _, e := range errs {
 			log.Error("%s %v", m.shortID(), e)
 		}
@@ -391,12 +383,4 @@ func (m *Manager) handleNewSessionAsParticipant() error {
 func (m *Manager) handleNewSessionAsController() error {
 	// DistributedLeaderElection
 	return helix.ErrNotImplemented
-}
-
-func (m *Manager) initHandlers() {
-	log.Trace("%s init handlers", m.shortID())
-}
-
-func (m *Manager) resetHandlers() {
-	log.Trace("%s reset handlers", m.shortID())
 }

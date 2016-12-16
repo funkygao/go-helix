@@ -22,3 +22,4 @@
     /{cluster}/CONFIGS/RESOURCE
     /{cluster}/EXTERNALVIEW/{resource}
     /{cluster}/IDEALSTATES/{resource}
+    /{cluster}/INSTANCES/{instance}/CURRENTSTATES/{sessionid}/{resource}
