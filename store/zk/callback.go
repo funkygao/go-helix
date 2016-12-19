@@ -3,6 +3,7 @@ package zk
 import (
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-zookeeper/zk"
+	log "github.com/funkygao/log4go"
 	"github.com/funkygao/zkclient"
 )
 
@@ -38,14 +39,42 @@ func (cb *CallbackHandler) Reset() {
 func (cb *CallbackHandler) invoke(cn helix.ChangeNotification) {
 	switch cn.ChangeType {
 	case helix.ExternalViewChanged:
+		if l, ok := cb.listener.(helix.ExternalViewChangeListener); ok {
+			l(nil, nil)
+		} else {
+			log.Error("Initialization with wrong listener type")
+		}
+
 	case helix.LiveInstanceChanged:
+		if l, ok := cb.listener.(helix.LiveInstanceChangeListener); ok {
+			l(nil, nil)
+		}
+
 	case helix.IdealStateChanged:
-		l := cb.listener.(helix.IdealStateChangeListener)
-		l(nil, nil)
+		if l, ok := cb.listener.(helix.IdealStateChangeListener); ok {
+			l(nil, nil)
+		}
 
 	case helix.CurrentStateChanged:
+		if l, ok := cb.listener.(helix.CurrentStateChangeListener); ok {
+			l("", nil, nil)
+		}
+
 	case helix.InstanceConfigChanged:
+		if l, ok := cb.listener.(helix.InstanceConfigChangeListener); ok {
+			l(nil, nil)
+		}
+
+	case helix.ControllerChanged:
+		if l, ok := cb.listener.(helix.ControllerChangeListener); ok {
+			l(nil)
+		}
+
 	case helix.ControllerMessagesChanged:
+		if l, ok := cb.listener.(helix.ControllerMessageListener); ok {
+			l(nil, nil)
+		}
+
 	case helix.InstanceMessagesChanged:
 	}
 }

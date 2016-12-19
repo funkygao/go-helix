@@ -20,11 +20,11 @@ type (
 	// InstanceConfigChangeListener is triggered when the instance configs are updated.
 	InstanceConfigChangeListener func(configs []*model.Record, context *Context)
 
-	// ControllerMessageListener is triggered when the controller messages are updated.
-	ControllerMessageListener func(messages []*model.Record, context *Context)
-
 	// MessageListener is triggered when the instance received new messages.
 	MessageListener func(instance string, messages []*model.Record, context *Context)
+
+	// ControllerMessageListener is triggered when the controller messages are updated.
+	ControllerMessageListener func(messages []*model.Record, context *Context)
 
 	// ControllerChangeListener is triggered when controller changes.
 	ControllerChangeListener func(context *Context)
