@@ -44,10 +44,10 @@ func (r *redisNode) Start() {
 		log.Info("will be connecting...")
 	})
 
-	redisInstance.AddExternalViewChangeListener(func(externalViews []*model.Record, context *helix.Context) {
+	redisInstance.AddExternalViewChangeListener(func(externalViews []*model.ExternalView, context *helix.Context) {
 		log.Info(color.Red("external view changed: %+v %+v", externalViews, context))
 	})
-	redisInstance.AddIdealStateChangeListener(func(idealState []*model.Record, context *helix.Context) {
+	redisInstance.AddIdealStateChangeListener(func(idealState []*model.IdealState, context *helix.Context) {
 		log.Info(color.Yellow("ideal state changed: %+v %+v", idealState, context))
 	})
 

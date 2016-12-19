@@ -37,7 +37,12 @@ func (m *Manager) handleListenerErrors() {
 			return
 
 		case err, ok := <-m.conn.LisenterErrors():
-			log.Error("%v %v", ok, err) // TODO err should contain path
+			if !ok {
+				log.Warn("%s listener error channel closed", m.shortID())
+				return
+			}
+
+			log.Error("%s %s %s", m.shortID(), err.Path, err.Error())
 		}
 	}
 }

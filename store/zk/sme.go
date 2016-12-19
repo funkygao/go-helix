@@ -50,3 +50,11 @@ func (sme *stateMachineEngine) StateModel(stateModel string) (*helix.StateModel,
 	r, present := sme.stateModels[stateModel]
 	return r, present
 }
+
+func (sme *stateMachineEngine) MessageType() string {
+	return helix.MessageTypeStateTransition
+}
+
+func (sme *stateMachineEngine) Reset() {
+	// TODO
+}

@@ -26,6 +26,10 @@ func NewLiveInstanceRecord(participantID string, sessionID string) *Record {
 	return node
 }
 
+func NewLiveInstanceFromRecord(record *Record) *LiveInstance {
+	return &LiveInstance{Record: record}
+}
+
 func (li *LiveInstance) SetSessionID(sessionID string) {
 	li.SetStringField("SESSION_ID", sessionID)
 }

@@ -84,11 +84,7 @@ func (p *participant) joinCluster() (bool, error) {
 }
 
 func (p *participant) setupMsgHandler() {
-	// TODO register messaging STATE_TRANSITION
-
-	p.messaging.registerMessageHandler(helix.MessageTypeStateTransition)
-
-	p.AddMessageListener(p.instanceID, p.messaging.recvMessages)
-
+	p.messaging.enableMessage(helix.MessageTypeStateTransition,
+		helix.MessageTypeNoOp)
 	p.messaging.onConnected()
 }

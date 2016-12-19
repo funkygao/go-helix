@@ -18,8 +18,10 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 )
 
-var _ helix.HelixManager = &Manager{}
-var _ zkclient.ZkStateListener = &Manager{}
+var (
+	_ helix.HelixManager       = &Manager{}
+	_ zkclient.ZkStateListener = &Manager{}
+)
 
 // NewZkParticipant creates a Participant implementation with zk as storage.
 func NewZkParticipant(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
@@ -183,9 +185,6 @@ func newZkHelixManager(clusterID, host, port, zkSvr string,
 		mgr.sme = newStateMachineEngine(mgr)
 		mgr.timerTasks = []helix.HelixTimerTask{healthcheck.NewParticipanthealthcheckTask()}
 
-	case helix.InstanceTypeSpectator:
-		// do nothing
-
 	case helix.InstanceTypeControllerDistributed:
 		mgr.sme = newStateMachineEngine(mgr)
 		err = helix.ErrNotImplemented
@@ -194,7 +193,8 @@ func newZkHelixManager(clusterID, host, port, zkSvr string,
 		mgr.controllerTimerTasks = []helix.HelixTimerTask{}
 		err = helix.ErrNotImplemented
 
-	case helix.InstanceTypeAdministrator:
+	case helix.InstanceTypeAdministrator, helix.InstanceTypeSpectator:
+		// do nothing
 
 	default:
 		err = helix.ErrInvalidArgument
@@ -264,7 +264,6 @@ func (m *Manager) Disconnect() {
 }
 
 func (m *Manager) connectToZookeeper() (err error) {
-	// will trigger HandleStateChanged, HandleNewSession
 	m.conn.SubscribeStateChanges(m)
 
 	if err = m.conn.Connect(); err != nil {
@@ -323,7 +322,10 @@ func (m *Manager) HandleNewSession() (err error) {
 
 	m.stopTimerTasks()
 	m.resetHandlers()
-	m.stopChangeNotificationLoop()
+
+	if ok, err := m.conn.IsClusterSetup(m.clusterID); !ok || err != nil {
+		return helix.ErrClusterNotSetup
+	}
 
 	switch m.it {
 	case helix.InstanceTypeParticipant:
@@ -349,7 +351,6 @@ func (m *Manager) HandleNewSession() (err error) {
 	}
 
 	m.initHandlers()
-	m.startChangeNotificationLoop()
 	return
 }
 
