@@ -1,7 +1,10 @@
 package zk
 
 import (
+	"fmt"
+
 	"github.com/funkygao/go-helix"
+	"github.com/funkygao/go-helix/model"
 	"github.com/funkygao/go-zookeeper/zk"
 	log "github.com/funkygao/log4go"
 	"github.com/funkygao/zkclient"
@@ -37,6 +40,10 @@ func newCallbackHandler(mgr *Manager, path string, listener interface{},
 	}
 }
 
+func (cb *CallbackHandler) String() string {
+	return fmt.Sprintf("%s %s", cb.path, helix.ChangeNotificationText(cb.changeType))
+}
+
 func (cb *CallbackHandler) Init() {
 	switch cb.changeType {
 	case helix.ExternalViewChanged:
@@ -59,7 +66,44 @@ func (cb *CallbackHandler) Init() {
 
 }
 
+func (cb *CallbackHandler) subscribeForChanges(path string) {
+	cb.Manager.conn.SubscribeChildChanges(path, cb)
+	children, err := cb.conn.Children(path)
+	if err != nil {
+		log.Error("%v", err)
+		return
+	}
+
+	switch cb.changeType {
+	case helix.ExternalViewChanged, helix.IdealStateChanged, helix.CurrentStateChanged:
+		for _, child := range children {
+			childPath := fmt.Sprintf("%s/%s", path, child)
+			data, err := cb.conn.Get(childPath)
+			if err != nil {
+				log.Error("%v", err)
+				continue
+			}
+
+			record, err := model.NewRecordFromBytes(data)
+			if err != nil {
+				log.Error("%v", err)
+				continue
+			}
+			cb.conn.SubscribeChildChanges(fmt.Sprintf("%s/%s", path, record.ID), cb)
+			cb.conn.SubscribeDataChanges(fmt.Sprintf("%s/%s", path, record.ID), cb)
+		}
+
+	default:
+		for _, child := range children {
+			cb.conn.SubscribeDataChanges(fmt.Sprintf("%s/%s", path, child), cb)
+		}
+
+	}
+}
+
 func (cb *CallbackHandler) Reset() {
+	log.Debug("%s reset callback for %s", cb.shortID(), cb.changeType)
+
 	switch cb.changeType {
 	case helix.ExternalViewChanged:
 
@@ -78,6 +122,8 @@ func (cb *CallbackHandler) Reset() {
 }
 
 func (cb *CallbackHandler) invokeListener(cn helix.ChangeNotification) {
+	log.Debug("%s invoke %+v", cb.shortID(), cn)
+
 	switch cn.ChangeType {
 	case helix.ExternalViewChanged:
 		if l, ok := cb.listener.(helix.ExternalViewChangeListener); ok {
@@ -124,6 +170,7 @@ func (cb *CallbackHandler) HandleChildChange(parentPath string, currentChilds []
 	switch cb.changeType {
 	case helix.ExternalViewChanged:
 		resources, err := cb.conn.Children(parentPath)
+		log.Debug("%s %+v %v", cb.shortID(), resources, err)
 		if err != nil {
 			return err
 		}
@@ -137,6 +184,7 @@ func (cb *CallbackHandler) HandleChildChange(parentPath string, currentChilds []
 
 	case helix.LiveInstanceChanged:
 		liveInstances, err := cb.conn.Children(cb.kb.liveInstances())
+		log.Debug("%s %+v %v", cb.shortID(), liveInstances, err)
 		if err != nil {
 			return err
 		}

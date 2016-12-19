@@ -294,18 +294,25 @@ func (m *Manager) IsConnected() bool {
 }
 
 func (m *Manager) HandleStateChanged(state zk.State) (err error) {
-	log.Debug("new state: %s", state)
+	if state == zk.StateUnknown {
+		// e,g. EventNodeChildrenChanged
+		return
+	}
 
-	m.connected.Set(false)
+	log.Debug("%s new state: %s", m.shortID(), state)
 
-	// StateHasSession will be handled by HandleNewSession
 	switch state {
 	case zk.StateConnecting:
+		m.connected.Set(false)
 	case zk.StateConnected:
+		m.connected.Set(false)
 	case zk.StateConnectedReadOnly:
 	case zk.StateDisconnected:
+		m.connected.Set(false)
 	case zk.StateExpired:
-	case zk.StateUnknown: // e,g. EventNodeChildrenChanged
+		m.connected.Set(false)
+	case zk.StateHasSession:
+		// StateHasSession will be handled by HandleNewSession
 	}
 
 	return
@@ -326,6 +333,7 @@ func (m *Manager) HandleNewSession() (err error) {
 	if ok, err := m.conn.IsClusterSetup(m.clusterID); !ok || err != nil {
 		return helix.ErrClusterNotSetup
 	}
+	log.Debug("%s cluster setup ok", m.shortID())
 
 	switch m.it {
 	case helix.InstanceTypeParticipant:
@@ -362,6 +370,7 @@ func (m *Manager) handleNewSessionAsParticipant() error {
 		}
 		return helix.ErrEnsureParticipantConfig
 	}
+	log.Debug("%s join cluster ok", m.shortID())
 
 	// only participant has pre connection callbacks
 	for _, cb := range m.preConnectCallbacks {
@@ -371,10 +380,12 @@ func (m *Manager) handleNewSessionAsParticipant() error {
 	if err := p.createLiveInstance(); err != nil {
 		return err
 	}
+	log.Debug("%s create live instance ok", m.shortID())
 
 	if err := p.carryOverPreviousCurrentState(); err != nil {
 		return err
 	}
+	log.Debug("%s carry over previous current state ok", m.shortID())
 
 	p.setupMsgHandler()
 

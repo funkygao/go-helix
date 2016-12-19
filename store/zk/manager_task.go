@@ -1,5 +1,9 @@
 package zk
 
+import (
+	log "github.com/funkygao/log4go"
+)
+
 func (m *Manager) startTimerTasks() []error {
 	var errs []error
 	for _, t := range m.timerTasks {
@@ -8,10 +12,13 @@ func (m *Manager) startTimerTasks() []error {
 		}
 	}
 
+	log.Debug("%s start timer tasks with %+v", m.shortID(), errs)
+
 	return errs
 }
 
 func (m *Manager) stopTimerTasks() {
+	log.Debug("%s stop timer tasks", m.shortID())
 	for _, t := range m.timerTasks {
 		t.Stop()
 	}

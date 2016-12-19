@@ -62,8 +62,6 @@ func (p *participant) autoJoinAllowed() (bool, error) {
 }
 
 func (p *participant) joinCluster() (bool, error) {
-	log.Debug("%s join cluster...", p.shortID())
-
 	exists, err := p.conn.IsInstanceSetup(p.clusterID, p.instanceID)
 	if err != nil {
 		return false, err
@@ -84,6 +82,8 @@ func (p *participant) joinCluster() (bool, error) {
 }
 
 func (p *participant) setupMsgHandler() {
+	log.Debug("%s setup message handler", p.shortID())
+
 	p.messaging.enableMessage(helix.MessageTypeStateTransition,
 		helix.MessageTypeNoOp)
 	p.messaging.onConnected()

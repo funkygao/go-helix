@@ -13,6 +13,7 @@ func (m *Manager) initHandlers() {
 	defer m.Unlock()
 
 	for _, handler := range m.handlers {
+		log.Debug("%s init %s", m.shortID(), handler)
 		handler.Init()
 	}
 }
@@ -24,12 +25,15 @@ func (m *Manager) resetHandlers() {
 	defer m.Unlock()
 
 	for _, handler := range m.handlers {
+		log.Debug("%s reset %s", m.shortID(), handler)
 		handler.Reset()
 	}
 }
 
 func (m *Manager) handleListenerErrors() {
 	defer m.wg.Done()
+
+	log.Trace("%s start listener errors handler", m.shortID())
 
 	for {
 		select {
@@ -52,6 +56,9 @@ func (m *Manager) addListener(listener interface{}, path string,
 	if !m.IsConnected() {
 		return helix.ErrNotConnected
 	}
+
+	log.Debug("%s add listener %s for %s", m.shortID(),
+		helix.ChangeNotificationText(changeType), path)
 
 	m.Lock()
 	defer m.Unlock()
@@ -140,6 +147,8 @@ func (m *Manager) AddControllerListener(listener helix.ControllerChangeListener)
 }
 
 func (m *Manager) RemoveListener(path string, listener interface{}) error {
+	log.Debug("%s remove listener %s %#v", m.shortID(), path, listener)
+
 	m.Lock()
 	defer m.Unlock()
 

@@ -50,6 +50,8 @@ func (m *zkMessagingService) HandleChildChange(parentPath string, currentChilds 
 		return err
 	}
 
+	log.Debug("%s handle child change: %+v", m.shortID(), msgIDs)
+
 	for _, msgID := range msgIDs {
 		// TODO handle outstanding duplicated messages
 		m.processMessage(msgID)
@@ -59,6 +61,8 @@ func (m *zkMessagingService) HandleChildChange(parentPath string, currentChilds 
 
 func (m *zkMessagingService) onConnected() {
 	path := m.kb.messages(m.instanceID)
+	log.Debug("%s onConnected for %s", m.shortID(), path)
+
 	m.conn.SubscribeChildChanges(path, m)
 }
 

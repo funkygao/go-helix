@@ -41,14 +41,7 @@ func (r *redisNode) Start() {
 		zk.WithPprofPort(10001))
 
 	redisInstance.AddPreConnectCallback(func() {
-		log.Info("will be connecting...")
-	})
-
-	redisInstance.AddExternalViewChangeListener(func(externalViews []*model.ExternalView, context *helix.Context) {
-		log.Info(color.Red("external view changed: %+v %+v", externalViews, context))
-	})
-	redisInstance.AddIdealStateChangeListener(func(idealState []*model.IdealState, context *helix.Context) {
-		log.Info(color.Yellow("ideal state changed: %+v %+v", idealState, context))
+		log.Info("Will be connecting...")
 	})
 
 	// register state model before connecting
@@ -82,6 +75,22 @@ func (r *redisNode) Start() {
 	redisInstance.StateMachineEngine().RegisterStateModel(r.stateModel, sm)
 
 	must(redisInstance.Connect())
+
+	if err := redisInstance.AddExternalViewChangeListener(func(externalViews []*model.ExternalView, context *helix.Context) {
+		log.Info(color.Red("external view changed: %+v %+v", externalViews, context))
+	}); err != nil {
+		log.Error("%s", err)
+	}
+	if err := redisInstance.AddIdealStateChangeListener(func(idealState []*model.IdealState, context *helix.Context) {
+		log.Info(color.Yellow("ideal state changed: %+v %+v", idealState, context))
+	}); err != nil {
+		log.Error("%s", err)
+	}
+	if err := redisInstance.AddLiveInstanceChangeListener(func(liveInstances []*model.LiveInstance, context *helix.Context) {
+		log.Info("live instances: %+v %v", liveInstances, context)
+	}); err != nil {
+		log.Error("%s", err)
+	}
 
 	log.Info("start rebalancing %s/%d ...", r.resource, r.replicas)
 	admin := redisInstance.ClusterManagementTool()

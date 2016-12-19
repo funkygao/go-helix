@@ -52,6 +52,9 @@ func (m *Manager) ClusterManagementTool() helix.HelixAdmin {
 	defer m.Unlock()
 
 	if m.admin == nil {
+		if !m.IsConnected() {
+			return nil
+		}
 		m.admin = newZkHelixAdminWithConn(m.conn)
 	}
 	return m.admin
