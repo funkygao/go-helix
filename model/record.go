@@ -222,9 +222,14 @@ func (r Record) String() string {
 	return string(r.Marshal())
 }
 
-// NewRecordFromBytes creates a new znode instance from a byte array
+// NewRecordFromBytes creates a Record from a byte slice.
+// If data is empty, returns an empty Record with nil error.
 func NewRecordFromBytes(data []byte) (*Record, error) {
-	var zn Record
-	err := json.Unmarshal(data, &zn)
-	return &zn, err
+	var record = new(Record)
+	if len(data) == 0 {
+		return record, nil
+	}
+
+	err := json.Unmarshal(data, record)
+	return record, err
 }
