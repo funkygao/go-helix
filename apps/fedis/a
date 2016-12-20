@@ -1,2 +1,3 @@
 go install
 fedis redis -node localhost_10001 -log trace
+#fedis redis -node localhost_10002 -log trace

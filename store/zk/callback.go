@@ -2,6 +2,7 @@ package zk
 
 import (
 	"fmt"
+	gopath "path"
 
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
@@ -41,19 +42,22 @@ func newCallbackHandler(mgr *Manager, path string, listener interface{},
 }
 
 func (cb *CallbackHandler) String() string {
-	return fmt.Sprintf("%s %s", cb.path, helix.ChangeNotificationText(cb.changeType))
+	return fmt.Sprintf("%s^%s", cb.path, helix.ChangeNotificationText(cb.changeType))
 }
 
 func (cb *CallbackHandler) Init() {
+	cb.subscribeForChanges(cb.path)
+}
+
+func (cb *CallbackHandler) Reset() {
+	log.Trace("%s reset callback for %s", cb.shortID(), cb)
+
 	switch cb.changeType {
 	case helix.ExternalViewChanged:
-		cb.Manager.conn.SubscribeChildChanges(cb.kb.externalView(), cb)
 
 	case helix.LiveInstanceChanged:
-		cb.Manager.conn.SubscribeDataChanges(cb.kb.instance(cb.instanceID), cb)
 
 	case helix.IdealStateChanged:
-		cb.Manager.conn.SubscribeChildChanges(cb.kb.idealStates(), cb)
 
 	case helix.CurrentStateChanged:
 
@@ -63,7 +67,6 @@ func (cb *CallbackHandler) Init() {
 
 	case helix.ControllerMessagesChanged:
 	}
-
 }
 
 func (cb *CallbackHandler) subscribeForChanges(path string) {
@@ -77,7 +80,7 @@ func (cb *CallbackHandler) subscribeForChanges(path string) {
 	switch cb.changeType {
 	case helix.ExternalViewChanged, helix.IdealStateChanged, helix.CurrentStateChanged:
 		for _, child := range children {
-			childPath := fmt.Sprintf("%s/%s", path, child)
+			childPath := gopath.Join(path, child)
 			data, err := cb.conn.Get(childPath)
 			if err != nil {
 				log.Error("%v", err)
@@ -89,80 +92,66 @@ func (cb *CallbackHandler) subscribeForChanges(path string) {
 				log.Error("%v", err)
 				continue
 			}
-			cb.conn.SubscribeChildChanges(fmt.Sprintf("%s/%s", path, record.ID), cb)
-			cb.conn.SubscribeDataChanges(fmt.Sprintf("%s/%s", path, record.ID), cb)
+			cb.conn.SubscribeChildChanges(gopath.Join(path, record.ID), cb)
+			cb.conn.SubscribeDataChanges(gopath.Join(path, record.ID), cb)
 		}
 
 	default:
 		for _, child := range children {
-			cb.conn.SubscribeDataChanges(fmt.Sprintf("%s/%s", path, child), cb)
+			cb.conn.SubscribeDataChanges(gopath.Join(path, child), cb)
 		}
 
-	}
-}
-
-func (cb *CallbackHandler) Reset() {
-	log.Debug("%s reset callback for %s", cb.shortID(), cb.changeType)
-
-	switch cb.changeType {
-	case helix.ExternalViewChanged:
-
-	case helix.LiveInstanceChanged:
-
-	case helix.IdealStateChanged:
-
-	case helix.CurrentStateChanged:
-
-	case helix.InstanceConfigChanged:
-
-	case helix.ControllerChanged:
-
-	case helix.ControllerMessagesChanged:
 	}
 }
 
 func (cb *CallbackHandler) invokeListener(cn helix.ChangeNotification) {
-	log.Debug("%s invoke %+v", cb.shortID(), cn)
+	log.Debug("%s invoking listener %+v", cb.shortID(), cn)
 
 	switch cn.ChangeType {
 	case helix.ExternalViewChanged:
 		if l, ok := cb.listener.(helix.ExternalViewChangeListener); ok {
-			l(nil, nil)
-		} else {
-			log.Error("Initialization with wrong listener type")
+			data := cn.ChangeData.([]*model.ExternalView)
+			l(data, nil)
 		}
 
 	case helix.LiveInstanceChanged:
 		if l, ok := cb.listener.(helix.LiveInstanceChangeListener); ok {
-			l(nil, nil)
+			data := cn.ChangeData.([]*model.LiveInstance)
+			l(data, nil)
 		}
 
 	case helix.IdealStateChanged:
 		if l, ok := cb.listener.(helix.IdealStateChangeListener); ok {
-			l(nil, nil)
+			data := cn.ChangeData.([]*model.IdealState)
+			l(data, nil)
 		}
 
 	case helix.CurrentStateChanged:
 		if l, ok := cb.listener.(helix.CurrentStateChangeListener); ok {
-			l("", nil, nil)
+			data := cn.ChangeData.([]*model.CurrentState)
+			l("", data, nil)
 		}
 
 	case helix.InstanceConfigChanged:
 		if l, ok := cb.listener.(helix.InstanceConfigChangeListener); ok {
-			l(nil, nil)
+			data := cn.ChangeData.([]*model.InstanceConfig)
+			l(data, nil)
 		}
 
 	case helix.ControllerChanged:
 		if l, ok := cb.listener.(helix.ControllerChangeListener); ok {
+			// TODO
 			l(nil)
 		}
 
 	case helix.ControllerMessagesChanged:
 		if l, ok := cb.listener.(helix.ControllerMessageListener); ok {
+			// TODO
 			l(nil, nil)
 		}
 
 	case helix.InstanceMessagesChanged:
+		// TODO
 	}
 }
 
@@ -170,7 +159,6 @@ func (cb *CallbackHandler) HandleChildChange(parentPath string, currentChilds []
 	switch cb.changeType {
 	case helix.ExternalViewChanged:
 		resources, err := cb.conn.Children(parentPath)
-		log.Debug("%s %+v %v", cb.shortID(), resources, err)
 		if err != nil {
 			return err
 		}
@@ -183,15 +171,23 @@ func (cb *CallbackHandler) HandleChildChange(parentPath string, currentChilds []
 		}
 
 	case helix.LiveInstanceChanged:
-		liveInstances, err := cb.conn.Children(cb.kb.liveInstances())
-		log.Debug("%s %+v %v", cb.shortID(), liveInstances, err)
+		liveInstances, values, err := cb.conn.ChildrenValues(cb.kb.liveInstances())
 		if err != nil {
 			return err
 		}
 
+		datas := make([]*model.LiveInstance, 0, len(liveInstances))
+		for _, val := range values {
+			record, err := model.NewRecordFromBytes(val)
+			if err != nil {
+				return err
+			}
+			datas = append(datas, model.NewLiveInstanceFromRecord(record))
+		}
+
 		notify := helix.ChangeNotification{
 			ChangeType: helix.LiveInstanceChanged,
-			ChangeData: liveInstances,
+			ChangeData: datas,
 		}
 		cb.invokeListener(notify)
 
