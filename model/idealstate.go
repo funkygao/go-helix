@@ -128,13 +128,13 @@ func (is IdealState) NumPartitions() int {
 	return n
 }
 
+func (is IdealState) SetNumPartitions(n int) {
+	is.SetStringField("NUM_PARTITIONS", strconv.Itoa(n))
+}
+
 // StateModelDefRef returns the state model associated with this resource.
 func (is IdealState) StateModelDefRef() string {
 	return is.GetStringField("STATE_MODEL_DEF_REF", "")
-}
-
-func (is IdealState) SetNumPartitions(n int) {
-	is.SetStringField("NUM_PARTITIONS", strconv.Itoa(n))
 }
 
 func (is IdealState) InstanceGroupTag() string {

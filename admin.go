@@ -92,6 +92,9 @@ type HelixAdmin interface {
 	// EnableResource enables/disables the specified resource in the cluster.
 	EnableResource(cluster string, resource string, yes bool) error
 
+	// ScaleResource hot change partition num of a resource.
+	ScaleResource(cluster string, resource string, partitions int) error
+
 	// EnablePartitions disable or enable a list of partitions on an instance.
 	EnablePartitions(cluster, resource string, partitions []string, yes bool) error
 
