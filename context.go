@@ -3,6 +3,7 @@ package helix
 import "sync"
 
 // Context is a goroutine safe property bag for storing data between listeners and callbacks.
+// TODO mv to model pkg
 type Context struct {
 	sync.RWMutex
 	data map[string]interface{}

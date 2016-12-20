@@ -1,5 +1,9 @@
 package helix
 
+import (
+	"fmt"
+)
+
 const (
 	ConstaintTypeState   = "STATE_CONSTRAINT"
 	ConstaintTypeMessage = "MESSAGE_CONSTRAINT"
@@ -74,6 +78,10 @@ const (
 
 type ChangeNotificationType uint8
 
+func (cn ChangeNotificationType) IsCallbackInvoke() bool {
+	return cn == CallbackInvoke
+}
+
 const (
 	ExternalViewChanged       ChangeNotificationType = 0
 	LiveInstanceChanged       ChangeNotificationType = 1
@@ -83,6 +91,10 @@ const (
 	ControllerMessagesChanged ChangeNotificationType = 5
 	InstanceMessagesChanged   ChangeNotificationType = 6
 	ControllerChanged         ChangeNotificationType = 7
+
+	CallbackInit     ChangeNotificationType = 101
+	CallbackInvoke   ChangeNotificationType = 102
+	CallbackFinalize ChangeNotificationType = 103
 )
 
 var changeNotificationText = map[ChangeNotificationType]string{
@@ -94,6 +106,10 @@ var changeNotificationText = map[ChangeNotificationType]string{
 	ControllerMessagesChanged: "ControllerMessage",
 	InstanceMessagesChanged:   "InstanceMessage",
 	ControllerChanged:         "Controller",
+
+	CallbackInit:     "Init",
+	CallbackInvoke:   "Invoke",
+	CallbackFinalize: "Finalize",
 }
 
 func ChangeNotificationText(t ChangeNotificationType) string {
@@ -103,6 +119,10 @@ func ChangeNotificationText(t ChangeNotificationType) string {
 type ChangeNotification struct {
 	ChangeType ChangeNotificationType
 	ChangeData interface{}
+}
+
+func (ctx ChangeNotification) String() string {
+	return fmt.Sprintf("{%s %+v}", ChangeNotificationText(ctx.ChangeType), ctx.ChangeData)
 }
 
 const (

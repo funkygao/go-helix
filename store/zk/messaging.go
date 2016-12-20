@@ -9,6 +9,7 @@ import (
 	"github.com/funkygao/go-helix/model"
 	log "github.com/funkygao/log4go"
 	"github.com/funkygao/zkclient"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 var (
@@ -23,13 +24,25 @@ type zkMessagingService struct {
 	lock sync.RWMutex
 
 	messageTypes map[string]struct{}
+
+	// a LRU cache of recently received message IDs.
+	// Use this to detect new messages and existing messages
+	receivedMessages *lru.Cache
 }
 
 func newZkMessagingService(m *Manager) *zkMessagingService {
-	return &zkMessagingService{
+	ms := &zkMessagingService{
 		Manager:      m,
 		messageTypes: map[string]struct{}{},
 	}
+
+	var err error
+	ms.receivedMessages, err = lru.New(10 << 10)
+	if err != nil {
+		return nil
+	}
+
+	return ms
 }
 
 func (m *zkMessagingService) Send(msg *model.Message) error {
@@ -61,7 +74,7 @@ func (m *zkMessagingService) HandleChildChange(parentPath string, currentChilds 
 
 func (m *zkMessagingService) onConnected() {
 	path := m.kb.messages(m.instanceID)
-	log.Debug("%s onConnected for %s", m.shortID(), path)
+	log.Trace("%s watching %s", m.shortID(), path)
 
 	m.conn.SubscribeChildChanges(path, m)
 }

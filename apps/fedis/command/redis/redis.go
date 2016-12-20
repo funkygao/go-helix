@@ -76,19 +76,28 @@ func (r *redisNode) Start() {
 
 	must(redisInstance.Connect())
 
-	if err := redisInstance.AddExternalViewChangeListener(func(externalViews []*model.ExternalView, context *helix.Context) {
-		log.Info(color.Red("external view changed: %+v %+v", externalViews, context))
-	}); err != nil {
+	if err := redisInstance.AddExternalViewChangeListener(
+		func(externalViews []*model.ExternalView, context *helix.Context) {
+			log.Info(color.Red("external view changed: %+v %+v", externalViews, context))
+		}); err != nil {
 		log.Error("%s", err)
 	}
-	if err := redisInstance.AddIdealStateChangeListener(func(idealState []*model.IdealState, context *helix.Context) {
-		log.Info(color.Yellow("ideal state changed: %+v %+v", idealState, context))
-	}); err != nil {
+	if err := redisInstance.AddIdealStateChangeListener(
+		func(idealState []*model.IdealState, context *helix.Context) {
+			log.Info(color.Yellow("ideal state changed: %+v %+v", idealState, context))
+		}); err != nil {
 		log.Error("%s", err)
 	}
-	if err := redisInstance.AddLiveInstanceChangeListener(func(liveInstances []*model.LiveInstance, context *helix.Context) {
-		log.Info("live instances: %+v %v", liveInstances, context)
-	}); err != nil {
+	if err := redisInstance.AddLiveInstanceChangeListener(
+		func(liveInstances []*model.LiveInstance, context *helix.Context) {
+			log.Info("live instances: %+v %v", liveInstances, context)
+		}); err != nil {
+		log.Error("%s", err)
+	}
+	if err := redisInstance.AddCurrentStateChangeListener(redisInstance.Instance(), redisInstance.SessionID(),
+		func(instance string, currentState []*model.CurrentState, context *helix.Context) {
+			log.Info("current state[%s] %+v", instance, currentState)
+		}); err != nil {
 		log.Error("%s", err)
 	}
 

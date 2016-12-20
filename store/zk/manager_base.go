@@ -121,7 +121,6 @@ func (s *Manager) GetLiveInstances() ([]*model.LiveInstance, error) {
 }
 
 // GetExternalView retrieves a copy of the external views
-// TODO return []*mode.ExternalView
 func (s *Manager) GetExternalView() []*model.ExternalView {
 	result := []*model.ExternalView{}
 	for resource, v := range s.externalViewResourceMap {

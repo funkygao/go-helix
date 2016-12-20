@@ -62,4 +62,6 @@ var (
 	ErrDupOperation = errors.New("Duplicated operation")
 
 	ErrUnkownMessageType = errors.New("Unknown message type")
+
+	ErrSystem = errors.New("Unknown system error")
 )

@@ -25,7 +25,6 @@ func (m *Manager) resetHandlers() {
 	defer m.Unlock()
 
 	for _, handler := range m.handlers {
-		log.Debug("%s reset %s", m.shortID(), handler)
 		handler.Reset()
 	}
 }
