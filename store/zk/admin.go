@@ -548,6 +548,27 @@ func (adm *Admin) EnableResource(cluster string, resource string, enabled bool) 
 	return adm.UpdateSimpleField(isPath, "HELIX_ENABLED", "false")
 }
 
+func (adm *Admin) ScaleResource(cluster string, resource string, partitions int) error {
+	if partitions <= 0 {
+		return helix.ErrInvalidArgument
+	}
+
+	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
+		return helix.ErrClusterNotSetup
+	}
+
+	kb := newKeyBuilder(cluster)
+	isPath := kb.idealStateForResource(resource)
+	if exists, err := adm.Exists(isPath); !exists || err != nil {
+		if !exists {
+			return helix.ErrResourceNotExists
+		}
+		return err
+	}
+
+	return adm.UpdateSimpleField(isPath, "NUM_PARTITIONS", strconv.Itoa(partitions))
+}
+
 func (adm *Admin) Resources(cluster string) ([]string, error) {
 	kb := newKeyBuilder(cluster)
 	return adm.Children(kb.idealStates())

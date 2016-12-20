@@ -67,8 +67,11 @@ func (m *zkMessagingService) HandleChildChange(parentPath string, currentChilds 
 
 	for _, msgID := range msgIDs {
 		// TODO handle outstanding duplicated messages
-		m.processMessage(msgID)
+		if err = m.processMessage(msgID); err != nil {
+			log.Error("%v", err)
+		}
 	}
+
 	return nil
 }
 
