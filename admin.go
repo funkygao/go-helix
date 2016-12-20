@@ -28,6 +28,9 @@ type HelixAdmin interface {
 	// DropCluster removes a Helix managed cluster.
 	DropCluster(cluster string) error
 
+	// IsClusterSetup checks if a cluster is setup ok.
+	IsClusterSetup(cluster string) (bool, error)
+
 	// AllowParticipantAutoJoin permits a partitipant work without calling AddInstance beforehand.
 	// By default this feature is off.
 	AllowParticipantAutoJoin(cluster string, yes bool) error

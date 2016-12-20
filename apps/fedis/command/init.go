@@ -8,7 +8,6 @@ import (
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/store/zk"
 	"github.com/funkygao/gocli"
-	log "github.com/funkygao/log4go"
 )
 
 type Init struct {
@@ -17,43 +16,52 @@ type Init struct {
 }
 
 func (this *Init) Run(args []string) (exitCode int) {
-	var node string
+	var (
+		node   string
+		reinit bool
+	)
 	cmdFlags := flag.NewFlagSet("init", flag.ContinueOnError)
 	cmdFlags.Usage = func() { this.Ui.Output(this.Help()) }
 	cmdFlags.StringVar(&node, "addNode", "", "")
+	cmdFlags.BoolVar(&reinit, "reinit", false, "")
 	if err := cmdFlags.Parse(args); err != nil {
 		return 1
-	}
-
-	if node == "" {
-		this.Ui.Output(this.Help())
-		return
 	}
 
 	// create the admin instance and connect
 	admin := zk.NewZkHelixAdmin(zkSvr)
 	must(admin.Connect())
 
+	if reinit {
+		must(admin.DropCluster(cluster))
+	}
+
 	if node != "" {
+		if ok, err := admin.IsClusterSetup(cluster); !ok || err != nil {
+			this.Ui.Errorf("cluster %s not setup", cluster)
+			return 1
+		}
+
 		must(admin.AddNode(cluster, node))
-		log.Info("node:%s added to cluster[%s]", node, cluster)
+		this.Ui.Infof("node %s added to cluster %s", node, cluster)
 		return
 	}
 
 	// create the cluster
 	must(admin.AddCluster(cluster))
-	log.Info("added cluster: %s", cluster)
+	this.Ui.Infof("cluster[%s] added", cluster)
 
 	must(admin.AllowParticipantAutoJoin(cluster, true))
+	this.Ui.Output("enable partition auto join")
 
 	// define the resource and partition
 	resourceOption := helix.DefaultAddResourceOption(partitions, stateModel)
 	resourceOption.RebalancerMode = helix.RebalancerModeFullAuto
 	must(admin.AddResource(cluster, resource, resourceOption))
-	log.Info("resource[%s] partitions:%d model:%s added to cluster[%s]", resource,
+	this.Ui.Outputf("resource[%s] partitions:%d model:%s added to cluster[%s]", resource,
 		partitions, stateModel, cluster)
 
-	log.Info("%s/bin/run-helix-controller.sh --zkSvr %s --cluster %s", helixInstallBase, zkSvr, cluster)
+	this.Ui.Warnf("%s/bin/run-helix-controller.sh --zkSvr %s --cluster %s", helixInstallBase, zkSvr, cluster)
 
 	return
 }
@@ -71,6 +79,8 @@ Usage: %s init [options]
 Options:
 
     -addNode host_port
+
+    -reinit
 
 `, this.Cmd, this.Synopsis())
 	return strings.TrimSpace(help)
