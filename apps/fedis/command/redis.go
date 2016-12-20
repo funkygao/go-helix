@@ -30,7 +30,7 @@ func (this *Redis) Run(args []string) (exitCode int) {
 
 	tuples := strings.Split(node, "_")
 	if len(tuples) != 2 {
-		this.Ui.Error("-node must in form of host_port")
+		this.Ui.Output(this.Help())
 		return 2
 	}
 
@@ -65,8 +65,6 @@ Usage: %s redis [options]
 Options:
 
     -node host_port
-
-    -kill host_port
 
     -log debug|info|trace
       Default debug.

@@ -15,21 +15,24 @@ type Scale struct {
 }
 
 func (this *Scale) Run(args []string) (exitCode int) {
+	var partition int
 	cmdFlags := flag.NewFlagSet("scale", flag.ContinueOnError)
+	cmdFlags.IntVar(&partition, "p", 0, "")
 	cmdFlags.Usage = func() { this.Ui.Output(this.Help()) }
 	if err := cmdFlags.Parse(args); err != nil {
 		return 1
 	}
 
-	// create the admin instance and connect
+	if partition == 0 {
+		this.Ui.Output(this.Help())
+		return 2
+	}
+
 	admin := zk.NewZkHelixAdmin(zkSvr)
 	must(admin.Connect())
 
-	instances, err := admin.Instances(cluster)
-	must(err)
-	for _, instance := range instances {
-		this.Ui.Info(instance)
-	}
+	must(admin.ScaleResource(cluster, resource, partition))
+	this.Ui.Info(fmt.Sprintf("scaled to %d", partition))
 
 	return
 }
@@ -46,11 +49,7 @@ Usage: %s scale [options]
 
 Options:
 
-    -z zone
-
-    -add cluster
-
-    -drop cluster
+    -p partition
 
 `, this.Cmd, this.Synopsis())
 	return strings.TrimSpace(help)

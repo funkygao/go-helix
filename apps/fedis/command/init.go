@@ -25,6 +25,11 @@ func (this *Init) Run(args []string) (exitCode int) {
 		return 1
 	}
 
+	if node == "" {
+		this.Ui.Output(this.Help())
+		return
+	}
+
 	// create the admin instance and connect
 	admin := zk.NewZkHelixAdmin(zkSvr)
 	must(admin.Connect())

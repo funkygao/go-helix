@@ -66,8 +66,6 @@ type HelixAdmin interface {
 	// InstanceConfig returns configuration information of an instance in a cluster.
 	InstanceConfig(cluster, instance string) (*model.InstanceConfig, error)
 
-	InstanceInfo(cluster string, ic *model.InstanceConfig) (*model.Record, error)
-
 	// Enable or disable an instance.
 	EnableInstance(cluster, instance string, yes bool) error
 

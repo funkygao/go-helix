@@ -21,7 +21,7 @@ type Admin struct {
 }
 
 // NewZkHelixAdmin creates a HelixAdmin implementation with zk as storage.
-func NewZkHelixAdmin(zkSvr string, options ...zkclient.Option) *Admin {
+func NewZkHelixAdmin(zkSvr string, options ...zkclient.Option) helix.HelixAdmin {
 	admin := newZkHelixAdminWithConn(newConnection(zkSvr))
 
 	// apply additional options over the default
@@ -333,23 +333,6 @@ func (adm *Admin) RemoveInstanceTag(cluster, instance, tag string) error {
 func (adm *Admin) Instances(cluster string) ([]string, error) {
 	kb := newKeyBuilder(cluster)
 	return adm.Children(kb.instances())
-}
-
-func (adm *Admin) InstanceInfo(cluster string, ic *model.InstanceConfig) (*model.Record, error) {
-	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
-		return nil, helix.ErrClusterNotSetup
-	}
-
-	kb := newKeyBuilder(cluster)
-	instanceCfg := kb.participantConfig(ic.Node())
-	if exists, err := adm.Exists(instanceCfg); !exists || err != nil {
-		if !exists {
-			return nil, helix.ErrNodeNotExist
-		}
-		return nil, err
-	}
-
-	return adm.GetRecord(instanceCfg)
 }
 
 func (adm *Admin) InstanceConfig(cluster, instance string) (*model.InstanceConfig, error) {

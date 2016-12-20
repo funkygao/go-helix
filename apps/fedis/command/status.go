@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	//"github.com/funkygao/go-helix"
-	//"github.com/funkygao/go-helix/model"
 	"github.com/funkygao/go-helix/store/zk"
 	"github.com/funkygao/gocli"
 )
@@ -27,13 +25,41 @@ func (this *Status) Run(args []string) (exitCode int) {
 	admin := zk.NewZkHelixAdmin(zkSvr)
 	must(admin.Connect())
 
+	controller := admin.ControllerLeader(cluster)
+	controlerHistory, err := admin.ControllerHistory(cluster)
+	must(err)
+
 	instances, err := admin.Instances(cluster)
 	must(err)
+
 	resources, err := admin.Resources(cluster)
 	must(err)
 
-	this.Ui.Output(fmt.Sprintf("resources: %+v", resources))
-	this.Ui.Output(fmt.Sprintf("instances: %+v", instances))
+	// controller
+	this.Ui.Info(fmt.Sprintf("controller: %s", controller))
+	this.Ui.Output(fmt.Sprintf("    %+v", controlerHistory))
+
+	// resource
+	this.Ui.Info(fmt.Sprintf("resources:"))
+	for _, res := range resources {
+		idealState, err := admin.ResourceIdealState(cluster, res)
+		must(err)
+		this.Ui.Output(fmt.Sprintf("    %s#%d replica:%s %s %s", idealState.Resource(),
+			idealState.NumPartitions(),
+			idealState.Replicas(),
+			idealState.RebalanceMode(),
+			idealState.StateModelDefRef(),
+		))
+	}
+
+	// instance
+	this.Ui.Info(fmt.Sprintf("instances:"))
+	for _, instance := range instances {
+		ic, err := admin.InstanceConfig(cluster, instance)
+		must(err)
+
+		this.Ui.Output(fmt.Sprintf("    %s", ic))
+	}
 
 	return
 }

@@ -1,5 +1,9 @@
 package model
 
+import (
+	"fmt"
+)
+
 type InstanceConfig struct {
 	*Record
 }
@@ -65,6 +69,10 @@ func (ic *InstanceConfig) ContainsTag(tag string) bool {
 
 func (ic InstanceConfig) DisabledPartitions() []string {
 	return ic.GetListField("HELIX_DISABLED_PARTITION")
+}
+
+func (ic InstanceConfig) String() string {
+	return fmt.Sprintf("%s enabled:%v tags:%+v", ic.Node(), ic.IsEnabled(), ic.Tags())
 }
 
 // TODO
