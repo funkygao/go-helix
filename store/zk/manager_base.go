@@ -6,6 +6,11 @@ import (
 	log "github.com/funkygao/log4go"
 )
 
+func (m *Manager) Valid() bool {
+	// TODO
+	return true
+}
+
 func (m *Manager) AddPreConnectCallback(cb helix.PreConnectCallback) {
 	m.preConnectCallbacks = append(m.preConnectCallbacks, cb)
 }
@@ -19,7 +24,11 @@ func (m *Manager) InstanceType() helix.InstanceType {
 }
 
 func (m *Manager) IsLeader() bool {
-	return false
+	if !m.it.IsController() || !m.IsConnected() {
+		return false
+	}
+
+	return m.ClusterManagementTool().ControllerLeader(m.clusterID) == m.instanceID
 }
 
 func (m *Manager) Instance() string {
@@ -39,7 +48,13 @@ func (m *Manager) MessagingService() helix.ClusterMessagingService {
 }
 
 func (m *Manager) ClusterManagementTool() helix.HelixAdmin {
+	m.Lock()
+	defer m.Unlock()
+
 	if m.admin == nil {
+		if !m.IsConnected() {
+			return nil
+		}
 		m.admin = newZkHelixAdminWithConn(m.conn)
 	}
 	return m.admin
@@ -86,29 +101,28 @@ func (s *Manager) GetInstanceMessages(instance string) ([]*model.Record, error) 
 }
 
 // GetLiveInstances retrieve a copy of the current live instances.
-func (s *Manager) GetLiveInstances() ([]*model.Record, error) {
+func (s *Manager) GetLiveInstances() ([]*model.LiveInstance, error) {
 	instances, err := s.conn.Children(s.kb.liveInstances())
 	if err != nil {
 		return nil, err
 	}
 
-	liveInstances := []*model.Record{}
+	liveInstances := []*model.LiveInstance{}
 	for _, participantID := range instances {
-		r, err := s.conn.GetRecord(s.kb.liveInstance(participantID))
+		record, err := s.conn.GetRecord(s.kb.liveInstance(participantID))
 		if err != nil {
 			return liveInstances, err
 		}
 
-		liveInstances = append(liveInstances, r)
+		liveInstances = append(liveInstances, model.NewLiveInstanceFromRecord(record))
 	}
 
 	return liveInstances, nil
 }
 
 // GetExternalView retrieves a copy of the external views
-// TODO return []*mode.ExternalView
-func (s *Manager) GetExternalView() []*model.Record {
-	result := []*model.Record{}
+func (s *Manager) GetExternalView() []*model.ExternalView {
+	result := []*model.ExternalView{}
 	for resource, v := range s.externalViewResourceMap {
 		if v == false {
 			continue
@@ -120,15 +134,15 @@ func (s *Manager) GetExternalView() []*model.Record {
 			continue
 		}
 
-		result = append(result, record)
+		result = append(result, model.NewExternalViewFromRecord(record))
 	}
 
 	return result
 }
 
 // GetIdealState retrieves a copy of the ideal state
-func (s *Manager) GetIdealState() []*model.Record {
-	result := []*model.Record{}
+func (s *Manager) GetIdealState() []*model.IdealState {
+	result := []*model.IdealState{}
 	for resource, v := range s.idealStateResourceMap {
 		if v == false {
 			continue
@@ -140,20 +154,20 @@ func (s *Manager) GetIdealState() []*model.Record {
 			continue
 		}
 
-		result = append(result, record)
+		result = append(result, model.NewIdealStateFromRecord(record))
 	}
 
 	return result
 }
 
 // GetCurrentState retrieves a copy of the current state for specified instance
-func (s *Manager) GetCurrentState(instance string) []*model.Record {
+func (s *Manager) GetCurrentState(instance string) []*model.CurrentState {
 	resources, err := s.conn.Children(s.kb.instance(instance))
 	if err != nil {
 		return nil
 	}
 
-	result := []*model.Record{}
+	result := []*model.CurrentState{}
 	for _, r := range resources {
 		record, err := s.conn.GetRecord(s.kb.currentStateForResource(instance, s.conn.SessionID(), r))
 		if err != nil {
@@ -161,20 +175,20 @@ func (s *Manager) GetCurrentState(instance string) []*model.Record {
 			continue
 		}
 
-		result = append(result, record)
+		result = append(result, model.NewCurrentStateFromRecord(record))
 	}
 
 	return result
 }
 
 // GetInstanceConfigs retrieves a copy of instance configs from zookeeper
-func (s *Manager) GetInstanceConfigs() []*model.Record {
+func (s *Manager) GetInstanceConfigs() []*model.InstanceConfig {
 	configs, err := s.conn.Children(s.kb.participantConfigs())
 	if err != nil {
 		return nil
 	}
 
-	result := []*model.Record{}
+	result := []*model.InstanceConfig{}
 	for _, i := range configs {
 		record, err := s.conn.GetRecord(s.kb.participantConfig(i))
 		if err != nil {
@@ -182,7 +196,7 @@ func (s *Manager) GetInstanceConfigs() []*model.Record {
 			continue
 		}
 
-		result = append(result, record)
+		result = append(result, model.NewInstanceConfigFromRecord(record))
 	}
 
 	return result

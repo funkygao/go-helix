@@ -20,7 +20,19 @@ Originally based on https://github.com/yichen/gohelix
 - [ ] constraint
 - [ ] HelixMultiClusterController, HelixStateTransitionHandler, HelixTaskExecutor.onMessage
 
-### Codebase
+### Features
 
-- helix.Context
+- Multi node
+  - partitioning
+  - discovery
+  - co-location
+
+- Fault tolarant
+  - replication
+  - fault detection
+  - recovery
+
+- Cluster expansion
+  - throttle movement
+  - redistribute data
 

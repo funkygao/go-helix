@@ -14,7 +14,7 @@ race:
 	go test -race -v
 
 vet:
-	go vet
+	go vet ./...
 
 lint:
 	golint | grep -v 'comment or be unexported'

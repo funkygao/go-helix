@@ -18,6 +18,8 @@ type redisNode struct {
 	resource, stateModel string
 	replicas             int
 	host, port           string
+
+	prevMaster string
 }
 
 func NewNode(zkSvr, cluster, resource, stateModel string, replicas int, host, port string) *redisNode {
@@ -33,21 +35,13 @@ func NewNode(zkSvr, cluster, resource, stateModel string, replicas int, host, po
 }
 
 func (r *redisNode) Start() {
-	// create the manager instance and connect
-	manager, _ := zk.NewZkHelixManager(r.cluster, r.host, r.port, r.zkSvr,
-		helix.InstanceTypeParticipant,
+	// create the redisInstance instance and connect
+	redisInstance, _ := zk.NewZkParticipant(r.cluster, r.host, r.port, r.zkSvr,
 		zk.WithZkSessionTimeout(time.Second*5),
 		zk.WithPprofPort(10001))
 
-	manager.AddPreConnectCallback(func() {
-		log.Info("will be connecting...")
-	})
-
-	manager.AddExternalViewChangeListener(func(externalViews []*model.Record, context *helix.Context) {
-		log.Info(color.Red("external view changed: %+v %+v", externalViews, context))
-	})
-	manager.AddIdealStateChangeListener(func(idealState []*model.Record, context *helix.Context) {
-		log.Info(color.Yellow("ideal state changed: %+v %+v", idealState, context))
+	redisInstance.AddPreConnectCallback(func() {
+		log.Info("Will be connecting...")
 	})
 
 	// register state model before connecting
@@ -61,11 +55,16 @@ func (r *redisNode) Start() {
 		{"SLAVE", "MASTER", func(message *model.Message, context *helix.Context) {
 			log.Info(color.Cyan("resource[%s/%s] %s->%s", message.Resource(),
 				message.PartitionName(), message.FromState(), message.ToState()))
+
+			// catch up previous master, enable writes, etc.
 		}},
 
 		{"OFFLINE", "SLAVE", func(message *model.Message, context *helix.Context) {
 			log.Info(color.Blue("resource[%s/%s] %s->%s", message.Resource(),
 				message.PartitionName(), message.FromState(), message.ToState()))
+
+			r.prevMaster = "" // get from current state
+			// bootstrap data, setup replication, etc.
 		}},
 
 		{"SLAVE", "OFFLINE", func(message *model.Message, context *helix.Context) {
@@ -73,12 +72,37 @@ func (r *redisNode) Start() {
 				message.PartitionName(), message.FromState(), message.ToState()))
 		}},
 	}))
-	manager.StateMachineEngine().RegisterStateModel(r.stateModel, sm)
+	redisInstance.StateMachineEngine().RegisterStateModel(r.stateModel, sm)
 
-	must(manager.Connect())
+	must(redisInstance.Connect())
+
+	if err := redisInstance.AddExternalViewChangeListener(
+		func(externalViews []*model.ExternalView, context *helix.Context) {
+			log.Info(color.Red("external view changed: %+v %+v", externalViews, context))
+		}); err != nil {
+		log.Error("%s", err)
+	}
+	if err := redisInstance.AddIdealStateChangeListener(
+		func(idealState []*model.IdealState, context *helix.Context) {
+			log.Info(color.Yellow("ideal state changed: %+v %+v", idealState, context))
+		}); err != nil {
+		log.Error("%s", err)
+	}
+	if err := redisInstance.AddLiveInstanceChangeListener(
+		func(liveInstances []*model.LiveInstance, context *helix.Context) {
+			log.Info("live instances: %+v %v", liveInstances, context)
+		}); err != nil {
+		log.Error("%s", err)
+	}
+	if err := redisInstance.AddCurrentStateChangeListener(redisInstance.Instance(), redisInstance.SessionID(),
+		func(instance string, currentState []*model.CurrentState, context *helix.Context) {
+			log.Info("current state[%s] %+v", instance, currentState)
+		}); err != nil {
+		log.Error("%s", err)
+	}
 
 	log.Info("start rebalancing %s/%d ...", r.resource, r.replicas)
-	admin := manager.ClusterManagementTool()
+	admin := redisInstance.ClusterManagementTool()
 	if err := admin.Rebalance(r.cluster, r.resource, r.replicas); err != nil {
 		log.Error("rebalance: %v", err)
 	} else {

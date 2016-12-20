@@ -2,75 +2,171 @@ package zk
 
 import (
 	"github.com/funkygao/go-helix"
+	"github.com/funkygao/go-zookeeper/zk"
+	log "github.com/funkygao/log4go"
 )
 
-func (s *Manager) AddExternalViewChangeListener(listener helix.ExternalViewChangeListener) {
-	s.Lock()
-	s.externalViewListeners = append(s.externalViewListeners, listener)
-	s.Unlock()
-}
+func (m *Manager) initHandlers() {
+	log.Trace("%s init handlers", m.shortID())
 
-func (s *Manager) AddLiveInstanceChangeListener(listener helix.LiveInstanceChangeListener) {
-	s.Lock()
-	s.liveInstanceChangeListeners = append(s.liveInstanceChangeListeners, listener)
-	s.Unlock()
-}
+	m.Lock()
+	defer m.Unlock()
 
-// AddCurrentStateChangeListener.
-// FIXME sessionID
-func (s *Manager) AddCurrentStateChangeListener(instance string, sessionID string, listener helix.CurrentStateChangeListener) {
-	s.Lock()
-	defer s.Unlock()
-
-	if s.currentStateChangeListeners[instance] == nil {
-		s.currentStateChangeListeners[instance] = []helix.CurrentStateChangeListener{}
-	}
-
-	s.currentStateChangeListeners[instance] = append(s.currentStateChangeListeners[instance], listener)
-
-	// if we are adding new listeners when the specator is already connected, we need
-	// to kick of the listener in the event loop
-	if len(s.currentStateChangeListeners[instance]) == 1 && s.IsConnected() {
-		s.watchCurrentStateForInstance(instance)
+	for _, handler := range m.handlers {
+		log.Debug("%s init %s", m.shortID(), handler)
+		handler.Init()
 	}
 }
 
-func (s *Manager) AddMessageListener(instance string, listener helix.MessageListener) {
-	s.Lock()
-	defer s.Unlock()
+func (m *Manager) resetHandlers() {
+	log.Trace("%s reset handlers", m.shortID())
 
-	if _, ok := s.messageListeners[instance]; !ok {
-		s.messageListeners[instance] = []helix.MessageListener{}
-	}
+	m.Lock()
+	defer m.Unlock()
 
-	s.messageListeners[instance] = append(s.messageListeners[instance], listener)
-
-	// if the spectator is already connected and this is the first listener
-	// for the instance, we need to start watching the zookeeper path for
-	// upcoming messages
-	if len(s.messageListeners[instance]) == 1 && s.IsConnected() {
-		s.watchInstanceMessages(instance)
+	for _, handler := range m.handlers {
+		handler.Reset()
 	}
 }
 
-func (s *Manager) AddIdealStateChangeListener(listener helix.IdealStateChangeListener) {
-	s.Lock()
-	s.idealStateChangeListeners = append(s.idealStateChangeListeners, listener)
-	s.Unlock()
+func (m *Manager) handleListenerErrors() {
+	defer m.wg.Done()
+
+	log.Trace("%s start listener errors handler", m.shortID())
+
+	for {
+		select {
+		case <-m.stop:
+			return
+
+		case err, ok := <-m.conn.LisenterErrors():
+			if !ok {
+				log.Warn("%s listener error channel closed", m.shortID())
+				return
+			}
+
+			log.Error("%s %s %s", m.shortID(), err.Path, err.Error())
+		}
+	}
 }
 
-func (s *Manager) AddInstanceConfigChangeListener(listener helix.InstanceConfigChangeListener) {
-	s.Lock()
-	s.instanceConfigChangeListeners = append(s.instanceConfigChangeListeners, listener)
-	s.Unlock()
+func (m *Manager) addListener(listener interface{}, path string,
+	changeType helix.ChangeNotificationType, events []zk.EventType) error {
+	if !m.IsConnected() {
+		return helix.ErrNotConnected
+	}
+
+	log.Debug("%s add listener %s for %s", m.shortID(),
+		helix.ChangeNotificationText(changeType), path)
+
+	m.Lock()
+	defer m.Unlock()
+
+	for _, handler := range m.handlers {
+		if handler.listener == listener && handler.path == path {
+			return helix.ErrDupOperation
+		}
+	}
+
+	cb := newCallbackHandler(m, path, listener, changeType, events)
+	m.handlers = append(m.handlers, cb)
+	return nil
 }
 
-func (s *Manager) AddControllerMessageListener(listener helix.ControllerMessageListener) {
-	s.Lock()
-	s.controllerMessageListeners = append(s.controllerMessageListeners, listener)
-	s.Unlock()
+func (m *Manager) AddExternalViewChangeListener(listener helix.ExternalViewChangeListener) error {
+	return m.addListener(listener, m.kb.externalView(), helix.ExternalViewChanged,
+		[]zk.EventType{
+			zk.EventNodeChildrenChanged,
+			zk.EventNodeDeleted, // TODO
+			zk.EventNodeCreated, // TODO
+		})
 }
 
-func (s *Manager) RemoveListener() {
-	panic(helix.ErrNotImplemented)
+func (m *Manager) AddLiveInstanceChangeListener(listener helix.LiveInstanceChangeListener) error {
+	return m.addListener(listener, m.kb.liveInstances(), helix.LiveInstanceChanged,
+		[]zk.EventType{
+			zk.EventNodeDataChanged,
+			zk.EventNodeChildrenChanged,
+			zk.EventNodeDeleted,
+			zk.EventNodeCreated,
+		})
+}
+
+func (m *Manager) AddCurrentStateChangeListener(instance string, sessionID string, listener helix.CurrentStateChangeListener) error {
+	return m.addListener(listener, m.kb.currentStatesForSession(instance, sessionID), helix.CurrentStateChanged,
+		[]zk.EventType{
+			zk.EventNodeChildrenChanged,
+			zk.EventNodeDeleted,
+			zk.EventNodeCreated,
+		})
+}
+
+// TODO Decide if do we still need this since we are exposing ClusterMessagingService
+func (m *Manager) AddMessageListener(instance string, listener helix.MessageListener) error {
+	return m.addListener(listener, m.kb.messages(instance), helix.InstanceMessagesChanged,
+		[]zk.EventType{
+			zk.EventNodeChildrenChanged,
+			zk.EventNodeDeleted,
+			zk.EventNodeCreated,
+		})
+}
+
+func (m *Manager) AddIdealStateChangeListener(listener helix.IdealStateChangeListener) error {
+	return m.addListener(listener, m.kb.idealStates(), helix.IdealStateChanged,
+		[]zk.EventType{
+			zk.EventNodeDataChanged,
+			zk.EventNodeDeleted,
+			zk.EventNodeCreated,
+		})
+}
+
+func (m *Manager) AddInstanceConfigChangeListener(listener helix.InstanceConfigChangeListener) error {
+	return m.addListener(listener, m.kb.instances(), helix.InstanceConfigChanged,
+		[]zk.EventType{
+			zk.EventNodeChildrenChanged,
+		})
+}
+
+func (m *Manager) AddControllerMessageListener(listener helix.ControllerMessageListener) error {
+	return m.addListener(listener, m.kb.controllerMessages(), helix.ControllerMessagesChanged,
+		[]zk.EventType{
+			zk.EventNodeChildrenChanged,
+			zk.EventNodeDeleted,
+			zk.EventNodeCreated,
+		})
+}
+
+func (m *Manager) AddControllerListener(listener helix.ControllerChangeListener) error {
+	return m.addListener(listener, m.kb.controller(), helix.ControllerChanged,
+		[]zk.EventType{
+			zk.EventNodeChildrenChanged,
+			zk.EventNodeDeleted,
+			zk.EventNodeCreated,
+		})
+}
+
+func (m *Manager) RemoveListener(path string, listener interface{}) error {
+	log.Debug("%s remove listener %s %#v", m.shortID(), path, listener)
+
+	m.Lock()
+	defer m.Unlock()
+
+	newHandlers := make([]*CallbackHandler, 0, len(m.handlers))
+	var toRemove *CallbackHandler
+	for _, handler := range m.handlers {
+		if handler.path == path && handler.listener == listener {
+			toRemove = handler
+			break
+		}
+
+		newHandlers = append(newHandlers, handler)
+	}
+
+	m.handlers = newHandlers
+
+	if toRemove != nil {
+		toRemove.Reset()
+	}
+
+	return helix.ErrNotImplemented
 }

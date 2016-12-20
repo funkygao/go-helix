@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
@@ -15,8 +14,6 @@ import (
 var _ helix.HelixAdmin = &Admin{}
 
 type Admin struct {
-	closeOnce sync.Once
-
 	*connection
 
 	// TODO kill this
@@ -65,13 +62,7 @@ func (adm *Admin) Connect() error {
 }
 
 func (adm *Admin) Disconnect() {
-	adm.closeOnce.Do(func() {
-		adm.Lock()
-		if adm.IsConnected() {
-			adm.connection.Disconnect()
-		}
-		adm.Unlock()
-	})
+	adm.connection.Disconnect()
 }
 
 func (adm *Admin) SetInstallPath(path string) {
@@ -129,12 +120,12 @@ func (adm *Admin) AddCluster(cluster string) error {
 
 	// create all the default state mode definitions
 	adm.CreateEmptyPersistent(kb.stateModelDefs())
-	adm.CreatePersistent(kb.stateModelDef(helix.StateModelLeaderStandby), helix.HelixDefaultStateModels[helix.StateModelLeaderStandby])
-	adm.CreatePersistent(kb.stateModelDef(helix.StateModelMasterSlave), helix.HelixDefaultStateModels[helix.StateModelMasterSlave])
-	adm.CreatePersistent(kb.stateModelDef(helix.StateModelOnlineOffline), helix.HelixDefaultStateModels[helix.StateModelOnlineOffline])
-	adm.CreatePersistent(kb.stateModelDef(helix.StateModelDefaultSchemata), helix.HelixDefaultStateModels[helix.StateModelDefaultSchemata])
-	adm.CreatePersistent(kb.stateModelDef(helix.StateModelSchedulerTaskQueue), helix.HelixDefaultStateModels[helix.StateModelSchedulerTaskQueue])
-	adm.CreatePersistent(kb.stateModelDef(helix.StateModelTask), helix.HelixDefaultStateModels[helix.StateModelTask])
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelLeaderStandby), helix.HelixBuiltinStateModels[helix.StateModelLeaderStandby])
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelMasterSlave), helix.HelixBuiltinStateModels[helix.StateModelMasterSlave])
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelOnlineOffline), helix.HelixBuiltinStateModels[helix.StateModelOnlineOffline])
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelDefaultSchemata), helix.HelixBuiltinStateModels[helix.StateModelDefaultSchemata])
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelSchedulerTaskQueue), helix.HelixBuiltinStateModels[helix.StateModelSchedulerTaskQueue])
+	adm.CreatePersistent(kb.stateModelDef(helix.StateModelTask), helix.HelixBuiltinStateModels[helix.StateModelTask])
 
 	adm.CreateEmptyPersistent(kb.configs())
 	adm.CreateEmptyPersistent(kb.participantConfigs())

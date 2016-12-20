@@ -12,4 +12,8 @@ type StateMachineEngine interface {
 
 	// StateModel returns a state model by name.
 	StateModel(stateModelDef string) (*StateModel, bool)
+
+	MessageType() string
+
+	Reset()
 }

@@ -4,6 +4,7 @@ package controller
 import (
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/controller/pipeline"
+	"github.com/funkygao/go-helix/controller/stages"
 	"github.com/funkygao/golib/sync2"
 	log "github.com/funkygao/log4go"
 )
@@ -17,8 +18,31 @@ type GenericHelixController struct {
 
 func NewGenericHelixController() *GenericHelixController {
 	c := &GenericHelixController{}
+	c.createDefaultRegistry()
 	go c.processClusterEvents()
 	return c
+}
+
+func (c *GenericHelixController) createDefaultRegistry() {
+	c.registry = pipeline.NewPipelineRegistry()
+
+	// cluster data cache refresh
+	dataRefresh := pipeline.NewPipeline()
+	dataRefresh.AddStage(&stages.ReadClusterDataStage{})
+
+	// rebalance pipeline
+	rebalancePipeline := pipeline.NewPipeline()
+	rebalancePipeline.AddStage(&stages.ResourceComputationStage{})
+	rebalancePipeline.AddStage(&stages.TaskAssignmentStage{})
+
+	// external view generation
+	externalViewPipeline := pipeline.NewPipeline()
+	externalViewPipeline.AddStage(&stages.ExternalViewComputeStage{})
+
+	c.registry.Register("idealStateChange", dataRefresh, rebalancePipeline)
+	c.registry.Register("currentStateChange", dataRefresh, rebalancePipeline, externalViewPipeline)
+	c.registry.Register("configChange", dataRefresh, rebalancePipeline)
+
 }
 
 func (c *GenericHelixController) processClusterEvents() {
