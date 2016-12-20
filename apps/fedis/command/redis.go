@@ -7,7 +7,6 @@ import (
 
 	"github.com/funkygao/go-helix/apps/fedis/command/redis"
 	"github.com/funkygao/gocli"
-	log "github.com/funkygao/log4go"
 )
 
 type Redis struct {
@@ -34,7 +33,7 @@ func (this *Redis) Run(args []string) (exitCode int) {
 		return 2
 	}
 
-	this.setupLogging(log)
+	setupLogging(log)
 
 	host := tuples[0]
 	port := tuples[1]
@@ -43,13 +42,6 @@ func (this *Redis) Run(args []string) (exitCode int) {
 	r.Start()
 
 	return
-}
-
-func (*Redis) setupLogging(level string) {
-	logLevel := log.ToLogLevel(level, log.DEBUG)
-	for _, filter := range log.Global {
-		filter.Level = logLevel
-	}
 }
 
 func (*Redis) Synopsis() string {

@@ -6,9 +6,10 @@ import (
 	"strings"
 
 	"github.com/funkygao/go-helix"
+	"github.com/funkygao/go-helix/model"
 	"github.com/funkygao/go-helix/store/zk"
 	"github.com/funkygao/gocli"
-	log "github.com/funkygao/log4go"
+	glog "github.com/funkygao/log4go"
 )
 
 type Trace struct {
@@ -17,30 +18,49 @@ type Trace struct {
 }
 
 func (this *Trace) Run(args []string) (exitCode int) {
+	var (
+		log    string
+		silent bool
+	)
 	cmdFlags := flag.NewFlagSet("trace", flag.ContinueOnError)
 	cmdFlags.Usage = func() { this.Ui.Output(this.Help()) }
+	cmdFlags.StringVar(&log, "log", "debug", "")
+	cmdFlags.BoolVar(&silent, "s", false, "")
 	if err := cmdFlags.Parse(args); err != nil {
 		return 1
 	}
 
-	// create the admin instance and connect
-	admin := zk.NewZkHelixAdmin(zkSvr)
-	must(admin.Connect())
+	setupLogging(log)
+	if silent {
+		glog.Disable()
+	}
 
-	// create the cluster
-	must(admin.AddCluster(cluster))
-	log.Info("added cluster: %s", cluster)
+	this.Ui.Infof("tracing cluster %s", cluster)
 
-	must(admin.AllowParticipantAutoJoin(cluster, true))
+	spectator, err := zk.NewZkSpectator(cluster, "", "", zkSvr)
+	must(err)
+	must(spectator.Connect())
 
-	// define the resource and partition
-	resourceOption := helix.DefaultAddResourceOption(partitions, stateModel)
-	resourceOption.RebalancerMode = helix.RebalancerModeFullAuto
-	must(admin.AddResource(cluster, resource, resourceOption))
-	log.Info("resource[%s] partitions:%d model:%s added to cluster[%s]", resource,
-		partitions, stateModel, cluster)
+	if err = spectator.AddExternalViewChangeListener(
+		func(externalViews []*model.ExternalView, context *helix.Context) {
+			this.Ui.Outputf("externalViews %+v", externalViews)
+		}); err != nil {
+		this.Ui.Error(err.Error())
+	}
+	if err = spectator.AddIdealStateChangeListener(
+		func(idealState []*model.IdealState, context *helix.Context) {
+			this.Ui.Outputf("idealState %+v", idealState)
+		}); err != nil {
+		this.Ui.Error(err.Error())
+	}
+	if err = spectator.AddLiveInstanceChangeListener(
+		func(liveInstances []*model.LiveInstance, context *helix.Context) {
+			this.Ui.Outputf("liveInstances %+v", liveInstances)
+		}); err != nil {
+		this.Ui.Error(err.Error())
+	}
 
-	log.Info("%s/bin/run-helix-controller.sh --zkSvr %s --cluster %s", helixInstallBase, zkSvr, cluster)
+	select {}
 
 	return
 }
@@ -54,6 +74,12 @@ func (this *Trace) Help() string {
 Usage: %s trace [options]
 
     %s
+
+    -log debug|info|trace
+      Default debug.
+
+    -s
+      Silent mode, turn of logging.
 
 `, this.Cmd, this.Synopsis())
 	return strings.TrimSpace(help)
