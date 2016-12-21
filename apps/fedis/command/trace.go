@@ -14,6 +14,7 @@ import (
 	"github.com/funkygao/go-helix/model"
 	"github.com/funkygao/go-helix/store/zk"
 	"github.com/funkygao/gocli"
+	"github.com/funkygao/golib/sync2"
 	glog "github.com/funkygao/log4go"
 )
 
@@ -21,6 +22,7 @@ type Trace struct {
 	Ui  cli.Ui
 	Cmd string
 
+	eventSeq      sync2.AtomicInt64
 	spectator     helix.HelixManager
 	lock          sync.Mutex
 	liveInstances map[string]bool
@@ -90,15 +92,15 @@ func (this *Trace) Run(args []string) (exitCode int) {
 }
 
 func (this *Trace) external(externalViews []*model.ExternalView, ctx *helix.Context) {
-	this.Ui.Errorf("externalViews %+v", externalViews)
+	this.Ui.Errorf("[%d] externalViews %+v", this.eventSeq.Add(1), externalViews)
 }
 
 func (this *Trace) ideal(idealState []*model.IdealState, ctx *helix.Context) {
-	this.Ui.Errorf("idealState %+v", idealState)
+	this.Ui.Errorf("[%d] idealState %+v", this.eventSeq.Add(1), idealState)
 }
 
 func (this *Trace) live(liveInstances []*model.LiveInstance, ctx *helix.Context) {
-	this.Ui.Errorf("liveInstances %+v", liveInstances)
+	this.Ui.Errorf("[%d] liveInstances %+v", this.eventSeq.Add(1), liveInstances)
 
 	this.lock.Lock()
 	defer this.lock.Unlock()
@@ -125,11 +127,11 @@ func (this *Trace) live(liveInstances []*model.LiveInstance, ctx *helix.Context)
 
 func (this *Trace) controller(ctx *helix.Context) {
 	leader := this.spectator.ClusterManagementTool().ControllerLeader(cluster)
-	this.Ui.Errorf("controller leader -> %s", leader)
+	this.Ui.Errorf("[%d] controller leader -> %s", this.eventSeq.Add(1), leader)
 }
 
 func (this *Trace) messages(instance string, messages []*model.Message, ctx *helix.Context) {
-	this.Ui.Errorf("[%s] %+v", instance, messages)
+	this.Ui.Errorf("[%d] [%s] %+v", this.eventSeq.Add(1), instance, messages)
 }
 
 func (*Trace) Synopsis() string {
