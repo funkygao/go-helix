@@ -10,6 +10,7 @@ import (
 	"github.com/funkygao/gafka/ctx"
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/controller"
+	//"github.com/funkygao/go-helix/model"
 	"github.com/funkygao/go-helix/store/zk/healthcheck"
 	"github.com/funkygao/go-zookeeper/zk"
 	"github.com/funkygao/golib/sync2"
@@ -303,6 +304,8 @@ func (m *Manager) HandleNewSession() (err error) {
 		err = m.handleNewSessionAsController()
 
 	case helix.InstanceTypeSpectator:
+		err = m.handleNewSessionAsSpectator()
+
 	case helix.InstanceTypeAdministrator:
 	}
 
@@ -348,5 +351,12 @@ func (m *Manager) handleNewSessionAsParticipant() error {
 
 func (m *Manager) handleNewSessionAsController() error {
 	// DistributedLeaderElection
+	return helix.ErrNotImplemented
+}
+
+func (m *Manager) handleNewSessionAsSpectator() error {
+	// TODO register live spectator
+	//record := model.NewLiveInstanceRecord(m.instanceID, m.conn.SessionID())
+	//return m.conn.CreateLiveNode(m.kb.liveSpectator(p.instanceID), record.Marshal(), p.liveRetry)
 	return helix.ErrNotImplemented
 }
