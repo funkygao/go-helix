@@ -13,5 +13,6 @@ type ClusterMessagingService interface {
 	Send(*model.Message) error
 
 	// RegisterMessageHandler will register a message handler for given type of message.
-	RegisterMessageHandler(messageType string)
+	// StateMachineEngine is the factory of message handler.
+	RegisterMessageHandlerFactory(messageType string, factory StateMachineEngine)
 }

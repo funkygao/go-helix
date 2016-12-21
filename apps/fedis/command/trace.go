@@ -89,15 +89,15 @@ func (this *Trace) Run(args []string) (exitCode int) {
 	return
 }
 
-func (this *Trace) external(externalViews []*model.ExternalView, context *helix.Context) {
+func (this *Trace) external(externalViews []*model.ExternalView, ctx *helix.Context) {
 	this.Ui.Outputf("externalViews %+v", externalViews)
 }
 
-func (this *Trace) ideal(idealState []*model.IdealState, context *helix.Context) {
+func (this *Trace) ideal(idealState []*model.IdealState, ctx *helix.Context) {
 	this.Ui.Outputf("idealState %+v", idealState)
 }
 
-func (this *Trace) live(liveInstances []*model.LiveInstance, context *helix.Context) {
+func (this *Trace) live(liveInstances []*model.LiveInstance, ctx *helix.Context) {
 	this.Ui.Outputf("liveInstances %+v", liveInstances)
 
 	this.lock.Lock()
@@ -128,7 +128,7 @@ func (this *Trace) controller(ctx *helix.Context) {
 	this.Ui.Outputf("controller leader -> %s", leader)
 }
 
-func (this *Trace) messages(instance string, messages []*model.Message, context *helix.Context) {
+func (this *Trace) messages(instance string, messages []*model.Message, ctx *helix.Context) {
 	this.Ui.Outputf("[%s] %+v", instance, messages)
 }
 

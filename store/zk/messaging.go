@@ -1,9 +1,7 @@
 package zk
 
 import (
-	"strings"
 	"sync"
-	"time"
 
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
@@ -23,7 +21,7 @@ type zkMessagingService struct {
 
 	lock sync.RWMutex
 
-	messageTypes map[string]struct{}
+	msgHandlerFactory map[string]helix.StateMachineEngine
 
 	// a LRU cache of recently received message IDs.
 	// Use this to detect new messages and existing messages
@@ -32,12 +30,12 @@ type zkMessagingService struct {
 
 func newZkMessagingService(m *Manager) *zkMessagingService {
 	ms := &zkMessagingService{
-		Manager:      m,
-		messageTypes: map[string]struct{}{},
+		Manager:           m,
+		msgHandlerFactory: map[string]helix.StateMachineEngine{},
 	}
 
 	var err error
-	ms.receivedMessages, err = lru.New(10 << 10)
+	ms.receivedMessages, err = lru.NewWithEvict(10<<10, nil)
 	if err != nil {
 		return nil
 	}
@@ -45,20 +43,15 @@ func newZkMessagingService(m *Manager) *zkMessagingService {
 	return ms
 }
 
-func (m *zkMessagingService) RegisterMessageHandler(messageType string) {
-	// TODO
+func (m *zkMessagingService) RegisterMessageHandlerFactory(messageType string, factory helix.StateMachineEngine) {
+	m.lock.Lock()
+	m.msgHandlerFactory[messageType] = factory
+	m.lock.Unlock()
 }
 
+// TODO
 func (m *zkMessagingService) Send(msg *model.Message) error {
 	return nil
-}
-
-func (m *zkMessagingService) enableMessage(messageTypes ...string) {
-	m.lock.Lock()
-	for _, t := range messageTypes {
-		m.messageTypes[t] = struct{}{}
-	}
-	m.lock.Unlock()
 }
 
 func (m *zkMessagingService) HandleChildChange(parentPath string, currentChilds []string) error {
@@ -70,7 +63,13 @@ func (m *zkMessagingService) HandleChildChange(parentPath string, currentChilds 
 	log.Debug("%s handle child change: %+v", m.shortID(), msgIDs)
 
 	for _, msgID := range msgIDs {
-		// TODO handle outstanding duplicated messages
+		if m.receivedMessages.Contains(msgID) {
+			continue
+		}
+
+		m.receivedMessages.Add(msgID, struct{}{})
+
+		// sequentially processing each message
 		if err = m.processMessage(msgID); err != nil {
 			log.Error("%v", err)
 		}
@@ -79,89 +78,27 @@ func (m *zkMessagingService) HandleChildChange(parentPath string, currentChilds 
 	return nil
 }
 
-func (m *zkMessagingService) onConnected() {
-	if !m.it.IsParticipant() {
-		// FIXME work with RegisterMessageHandler to avoid hard coding
-		return
-	}
-
-	path := m.kb.messages(m.instanceID)
-	log.Trace("%s watching %s", m.shortID(), path)
-
-	m.conn.SubscribeChildChanges(path, m)
-}
-
 func (p *zkMessagingService) processMessage(msgID string) error {
 	log.Debug("%s processing msg: %s", p.shortID(), msgID)
 
-	msgPath := p.kb.message(p.instanceID, msgID)
-	record, err := p.conn.GetRecord(msgPath)
+	record, err := p.conn.GetRecord(p.kb.message(p.instanceID, msgID))
 	if err != nil {
 		return err
 	}
 
 	message := model.NewMessageFromRecord(record)
-	msgType := message.MessageType()
-	if _, present := p.messageTypes[message.MessageType()]; !present {
+	factory := p.msgHandlerFactory[message.MessageType()]
+	if factory == nil {
 		return helix.ErrUnkownMessageType
 	}
 
-	if msgType == helix.MessageTypeNoOp {
-		log.Warn("%s discard NO-OP message: %s", p.shortID(), msgID)
-		return p.conn.DeleteTree(msgPath)
+	if handler := factory.CreateMessageHandler(message, nil); handler != nil {
+		return handler.HandleMessage(message)
 	}
 
-	targetSessionID := message.TargetSessionID()
-	if targetSessionID != "*" && targetSessionID != p.conn.SessionID() {
-		// message comes from expired session
-		log.Warn("%s got mismatched message: %s/%s, dropped", p.shortID(), msgID, targetSessionID)
-		return p.conn.DeleteTree(msgPath)
-	}
+	return nil
+}
 
-	if !strings.EqualFold(message.MessageState(), helix.MessageStateNew) {
-		// READ message is not deleted until the state has changed
-		log.Warn("%s skip %s message: %s", p.shortID(), message.MessageState(), msgID)
-		return nil
-	}
+func (m *zkMessagingService) onConnected() {
 
-	// update msgState to read
-	message.SetMessageState(helix.MessageStateRead)
-	message.SetReadTimestamp(time.Now().Unix())
-	message.SetExecuteSessionID(p.conn.SessionID())
-
-	// create current state meta data
-	// do it for non-controller and state transition messages only
-	targetName := message.TargetName()
-	if !strings.EqualFold(targetName, string(helix.InstanceTypeControllerStandalone)) &&
-		strings.EqualFold(msgType, helix.MessageTypeStateTransition) {
-		resourceID := message.Resource()
-
-		currentStateRecord := model.NewRecord(resourceID)
-		currentStateRecord.SetBucketSize(message.BucketSize())
-		currentStateRecord.SetBatchMessageMode(message.BatchMessageMode())
-		currentStateRecord.SetSimpleField("STATE_MODEL_DEF", message.GetSimpleField("STATE_MODEL_DEF"))
-		currentStateRecord.SetSimpleField("SESSION_ID", targetSessionID)
-		currentStateRecord.SetSimpleField("STATE_MODEL_FACTORY_NAME", message.GetStringField("STATE_MODEL_FACTORY_NAME", "DEFAULT"))
-
-		resourceCurrentStatePath := p.kb.currentStateForResource(p.instanceID, targetSessionID, resourceID)
-		exists, err := p.conn.Exists(resourceCurrentStatePath)
-		if err != nil {
-			return err
-		}
-
-		if !exists {
-			// only set the current state to zookeeper when it is not present
-			if err = p.conn.SetRecord(resourceCurrentStatePath, currentStateRecord); err != nil {
-				return err
-			}
-		}
-	}
-
-	if message.MessageType() == helix.MessageTypeStateTransition {
-		handler := newTransitionMessageHandler(p.Manager, message)
-		handler.handleMessage()
-	}
-
-	// after the message is processed successfully, remove it
-	return p.conn.DeleteTree(msgPath)
 }

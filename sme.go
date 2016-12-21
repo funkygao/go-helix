@@ -1,5 +1,9 @@
 package helix
 
+import (
+	"github.com/funkygao/go-helix/model"
+)
+
 // Helix participant manager uses StateMachineEngine to register/remove state model transition.
 // The state transition handles state transition messages.
 type StateMachineEngine interface {
@@ -13,7 +17,12 @@ type StateMachineEngine interface {
 	// StateModel returns a state model by name.
 	StateModel(stateModelDef string) (*StateModel, bool)
 
+	// CreateMessageHandler will create a handler to handle the message.
+	CreateMessageHandler(message *model.Message, ctx *ChangeNotification) MessageHandler
+
+	// MessageType returns the message type this state machine engine is interested in.
 	MessageType() string
 
+	// Reset will reset the state of the engine.
 	Reset()
 }

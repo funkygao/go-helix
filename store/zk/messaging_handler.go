@@ -10,6 +10,8 @@ import (
 	log "github.com/funkygao/log4go"
 )
 
+var _ helix.MessageHandler = &transitionMessageHandler{}
+
 type transitionMessageHandler struct {
 	*Manager
 	message *model.Message
@@ -22,21 +24,16 @@ func newTransitionMessageHandler(mgr *Manager, message *model.Message) *transiti
 	}
 }
 
-func (p *transitionMessageHandler) handleMessage() {
-	message := p.message
+func (h *transitionMessageHandler) HandleMessage(message *model.Message) error {
+	log.Trace("%s message: %s, %s -> %s", h.shortID(), message.ID(), message.FromState(), message.ToState())
 
-	log.Trace("%s message: %s, %s -> %s", p.shortID(), message.ID(), message.FromState(), message.ToState())
-
-	if err := p.preHandleMessage(message); err != nil {
-		log.Error("%s %v", p.shortID(), err)
-		return
+	if err := h.preHandleMessage(message); err != nil {
+		return err
 	}
 
-	p.invoke(message)
+	h.invoke(message)
 
-	if err := p.postHandleMessage(message); err != nil {
-		log.Error("%s %v", p.shortID(), err)
-	}
+	return h.postHandleMessage(message)
 }
 
 func (h *transitionMessageHandler) preHandleMessage(message *model.Message) error {
@@ -50,13 +47,13 @@ func (h *transitionMessageHandler) preHandleMessage(message *model.Message) erro
 	return nil
 }
 
-func (p *transitionMessageHandler) postHandleMessage(message *model.Message) error {
-	log.Debug("%s post handle message: %s", p.shortID(), message.ID())
+func (h *transitionMessageHandler) postHandleMessage(message *model.Message) error {
+	log.Debug("%s post handle message: %s", h.shortID(), message.ID())
 
 	// sessionID might change when we update the state model
 	// skip if we are handling an expired session
 
-	sessionID := p.conn.SessionID()
+	sessionID := h.conn.SessionID()
 	targetSessionID := message.TargetSessionID()
 	toState := message.ToState()
 	partitionName := message.PartitionName()
@@ -70,28 +67,30 @@ func (p *transitionMessageHandler) postHandleMessage(message *model.Message) err
 	// In the state model it will be stayed as OFFLINE, which is OK.
 
 	if strings.ToUpper(toState) == "DROPPED" {
-		p.conn.RemoveMapFieldKey(p.kb.currentStatesForSession(p.instanceID, sessionID), partitionName)
+		h.conn.RemoveMapFieldKey(h.kb.currentStatesForSession(h.instanceID, sessionID), partitionName)
 	}
 
+	h.conn.DeleteTree(h.kb.message(h.instanceID, message.ID()))
+
 	// actually set the current state
-	currentStateForResourcePath := p.kb.currentStateForResource(p.instanceID,
-		p.conn.SessionID(), message.Resource())
-	return p.conn.UpdateMapField(currentStateForResourcePath, partitionName,
+	currentStateForResourcePath := h.kb.currentStateForResource(h.instanceID,
+		h.conn.SessionID(), message.Resource())
+	return h.conn.UpdateMapField(currentStateForResourcePath, partitionName,
 		"CURRENT_STATE", toState)
 }
 
-func (p *transitionMessageHandler) invoke(message *model.Message) {
-	log.Debug("%s invoke messsage: %s", p.shortID(), message.ID())
+func (h *transitionMessageHandler) invoke(message *model.Message) {
+	log.Debug("%s invoke messsage: %s", h.shortID(), message.ID())
 
 	// TODO lock
-	transition, present := p.sme.StateModel(message.StateModelDef())
+	transition, present := h.sme.StateModel(message.StateModelDef())
 	if !present {
-		log.Error("%s has no transition defined for state model %s", p.shortID(), message.StateModelDef())
+		log.Error("%s has no transition defined for state model %s", h.shortID(), message.StateModelDef())
 	} else {
 		if handler := transition.Handler(message.FromState(), message.ToState()); handler == nil {
-			log.Warn("%s %s -> %s empty handler", p.shortID(), message.FromState(), message.ToState())
+			log.Debug("%s %s -> %s empty handler", h.shortID(), message.FromState(), message.ToState())
 		} else {
-			context := helix.NewContext(p)
+			context := helix.NewContext(h)
 			handler(message, context)
 		}
 	}

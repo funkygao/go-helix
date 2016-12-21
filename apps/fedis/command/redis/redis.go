@@ -47,19 +47,19 @@ func (r *redisNode) Start() {
 	// register state model before connecting
 	sm := helix.NewStateModel()
 	must(sm.AddTransitions([]helix.Transition{
-		{"MASTER", "SLAVE", func(message *model.Message, context *helix.Context) {
+		{"MASTER", "SLAVE", func(message *model.Message, ctx *helix.Context) {
 			log.Info(color.Green("resource[%s/%s] %s->%s", message.Resource(),
 				message.PartitionName(), message.FromState(), message.ToState()))
 		}},
 
-		{"SLAVE", "MASTER", func(message *model.Message, context *helix.Context) {
+		{"SLAVE", "MASTER", func(message *model.Message, ctx *helix.Context) {
 			log.Info(color.Cyan("resource[%s/%s] %s->%s", message.Resource(),
 				message.PartitionName(), message.FromState(), message.ToState()))
 
 			// catch up previous master, enable writes, etc.
 		}},
 
-		{"OFFLINE", "SLAVE", func(message *model.Message, context *helix.Context) {
+		{"OFFLINE", "SLAVE", func(message *model.Message, ctx *helix.Context) {
 			log.Info(color.Blue("resource[%s/%s] %s->%s", message.Resource(),
 				message.PartitionName(), message.FromState(), message.ToState()))
 
@@ -67,7 +67,7 @@ func (r *redisNode) Start() {
 			// bootstrap data, setup replication, etc.
 		}},
 
-		{"SLAVE", "OFFLINE", func(message *model.Message, context *helix.Context) {
+		{"SLAVE", "OFFLINE", func(message *model.Message, ctx *helix.Context) {
 			log.Info(color.Red("resource[%s/%s] %s->%s", message.Resource(),
 				message.PartitionName(), message.FromState(), message.ToState()))
 		}},
@@ -77,7 +77,7 @@ func (r *redisNode) Start() {
 	must(redisInstance.Connect())
 
 	if err := redisInstance.AddCurrentStateChangeListener(redisInstance.Instance(), redisInstance.SessionID(),
-		func(instance string, currentState []*model.CurrentState, context *helix.Context) {
+		func(instance string, currentState []*model.CurrentState, ctx *helix.Context) {
 			log.Info("current state[%s] %+v", instance, currentState)
 		}); err != nil {
 		log.Error("%s", err)

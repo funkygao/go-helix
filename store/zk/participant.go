@@ -84,7 +84,8 @@ func (p *participant) joinCluster() (bool, error) {
 func (p *participant) setupMsgHandler() {
 	log.Debug("%s setup message handler", p.shortID())
 
-	p.messaging.enableMessage(helix.MessageTypeStateTransition,
-		helix.MessageTypeNoOp)
+	p.messaging.RegisterMessageHandlerFactory(helix.MessageTypeStateTransition, p.sme)
+	p.conn.SubscribeChildChanges(p.kb.messages(p.instanceID), p.messaging)
+
 	p.messaging.onConnected()
 }
