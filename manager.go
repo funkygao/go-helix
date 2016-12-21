@@ -44,9 +44,10 @@ type HelixManager interface {
 	AddMessageListener(instance string, listener MessageListener) error
 
 	// AddControllerMessageListener add a listener to controller messages.
-	AddControllerMessageListener(ControllerMessageListener) error
+	AddControllerMessageListener(MessageListener) error
 
 	// AddControllerListener add a listener to respond to controller changes.
+	// Used in distributed cluster controller. TODO
 	AddControllerListener(ControllerChangeListener) error
 
 	// AddIdealStateChangeListener add a listener to the cluster ideal state changes.

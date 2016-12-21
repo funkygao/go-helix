@@ -37,3 +37,7 @@ func (li *LiveInstance) SetSessionID(sessionID string) {
 func (li *LiveInstance) SessionID() string {
 	return li.GetStringField("SESSION_ID", "")
 }
+
+func (li *LiveInstance) Node() string {
+	return li.ID
+}

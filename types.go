@@ -78,8 +78,12 @@ const (
 
 type ChangeNotificationType uint8
 
-func (cn ChangeNotificationType) IsCallbackInvoke() bool {
-	return cn == CallbackInvoke
+func (ct ChangeNotificationType) IsCallbackInvoke() bool {
+	return ct == CallbackInvoke
+}
+
+func (ct ChangeNotificationType) String() string {
+	return changeNotificationText[ct]
 }
 
 const (
@@ -112,24 +116,20 @@ var changeNotificationText = map[ChangeNotificationType]string{
 	CallbackFinalize: "Finalize",
 }
 
-func ChangeNotificationText(t ChangeNotificationType) string {
-	return changeNotificationText[t]
-}
-
 type ChangeNotification struct {
 	ChangeType ChangeNotificationType
 	ChangeData interface{}
 }
 
 func (ctx ChangeNotification) String() string {
-	return fmt.Sprintf("{%s %+v}", ChangeNotificationText(ctx.ChangeType), ctx.ChangeData)
+	return fmt.Sprintf("{%s %+v}", ctx.ChangeType, ctx.ChangeData)
 }
 
 const (
 	MessageTypeStateTransition  = "STATE_TRANSITION"
 	MessageTypeScheduler        = "SCHEDULER_MSG"
 	MessageTypeUserDefine       = "USER_DEFINE_MSG"
-	MessageTypeController       = "USER_DEFINE_MSG"
+	MessageTypeController       = "CONTROLLER_MSG"
 	MessageTypeTaskReply        = "TASK_REPLY"
 	MessageTypeNoOp             = "NO_OP"
 	MessageTypeParticipantError = "PARTICIPANT_ERROR_REPORT"

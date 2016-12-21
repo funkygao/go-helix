@@ -45,6 +45,10 @@ func newZkMessagingService(m *Manager) *zkMessagingService {
 	return ms
 }
 
+func (m *zkMessagingService) RegisterMessageHandler(messageType string) {
+	// TODO
+}
+
 func (m *zkMessagingService) Send(msg *model.Message) error {
 	return nil
 }
@@ -76,6 +80,11 @@ func (m *zkMessagingService) HandleChildChange(parentPath string, currentChilds 
 }
 
 func (m *zkMessagingService) onConnected() {
+	if !m.it.IsParticipant() {
+		// FIXME work with RegisterMessageHandler to avoid hard coding
+		return
+	}
+
 	path := m.kb.messages(m.instanceID)
 	log.Trace("%s watching %s", m.shortID(), path)
 

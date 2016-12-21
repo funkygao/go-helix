@@ -7,7 +7,6 @@ import (
 
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
-	"github.com/funkygao/go-zookeeper/zk"
 	log "github.com/funkygao/log4go"
 	"github.com/funkygao/zkclient"
 )
@@ -23,20 +22,22 @@ type CallbackHandler struct {
 	path       string
 	changeType helix.ChangeNotificationType
 	listener   interface{}
+	watchChild bool
 }
 
 func newCallbackHandler(mgr *Manager, path string, listener interface{},
-	changeType helix.ChangeNotificationType, events []zk.EventType) *CallbackHandler {
+	changeType helix.ChangeNotificationType, watchChild bool) *CallbackHandler {
 	return &CallbackHandler{
 		Manager:    mgr,
 		listener:   listener,
 		path:       path,
 		changeType: changeType,
+		watchChild: watchChild,
 	}
 }
 
 func (cb *CallbackHandler) String() string {
-	return fmt.Sprintf("%s^%s", cb.path, helix.ChangeNotificationText(cb.changeType))
+	return fmt.Sprintf("%s^%s", cb.path, cb.changeType)
 }
 
 func (cb *CallbackHandler) Init() {
@@ -45,8 +46,6 @@ func (cb *CallbackHandler) Init() {
 	cb.invoke(helix.ChangeNotification{
 		ChangeType: helix.CallbackInit,
 	})
-
-	//cb.subscribeForChanges(cb.path)
 }
 
 func (cb *CallbackHandler) Reset() {
@@ -88,11 +87,15 @@ func (cb *CallbackHandler) subscribeChildChanges(path string, ctx helix.ChangeNo
 func (cb *CallbackHandler) subscribeForChanges(path string, ctx helix.ChangeNotification) {
 	cb.subscribeChildChanges(path, ctx)
 
+	if !cb.watchChild {
+		return
+	}
+
 	switch cb.changeType {
 	case helix.ExternalViewChanged, helix.IdealStateChanged, helix.CurrentStateChanged:
 		children, err := cb.conn.Children(path)
 		if err != nil {
-			log.Error("%v %s", err, ctx)
+			log.Error("%s %v %s", cb, err, ctx)
 			return
 		}
 
@@ -109,29 +112,32 @@ func (cb *CallbackHandler) subscribeForChanges(path string, ctx helix.ChangeNoti
 				continue
 			}
 
-			cb.subscribeChildChanges(gopath.Join(path, record.ID), ctx)
-			cb.subscribeDataChanges(gopath.Join(path, record.ID), ctx)
+			if record.BucketSize() > 0 {
+				// TODO
+				// subscribe both data-change and child-change on bucketized parent node
+				// data-change gives a delete-callback which is used to remove watch
+				cb.subscribeChildChanges(gopath.Join(path, record.ID), ctx)
+				cb.subscribeDataChanges(gopath.Join(path, record.ID), ctx)
+			} else {
+				cb.subscribeDataChanges(gopath.Join(path, record.ID), ctx)
+			}
 		}
 
-	case helix.LiveInstanceChanged:
+	default:
 		children, err := cb.conn.Children(path)
 		if err != nil {
-			log.Error("%v", err)
+			log.Error("%s %v", cb, err)
 			return
 		}
 
 		for _, child := range children {
 			cb.subscribeDataChanges(gopath.Join(path, child), ctx)
 		}
-
-	default:
-		log.Warn("unkown type: %s", ctx)
-
 	}
 }
 
 func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
-	log.Debug("%s invoking listener %s", cb.shortID(), ctx)
+	log.Debug("%s %s invoking listener %s", cb.shortID(), cb, ctx)
 
 	// TODO
 	//cb.Manager.Lock()
@@ -142,7 +148,7 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 	switch cb.changeType {
 	case helix.ExternalViewChanged:
 		// TODO what if resource deleted
-		resources, values, err := cb.conn.ChildrenValues(cb.kb.externalView())
+		resources, values, err := cb.conn.ChildrenValues(cb.path)
 		if err != nil {
 			log.Error(err)
 			return
@@ -158,14 +164,11 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 
 			datas = append(datas, model.NewExternalViewFromRecord(record))
 		}
-		if l, ok := cb.listener.(helix.ExternalViewChangeListener); ok {
-			l(datas, nil)
-		} else {
-			// TODO
-		}
+
+		cb.listener.(helix.ExternalViewChangeListener)(datas, nil)
 
 	case helix.IdealStateChanged:
-		resources, values, err := cb.conn.ChildrenValues(cb.kb.idealStates())
+		resources, values, err := cb.conn.ChildrenValues(cb.path)
 		if err != nil {
 			log.Error(err)
 			return
@@ -181,12 +184,11 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 
 			datas = append(datas, model.NewIdealStateFromRecord(record))
 		}
-		if l, ok := cb.listener.(helix.IdealStateChangeListener); ok {
-			l(datas, nil)
-		}
+
+		cb.listener.(helix.IdealStateChangeListener)(datas, nil)
 
 	case helix.LiveInstanceChanged:
-		liveInstances, values, err := cb.conn.ChildrenValues(cb.kb.liveInstances())
+		liveInstances, values, err := cb.conn.ChildrenValues(cb.path)
 		if err != nil {
 			log.Error(err)
 			return
@@ -203,12 +205,10 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 			datas = append(datas, model.NewLiveInstanceFromRecord(record))
 		}
 
-		if l, ok := cb.listener.(helix.LiveInstanceChangeListener); ok {
-			l(datas, nil)
-		}
+		cb.listener.(helix.LiveInstanceChangeListener)(datas, nil)
 
 	case helix.CurrentStateChanged:
-		resources, values, err := cb.conn.ChildrenValues(cb.kb.currentStatesForSession(cb.instanceID, cb.SessionID()))
+		resources, values, err := cb.conn.ChildrenValues(cb.path)
 		if err != nil {
 			log.Error(err)
 			return
@@ -224,30 +224,75 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 
 			datas = append(datas, model.NewCurrentStateFromRecord(record))
 		}
-		if l, ok := cb.listener.(helix.CurrentStateChangeListener); ok {
-			l(cb.instanceID, datas, nil)
-		}
+
+		cb.listener.(helix.CurrentStateChangeListener)(cb.instanceID, datas, nil)
 
 	case helix.InstanceConfigChanged:
-		if l, ok := cb.listener.(helix.InstanceConfigChangeListener); ok {
-			data := ctx.ChangeData.([]*model.InstanceConfig)
-			l(data, nil)
+		instances, values, err := cb.conn.ChildrenValues(cb.path)
+		if err != nil {
+			log.Error(err)
+			return
 		}
+
+		datas := make([]*model.InstanceConfig, 0, len(instances))
+		for _, val := range values {
+			record, err := model.NewRecordFromBytes(val)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+
+			datas = append(datas, model.NewInstanceConfigFromRecord(record))
+		}
+
+		cb.listener.(helix.InstanceConfigChangeListener)(datas, nil)
 
 	case helix.ControllerChanged:
-		if l, ok := cb.listener.(helix.ControllerChangeListener); ok {
-			// TODO
-			l(nil)
-		}
+		cb.listener.(helix.ControllerChangeListener)(nil)
 
 	case helix.ControllerMessagesChanged:
-		if l, ok := cb.listener.(helix.ControllerMessageListener); ok {
-			// TODO
-			l(nil, nil)
+		messageIds, values, err := cb.conn.ChildrenValues(cb.path)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		datas := make([]*model.Message, 0, len(messageIds))
+		for _, val := range values {
+			record, err := model.NewRecordFromBytes(val)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+
+			datas = append(datas, model.NewMessageFromRecord(record))
+		}
+
+		if len(datas) > 0 {
+			cb.listener.(helix.MessageListener)(datas[0].TargetName(), datas, nil)
 		}
 
 	case helix.InstanceMessagesChanged:
-		// TODO
+		messageIds, values, err := cb.conn.ChildrenValues(cb.path)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		datas := make([]*model.Message, 0, len(messageIds))
+		for _, val := range values {
+			record, err := model.NewRecordFromBytes(val)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+
+			datas = append(datas, model.NewMessageFromRecord(record))
+		}
+
+		if len(datas) > 0 {
+			cb.listener.(helix.MessageListener)(datas[0].TargetName(), datas, nil)
+		}
 	}
 }
 
@@ -262,66 +307,12 @@ func (cb *CallbackHandler) HandleChildChange(parentPath string, currentChilds []
 	cb.invoke(helix.ChangeNotification{
 		ChangeType: helix.CallbackInvoke,
 	})
+
 	return nil
-
-	/*
-		switch cb.changeType {
-		case helix.ExternalViewChanged:
-			resources, err := cb.conn.Children(parentPath)
-			if err != nil {
-				return err
-			}
-
-			// TODO what if resource deleted
-			for _, resource := range resources {
-				if _, present := cb.externalViewResourceMap[resource]; !present {
-					cb.conn.SubscribeDataChanges(cb.kb.externalViewForResource(resource), cb)
-					cb.externalViewResourceMap[resource] = true
-				}
-			}
-
-		case helix.LiveInstanceChanged:
-			liveInstances, values, err := cb.conn.ChildrenValues(cb.kb.liveInstances())
-			if err != nil {
-
-				return err
-			}
-
-			datas := make([]*model.LiveInstance, 0, len(liveInstances))
-			for _, val := range values {
-				record, err := model.NewRecordFromBytes(val)
-				if err != nil {
-					return err
-				}
-				datas = append(datas, model.NewLiveInstanceFromRecord(record))
-			}
-
-			notify := helix.ChangeNotification{
-				ChangeType: helix.LiveInstanceChanged,
-				ChangeData: datas,
-			}
-			cb.invoke(notify)
-
-		case helix.IdealStateChanged:
-			cb.Manager.conn.SubscribeChildChanges(cb.kb.idealStates(), cb)
-
-		case helix.CurrentStateChanged:
-
-		case helix.InstanceConfigChanged:
-
-		case helix.ControllerChanged:
-
-		case helix.ControllerMessagesChanged:
-
-		default:
-			return helix.ErrInvalidArgument
-		}
-
-		return nil */
 }
 
 func (cb *CallbackHandler) HandleDataChange(dataPath string, data []byte) error {
-	log.Trace("%s changed to %s", dataPath, string(data))
+	log.Trace("%s %s changed to %s", cb, dataPath, string(data))
 
 	if !strings.HasPrefix(dataPath, cb.path) {
 		log.Debug(dataPath)
@@ -336,12 +327,14 @@ func (cb *CallbackHandler) HandleDataChange(dataPath string, data []byte) error 
 }
 
 func (cb *CallbackHandler) HandleDataDeleted(dataPath string) error {
-	log.Trace("%s deleted", dataPath)
+	log.Trace("%s %s deleted", cb, dataPath)
 
 	if !strings.HasPrefix(dataPath, cb.path) {
 		log.Debug(dataPath)
 		return nil
 	}
+
+	// session expiry will trigger /{cluster}/LIVEINSTANCES/{node} deleted
 
 	cb.conn.UnsubscribeChildChanges(dataPath, cb)
 	cb.conn.UnsubscribeDataChanges(dataPath, cb)
