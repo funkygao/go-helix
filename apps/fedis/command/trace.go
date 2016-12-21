@@ -43,9 +43,9 @@ func (this *Trace) Run(args []string) (exitCode int) {
 
 	this.liveInstances = make(map[string]bool)
 
+	golog.SetOutput(ioutil.Discard) // disable zk low level logging
 	setupLogging(log)
 	if silent {
-		golog.SetOutput(ioutil.Discard)
 		glog.Disable()
 	}
 
