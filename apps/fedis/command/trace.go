@@ -90,15 +90,15 @@ func (this *Trace) Run(args []string) (exitCode int) {
 }
 
 func (this *Trace) external(externalViews []*model.ExternalView, ctx *helix.Context) {
-	this.Ui.Outputf("externalViews %+v", externalViews)
+	this.Ui.Errorf("externalViews %+v", externalViews)
 }
 
 func (this *Trace) ideal(idealState []*model.IdealState, ctx *helix.Context) {
-	this.Ui.Outputf("idealState %+v", idealState)
+	this.Ui.Errorf("idealState %+v", idealState)
 }
 
 func (this *Trace) live(liveInstances []*model.LiveInstance, ctx *helix.Context) {
-	this.Ui.Outputf("liveInstances %+v", liveInstances)
+	this.Ui.Errorf("liveInstances %+v", liveInstances)
 
 	this.lock.Lock()
 	defer this.lock.Unlock()
@@ -125,11 +125,11 @@ func (this *Trace) live(liveInstances []*model.LiveInstance, ctx *helix.Context)
 
 func (this *Trace) controller(ctx *helix.Context) {
 	leader := this.spectator.ClusterManagementTool().ControllerLeader(cluster)
-	this.Ui.Outputf("controller leader -> %s", leader)
+	this.Ui.Errorf("controller leader -> %s", leader)
 }
 
 func (this *Trace) messages(instance string, messages []*model.Message, ctx *helix.Context) {
-	this.Ui.Outputf("[%s] %+v", instance, messages)
+	this.Ui.Errorf("[%s] %+v", instance, messages)
 }
 
 func (*Trace) Synopsis() string {

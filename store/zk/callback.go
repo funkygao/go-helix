@@ -41,16 +41,12 @@ func (cb *CallbackHandler) String() string {
 }
 
 func (cb *CallbackHandler) Init() {
-	log.Trace("%s %s init callback", cb.shortID(), cb)
-
 	cb.invoke(helix.ChangeNotification{
 		ChangeType: helix.CallbackInit,
 	})
 }
 
 func (cb *CallbackHandler) Reset() {
-	log.Trace("%s %s reset callback", cb.shortID(), cb)
-
 	cb.invoke(helix.ChangeNotification{
 		ChangeType: helix.CallbackFinalize,
 	})
@@ -59,13 +55,11 @@ func (cb *CallbackHandler) Reset() {
 func (cb *CallbackHandler) subscribeDataChanges(path string, ctx helix.ChangeNotification) {
 	switch ctx.ChangeType {
 	case helix.CallbackInit:
-		log.Debug("%s subscribe data changes: %s %s", cb.shortID(), path, ctx)
 		cb.conn.SubscribeDataChanges(path, cb)
 
 	case helix.CallbackInvoke:
 
 	case helix.CallbackFinalize:
-		log.Debug("%s unsubscribe data changes: %s %s", cb.shortID(), path, ctx)
 		cb.conn.UnsubscribeDataChanges(path, cb)
 	}
 }
@@ -73,13 +67,11 @@ func (cb *CallbackHandler) subscribeDataChanges(path string, ctx helix.ChangeNot
 func (cb *CallbackHandler) subscribeChildChanges(path string, ctx helix.ChangeNotification) {
 	switch ctx.ChangeType {
 	case helix.CallbackInit:
-		log.Debug("%s subscribe child changes: %s %s", cb.shortID(), path, ctx)
 		cb.conn.SubscribeChildChanges(path, cb)
 
 	case helix.CallbackInvoke:
 
 	case helix.CallbackFinalize:
-		log.Debug("%s unsubscribe child changes: %s %s", cb.shortID(), path, ctx)
 		cb.conn.UnsubscribeChildChanges(path, cb)
 	}
 }
@@ -137,7 +129,7 @@ func (cb *CallbackHandler) subscribeForChanges(path string, ctx helix.ChangeNoti
 }
 
 func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
-	log.Debug("%s %s invoking listener %s", cb.shortID(), cb, ctx)
+	log.Debug("%s %s invoking %s", cb.shortID(), cb, ctx)
 
 	// TODO
 	//cb.Manager.Lock()
@@ -312,10 +304,9 @@ func (cb *CallbackHandler) HandleChildChange(parentPath string, currentChilds []
 }
 
 func (cb *CallbackHandler) HandleDataChange(dataPath string, data []byte) error {
-	log.Trace("%s %s changed to %s", cb, dataPath, string(data))
+	log.Trace("%s %s data changed", cb, dataPath)
 
 	if !strings.HasPrefix(dataPath, cb.path) {
-		log.Debug(dataPath)
 		return nil
 	}
 
@@ -327,10 +318,9 @@ func (cb *CallbackHandler) HandleDataChange(dataPath string, data []byte) error 
 }
 
 func (cb *CallbackHandler) HandleDataDeleted(dataPath string) error {
-	log.Trace("%s %s deleted", cb, dataPath)
+	log.Trace("%s %s data deleted", cb, dataPath)
 
 	if !strings.HasPrefix(dataPath, cb.path) {
-		log.Debug(dataPath)
 		return nil
 	}
 

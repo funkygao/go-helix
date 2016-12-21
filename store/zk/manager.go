@@ -212,7 +212,6 @@ func (m *Manager) Disconnect() {
 	m.wg.Wait()
 
 	m.conn.Disconnect()
-
 	m.conn = nil
 	m.connected.Set(false)
 
@@ -289,7 +288,6 @@ func (m *Manager) HandleNewSession() (err error) {
 	if ok, err := m.conn.IsClusterSetup(m.clusterID); !ok || err != nil {
 		return helix.ErrClusterNotSetup
 	}
-	log.Debug("%s cluster setup ok", m.shortID())
 
 	switch m.it {
 	case helix.InstanceTypeParticipant:

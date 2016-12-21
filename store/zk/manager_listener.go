@@ -12,7 +12,6 @@ func (m *Manager) initHandlers() {
 	defer m.Unlock()
 
 	for _, handler := range m.handlers {
-		log.Debug("%s init %s", m.shortID(), handler)
 		handler.Init()
 	}
 }
@@ -53,8 +52,6 @@ func (m *Manager) addListener(listener interface{}, path string, changeType heli
 	if !m.IsConnected() {
 		return helix.ErrNotConnected
 	}
-
-	log.Debug("%s add listener %s for %s", m.shortID(), changeType, path)
 
 	m.Lock()
 	defer m.Unlock()

@@ -48,9 +48,6 @@ func (m *Manager) MessagingService() helix.ClusterMessagingService {
 }
 
 func (m *Manager) ClusterManagementTool() helix.HelixAdmin {
-	m.Lock()
-	defer m.Unlock()
-
 	if m.admin == nil {
 		if !m.IsConnected() {
 			return nil
