@@ -58,24 +58,19 @@ func (this *Trace) Run(args []string) (exitCode int) {
 	this.spectator = spectator
 
 	this.Ui.Warn("tracing controller leader changes...")
-	if err = spectator.AddControllerListener(this.controller); err != nil {
-		this.Ui.Error(err.Error())
-	}
+	must(spectator.AddControllerListener(this.controller))
 
 	this.Ui.Warn("tracing external view changes...")
-	if err = spectator.AddExternalViewChangeListener(this.external); err != nil {
-		this.Ui.Error(err.Error())
-	}
+	must(spectator.AddExternalViewChangeListener(this.external))
 
 	this.Ui.Warn("tracing ideal state changes...")
-	if err = spectator.AddIdealStateChangeListener(this.ideal); err != nil {
-		this.Ui.Error(err.Error())
-	}
+	must(spectator.AddIdealStateChangeListener(this.ideal))
 
 	this.Ui.Warn("tracing live instance changes...")
-	if err = spectator.AddLiveInstanceChangeListener(this.live); err != nil {
-		this.Ui.Error(err.Error())
-	}
+	must(spectator.AddLiveInstanceChangeListener(this.live))
+
+	this.Ui.Warn("tracing leader messages...")
+	must(spectator.AddControllerMessageListener(this.controllerMsg))
 
 	this.Ui.Info("waiting Ctrl-C...")
 
@@ -87,6 +82,7 @@ func (this *Trace) Run(args []string) (exitCode int) {
 	this.Ui.Info("disconnecting...")
 	spectator.Disconnect()
 	this.Ui.Info("bye!")
+	glog.Close()
 
 	return
 }
@@ -128,6 +124,10 @@ func (this *Trace) live(liveInstances []*model.LiveInstance, ctx *helix.Context)
 func (this *Trace) controller(ctx *helix.Context) {
 	leader := this.spectator.ClusterManagementTool().ControllerLeader(cluster)
 	this.Ui.Errorf("[%d] controller leader -> %s", this.eventSeq.Add(1), leader)
+}
+
+func (this *Trace) controllerMsg(instance string, messages []*model.Message, ctx *helix.Context) {
+	this.Ui.Errorf("[%d] [%s] %+v", this.eventSeq.Add(1), instance, messages)
 }
 
 func (this *Trace) messages(instance string, messages []*model.Message, ctx *helix.Context) {
