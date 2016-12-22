@@ -56,12 +56,6 @@ func (m *Manager) addListener(listener interface{}, path string, changeType heli
 	m.Lock()
 	defer m.Unlock()
 
-	for _, handler := range m.handlers {
-		if handler.listener == listener && handler.path == path {
-			return helix.ErrDupOperation
-		}
-	}
-
 	cb := newCallbackHandler(m, path, listener, changeType, watchChild)
 	m.handlers = append(m.handlers, cb)
 	return nil
