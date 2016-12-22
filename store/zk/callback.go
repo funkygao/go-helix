@@ -136,6 +136,9 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 	//defer cb.Manager.Unlock()
 
 	cb.subscribeForChanges(cb.path, ctx)
+	if ctx.ChangeType == helix.CallbackFinalize {
+		return
+	}
 
 	switch cb.changeType {
 	case helix.ExternalViewChanged:
