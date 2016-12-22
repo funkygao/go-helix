@@ -117,6 +117,7 @@ func (adm *Admin) AddCluster(cluster string) error {
 	adm.CreateEmptyPersistent(kb.idealStates())
 	adm.CreateEmptyPersistent(kb.externalView())
 	adm.CreateEmptyPersistent(kb.liveInstances())
+	adm.CreateEmptyPersistent(kb.liveSpectators())
 
 	// create all the default state mode definitions
 	adm.CreateEmptyPersistent(kb.stateModelDefs())

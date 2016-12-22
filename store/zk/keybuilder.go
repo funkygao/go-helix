@@ -21,6 +21,7 @@ import (
 // /{cluster}/IDEALSTATES
 // /{cluster}/INSTANCES
 // /{cluster}/LIVEINSTANCES
+// /{cluster}/LIVESPECTATORS
 // /{cluster}/PROPERTYSTORE
 // /{cluster}/STATEMODELDEFS
 // /{cluster}/STATEMODELDEFS/LeaderStandby
@@ -119,6 +120,14 @@ func (k *keyBuilder) participantConfigs() string {
 
 func (k *keyBuilder) participantConfig(participantID string) string {
 	return fmt.Sprintf("/%s/CONFIGS/PARTICIPANT/%s", k.clusterID, participantID)
+}
+
+func (k *keyBuilder) liveSpectators() string {
+	return fmt.Sprintf("/%s/LIVESPECTATORS", k.clusterID)
+}
+
+func (k *keyBuilder) liveSpectator(spectatorID string) string {
+	return fmt.Sprintf("/%s/LIVESPECTATORS/%s", k.clusterID, spectatorID)
 }
 
 func (k *keyBuilder) liveInstances() string {

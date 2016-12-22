@@ -10,8 +10,9 @@ import (
 	"github.com/funkygao/gafka/ctx"
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/controller"
-	//"github.com/funkygao/go-helix/model"
+	"github.com/funkygao/go-helix/model"
 	"github.com/funkygao/go-helix/store/zk/healthcheck"
+	"github.com/funkygao/go-helix/ver"
 	"github.com/funkygao/go-zookeeper/zk"
 	"github.com/funkygao/golib/sync2"
 	log "github.com/funkygao/log4go"
@@ -325,6 +326,8 @@ func (m *Manager) HandleNewSession() (err error) {
 }
 
 func (m *Manager) handleNewSessionAsParticipant() error {
+	t1 := time.Now()
+
 	p := newParticipant(m)
 	if ok, err := p.joinCluster(); !ok || err != nil {
 		if err != nil {
@@ -351,6 +354,8 @@ func (m *Manager) handleNewSessionAsParticipant() error {
 
 	p.setupMsgHandler()
 
+	log.Trace("handle new session as participant in %s", time.Since(t1))
+
 	return nil
 }
 
@@ -360,8 +365,10 @@ func (m *Manager) handleNewSessionAsController() error {
 }
 
 func (m *Manager) handleNewSessionAsSpectator() error {
-	// TODO register live spectator
-	//record := model.NewLiveInstanceRecord(m.instanceID, m.conn.SessionID())
-	//return m.conn.CreateLiveNode(m.kb.liveSpectator(p.instanceID), record.Marshal(), p.liveRetry)
-	return helix.ErrNotImplemented
+	t1 := time.Now()
+	record := model.NewRecord(m.instanceID)
+	record.SetStringField("HELIX_VERSION", ver.Ver)
+	err := m.conn.CreateLiveNode(m.kb.liveSpectator(m.instanceID), record.Marshal(), 3)
+	log.Trace("handle new session as spectator in %s", time.Since(t1))
+	return err
 }
