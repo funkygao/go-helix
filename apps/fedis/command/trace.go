@@ -14,6 +14,8 @@ import (
 	"github.com/funkygao/go-helix/model"
 	"github.com/funkygao/go-helix/store/zk"
 	"github.com/funkygao/gocli"
+	"github.com/funkygao/golib/color"
+	"github.com/funkygao/golib/debug"
 	"github.com/funkygao/golib/sync2"
 	glog "github.com/funkygao/log4go"
 )
@@ -22,10 +24,12 @@ type Trace struct {
 	Ui  cli.Ui
 	Cmd string
 
-	eventSeq      sync2.AtomicInt64
-	spectator     helix.HelixManager
-	lock          sync.Mutex
-	liveInstances map[string]bool
+	eventSeq  sync2.AtomicInt64
+	spectator helix.HelixManager
+
+	lock             sync.Mutex
+	liveInstances    map[string]bool
+	controllerLeader string
 }
 
 func (this *Trace) Run(args []string) (exitCode int) {
@@ -57,22 +61,22 @@ func (this *Trace) Run(args []string) (exitCode int) {
 
 	this.spectator = spectator
 
-	this.Ui.Warn("tracing controller leader changes...")
+	this.Ui.Warn("1. tracing controller leader changes...")
 	must(spectator.AddControllerListener(this.controller))
 
-	this.Ui.Warn("tracing external view changes...")
+	this.Ui.Warn("2. tracing external view changes...")
 	must(spectator.AddExternalViewChangeListener(this.external))
 
-	this.Ui.Warn("tracing ideal state changes...")
+	this.Ui.Warn("3. tracing ideal state changes...")
 	must(spectator.AddIdealStateChangeListener(this.ideal))
 
-	this.Ui.Warn("tracing live instance changes...")
+	this.Ui.Warn("4. tracing live instance changes...")
 	must(spectator.AddLiveInstanceChangeListener(this.live))
 
-	this.Ui.Warn("tracing instance config changes...")
+	this.Ui.Warn("5. tracing instance config changes...")
 	must(spectator.AddInstanceConfigChangeListener(this.instanceConfig))
 
-	this.Ui.Warn("tracing leader messages...")
+	this.Ui.Warn("6. tracing leader messages...")
 	must(spectator.AddControllerMessageListener(this.controllerMsg))
 
 	this.Ui.Info("waiting Ctrl-C...")
@@ -84,22 +88,17 @@ func (this *Trace) Run(args []string) (exitCode int) {
 
 	this.Ui.Info("disconnecting...")
 	spectator.Disconnect()
-	this.Ui.Info("bye!")
 	glog.Close()
+	this.Ui.Info("bye!")
 
 	return
 }
 
-func (this *Trace) external(externalViews []*model.ExternalView, ctx *helix.Context) {
-	this.Ui.Errorf("[%d] externalViews %+v", this.eventSeq.Add(1), externalViews)
-}
-
-func (this *Trace) ideal(idealState []*model.IdealState, ctx *helix.Context) {
-	this.Ui.Errorf("[%d] idealState %+v", this.eventSeq.Add(1), idealState)
-}
-
 func (this *Trace) live(liveInstances []*model.LiveInstance, ctx *helix.Context) {
-	this.Ui.Errorf("[%d] liveInstances %+v", this.eventSeq.Add(1), liveInstances)
+	seq := this.eventSeq.Add(1)
+	this.Ui.Errorf("[%d] liveInstances %+v", seq, liveInstances)
+
+	this.Ui.Output(color.Cyan("[%d] %+v", seq, debug.Callstack(4)))
 
 	this.lock.Lock()
 	defer this.lock.Unlock()
@@ -124,21 +123,43 @@ func (this *Trace) live(liveInstances []*model.LiveInstance, ctx *helix.Context)
 	}
 }
 
+func (this *Trace) external(externalViews []*model.ExternalView, ctx *helix.Context) {
+	seq := this.eventSeq.Add(1)
+	this.Ui.Errorf("[%d] externalViews %+v", seq, externalViews)
+	this.Ui.Output(color.Cyan("[%d] %+v", seq, debug.Callstack(4)))
+}
+
+func (this *Trace) ideal(idealState []*model.IdealState, ctx *helix.Context) {
+	seq := this.eventSeq.Add(1)
+	this.Ui.Errorf("[%d] idealState %+v", seq, idealState)
+	this.Ui.Output(color.Cyan("[%d] %+v", seq, debug.Callstack(4)))
+}
+
 func (this *Trace) controller(ctx *helix.Context) {
+	seq := this.eventSeq.Add(1)
+
 	leader := this.spectator.ClusterManagementTool().ControllerLeader(cluster)
-	this.Ui.Errorf("[%d] controller leader -> %s", this.eventSeq.Add(1), leader)
+	this.controllerLeader = leader
+	this.Ui.Errorf("[%d] controller leader -> %s", seq, leader)
+	this.Ui.Output(color.Cyan("[%d] %+v", seq, debug.Callstack(4)))
 }
 
 func (this *Trace) controllerMsg(instance string, messages []*model.Message, ctx *helix.Context) {
-	this.Ui.Errorf("[%d] controller msg [%s] %+v", this.eventSeq.Add(1), instance, messages)
+	seq := this.eventSeq.Add(1)
+	this.Ui.Errorf("[%d] controller msg [%s] %+v", seq, instance, messages)
+	this.Ui.Output(color.Cyan("[%d] %+v", seq, debug.Callstack(4)))
 }
 
 func (this *Trace) messages(instance string, messages []*model.Message, ctx *helix.Context) {
-	this.Ui.Errorf("[%d] participant msg [%s] %+v", this.eventSeq.Add(1), instance, messages)
+	seq := this.eventSeq.Add(1)
+	this.Ui.Errorf("[%d] participant msg [%s] %+v", seq, instance, messages)
+	this.Ui.Output(color.Cyan("[%d] %+v", seq, debug.Callstack(4)))
 }
 
 func (this *Trace) instanceConfig(configs []*model.InstanceConfig, ctx *helix.Context) {
-	this.Ui.Errorf("[%d]instance config  %+v", this.eventSeq.Add(1), configs)
+	seq := this.eventSeq.Add(1)
+	this.Ui.Errorf("[%d]instance config  %+v", seq, configs)
+	this.Ui.Output(color.Cyan("[%d] %+v", seq, debug.Callstack(4)))
 }
 
 func (*Trace) Synopsis() string {

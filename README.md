@@ -10,16 +10,6 @@ Originally based on https://github.com/yichen/gohelix
 - [ ] Full Spectator
 - [ ] Controller
 
-### TODO
-
-- [ ] chroot bug
-- [ ] curator
-- [ ] super cluster
-- [X] tag
-- [ ] metrics
-- [ ] constraint
-- [ ] HelixMultiClusterController, HelixStateTransitionHandler, HelixTaskExecutor.onMessage
-
 ### Features
 
 - Multi node
@@ -36,3 +26,13 @@ Originally based on https://github.com/yichen/gohelix
   - throttle movement
   - redistribute data
 
+### TODO
+
+- [ ] chroot bug
+- [ ] curator
+- [ ] super cluster
+- [X] tag
+- [ ] too many WaitUntilConnected
+- [ ] metrics
+- [ ] constraint
+- [ ] HelixMultiClusterController, HelixStateTransitionHandler, HelixTaskExecutor.onMessage
