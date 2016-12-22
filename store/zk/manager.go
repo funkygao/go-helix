@@ -175,12 +175,12 @@ func (m *Manager) Connect() error {
 	}
 
 	t1 := time.Now()
-	log.Info("%s connecting...", m.shortID())
+	log.Trace("%s connecting...", m.shortID())
 
 	if m.pprofPort > 0 {
 		addr := fmt.Sprintf("localhost:%d", m.pprofPort)
 		go http.ListenAndServe(addr, nil)
-		log.Trace("pprof ready on http://%s/debug/pprof", addr)
+		log.Info("pprof ready on http://%s/debug/pprof", addr)
 	}
 
 	if m.it.IsController() {
@@ -209,6 +209,9 @@ func (m *Manager) Connect() error {
 }
 
 func (m *Manager) Disconnect() {
+	t1 := time.Now()
+	log.Trace("%s disconnecting...", m.shortID())
+
 	close(m.stop)
 	m.wg.Wait()
 
@@ -216,7 +219,7 @@ func (m *Manager) Disconnect() {
 	m.conn = nil
 	m.connected.Set(false)
 
-	log.Info("%s disconnected", m.shortID())
+	log.Info("%s disconnected in %s", m.shortID(), time.Since(t1))
 }
 
 func (m *Manager) connectToZookeeper() (err error) {
