@@ -30,7 +30,7 @@ func (m *Manager) resetHandlers() {
 func (m *Manager) handleListenerErrors() {
 	defer m.wg.Done()
 
-	log.Trace("%s start listener errors handler", m.shortID())
+	log.Trace("%s start all listener errors handler", m.shortID())
 
 	for {
 		select {

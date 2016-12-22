@@ -5,6 +5,11 @@ import (
 )
 
 func (m *Manager) startTimerTasks() []error {
+	log.Trace("%s start timer tasks", m.shortID())
+
+	m.Lock()
+	defer m.Unlock()
+
 	var errs []error
 	for _, t := range m.timerTasks {
 		if err := t.Start(); err != nil {
@@ -12,13 +17,15 @@ func (m *Manager) startTimerTasks() []error {
 		}
 	}
 
-	log.Debug("%s start timer tasks with %+v", m.shortID(), errs)
-
 	return errs
 }
 
 func (m *Manager) stopTimerTasks() {
-	log.Debug("%s stop timer tasks", m.shortID())
+	log.Trace("%s stop timer tasks", m.shortID())
+
+	m.Lock()
+	defer m.Unlock()
+
 	for _, t := range m.timerTasks {
 		t.Stop()
 	}

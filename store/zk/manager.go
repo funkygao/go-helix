@@ -280,6 +280,8 @@ func (m *Manager) HandleStateChanged(state zk.State) (err error) {
 func (m *Manager) HandleNewSession() (err error) {
 	log.Trace("%s handling new session", m.shortID())
 
+	// TODO lock here
+
 	if err = m.conn.WaitUntilConnected(0); err != nil {
 		return
 	}
@@ -314,7 +316,7 @@ func (m *Manager) HandleNewSession() (err error) {
 
 	if errs := m.startTimerTasks(); len(errs) > 0 {
 		for _, e := range errs {
-			log.Error("%s %v", m.shortID(), e)
+			log.Error("%s timer task %v", m.shortID(), e)
 		}
 	}
 

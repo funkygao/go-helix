@@ -69,6 +69,9 @@ func (this *Trace) Run(args []string) (exitCode int) {
 	this.Ui.Warn("tracing live instance changes...")
 	must(spectator.AddLiveInstanceChangeListener(this.live))
 
+	this.Ui.Warn("tracing instance config changes...")
+	must(spectator.AddInstanceConfigChangeListener(this.instanceConfig))
+
 	this.Ui.Warn("tracing leader messages...")
 	must(spectator.AddControllerMessageListener(this.controllerMsg))
 
@@ -127,11 +130,15 @@ func (this *Trace) controller(ctx *helix.Context) {
 }
 
 func (this *Trace) controllerMsg(instance string, messages []*model.Message, ctx *helix.Context) {
-	this.Ui.Errorf("[%d] [%s] %+v", this.eventSeq.Add(1), instance, messages)
+	this.Ui.Errorf("[%d] controller msg [%s] %+v", this.eventSeq.Add(1), instance, messages)
 }
 
 func (this *Trace) messages(instance string, messages []*model.Message, ctx *helix.Context) {
-	this.Ui.Errorf("[%d] [%s] %+v", this.eventSeq.Add(1), instance, messages)
+	this.Ui.Errorf("[%d] participant msg [%s] %+v", this.eventSeq.Add(1), instance, messages)
+}
+
+func (this *Trace) instanceConfig(configs []*model.InstanceConfig, ctx *helix.Context) {
+	this.Ui.Errorf("[%d]instance config  %+v", this.eventSeq.Add(1), configs)
 }
 
 func (*Trace) Synopsis() string {

@@ -8,4 +8,4 @@ b:build
 	fedis redis -node localhost_10002 -log debug
 
 trace:build
-	@fedis trace
+	@fedis trace -log debug
