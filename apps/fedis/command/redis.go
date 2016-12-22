@@ -3,6 +3,8 @@ package command
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
+	golog "log"
 	"strings"
 
 	"github.com/funkygao/go-helix/apps/fedis/command/redis"
@@ -33,6 +35,7 @@ func (this *Redis) Run(args []string) (exitCode int) {
 		return 2
 	}
 
+	golog.SetOutput(ioutil.Discard)
 	setupLogging(log)
 
 	host := tuples[0]
