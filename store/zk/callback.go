@@ -87,20 +87,21 @@ func (cb *CallbackHandler) subscribeForChanges(path string, ctx helix.ChangeNoti
 	case helix.ExternalViewChanged, helix.IdealStateChanged, helix.CurrentStateChanged:
 		children, err := cb.conn.Children(path)
 		if err != nil {
-			log.Error("%s %v %s", cb, err, ctx)
+			log.Error("%s %s %v %s", cb, path, err, ctx)
 			return
 		}
 
 		for _, child := range children {
-			data, err := cb.conn.Get(gopath.Join(path, child))
+			childPath := gopath.Join(path, child)
+			data, err := cb.conn.Get(childPath)
 			if err != nil {
-				log.Error("%v", err)
+				log.Error("%s %s %v %s", cb, childPath, err, ctx)
 				continue
 			}
 
 			record, err := model.NewRecordFromBytes(data)
 			if err != nil {
-				log.Error("%v", err)
+				log.Error("%v data:%s", err, string(data))
 				continue
 			}
 
@@ -118,7 +119,7 @@ func (cb *CallbackHandler) subscribeForChanges(path string, ctx helix.ChangeNoti
 	default:
 		children, err := cb.conn.Children(path)
 		if err != nil {
-			log.Error("%s %v", cb, err)
+			log.Error("%s %s %v %s", cb, path, err, ctx)
 			return
 		}
 
@@ -128,6 +129,7 @@ func (cb *CallbackHandler) subscribeForChanges(path string, ctx helix.ChangeNoti
 	}
 }
 
+// TODO refactor to strip dup code block
 func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 	log.Debug("%s %s invoking %s", cb.shortID(), cb, ctx)
 
@@ -145,7 +147,7 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 		// TODO what if resource deleted
 		resources, values, err := cb.conn.ChildrenValues(cb.path)
 		if err != nil {
-			log.Error(err)
+			log.Error("%s %v", cb.path, err)
 			return
 		}
 
@@ -153,7 +155,7 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 		for _, val := range values {
 			record, err := model.NewRecordFromBytes(val)
 			if err != nil {
-				log.Error(err)
+				log.Error("%v %s", err, string(val))
 				return
 			}
 
@@ -165,7 +167,7 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 	case helix.IdealStateChanged:
 		resources, values, err := cb.conn.ChildrenValues(cb.path)
 		if err != nil {
-			log.Error(err)
+			log.Error("%s %v", cb.path, err)
 			return
 		}
 
@@ -173,7 +175,7 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 		for _, val := range values {
 			record, err := model.NewRecordFromBytes(val)
 			if err != nil {
-				log.Error(err)
+				log.Error("%v %s", err, string(val))
 				return
 			}
 
@@ -185,7 +187,7 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 	case helix.LiveInstanceChanged:
 		liveInstances, values, err := cb.conn.ChildrenValues(cb.path)
 		if err != nil {
-			log.Error(err)
+			log.Error("%s %v", cb.path, err)
 			return
 		}
 
@@ -193,7 +195,7 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 		for _, val := range values {
 			record, err := model.NewRecordFromBytes(val)
 			if err != nil {
-				log.Error(err)
+				log.Error("%v %s", err, string(val))
 				return
 			}
 
@@ -205,7 +207,7 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 	case helix.CurrentStateChanged:
 		resources, values, err := cb.conn.ChildrenValues(cb.path)
 		if err != nil {
-			log.Error(err)
+			log.Error("%s %v", cb.path, err)
 			return
 		}
 
@@ -213,7 +215,7 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 		for _, val := range values {
 			record, err := model.NewRecordFromBytes(val)
 			if err != nil {
-				log.Error(err)
+				log.Error("%v %s", err, string(val))
 				return
 			}
 
@@ -225,7 +227,7 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 	case helix.InstanceConfigChanged:
 		instances, values, err := cb.conn.ChildrenValues(cb.path)
 		if err != nil {
-			log.Error(err)
+			log.Error("%s %v", cb.path, err)
 			return
 		}
 
@@ -233,7 +235,7 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 		for _, val := range values {
 			record, err := model.NewRecordFromBytes(val)
 			if err != nil {
-				log.Error(err)
+				log.Error("%v %s", err, string(val))
 				return
 			}
 
@@ -248,7 +250,7 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 	case helix.ControllerMessagesChanged:
 		messageIds, values, err := cb.conn.ChildrenValues(cb.path)
 		if err != nil {
-			log.Error(err)
+			log.Error("%s %v", cb.path, err)
 			return
 		}
 
@@ -256,7 +258,7 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 		for _, val := range values {
 			record, err := model.NewRecordFromBytes(val)
 			if err != nil {
-				log.Error(err)
+				log.Error("%v %s", err, string(val))
 				return
 			}
 
@@ -270,7 +272,7 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 	case helix.InstanceMessagesChanged:
 		messageIds, values, err := cb.conn.ChildrenValues(cb.path)
 		if err != nil {
-			log.Error(err)
+			log.Error("%s %v", cb.path, err)
 			return
 		}
 
@@ -278,7 +280,7 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 		for _, val := range values {
 			record, err := model.NewRecordFromBytes(val)
 			if err != nil {
-				log.Error(err)
+				log.Error("%v %s", err, string(val))
 				return
 			}
 

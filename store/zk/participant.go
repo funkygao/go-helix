@@ -78,6 +78,8 @@ func (p *participant) joinCluster() (bool, error) {
 		return false, err
 	}
 
+	log.Trace("%s joined cluster %s", p.shortID(), p.clusterID)
+
 	return true, nil
 }
 

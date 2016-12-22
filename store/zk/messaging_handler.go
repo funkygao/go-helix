@@ -25,7 +25,8 @@ func newTransitionMessageHandler(mgr *Manager, message *model.Message) *transiti
 }
 
 func (h *transitionMessageHandler) HandleMessage(message *model.Message) error {
-	log.Trace("%s message: %s, %s -> %s", h.shortID(), message.ID(), message.FromState(), message.ToState())
+	log.Debug("%s message: %s, %s -> %s", h.shortID(), message.ID(),
+		message.FromState(), message.ToState())
 
 	if err := h.preHandleMessage(message); err != nil {
 		return err

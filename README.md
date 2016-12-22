@@ -28,6 +28,10 @@ Originally based on https://github.com/yichen/gohelix
 
 ### TODO
 
+- [ ] timer tasks
+- [ ] manager base
+- [ ] messaging log
+
 - [ ] chroot bug
 - [ ] curator
 - [ ] super cluster
@@ -36,3 +40,4 @@ Originally based on https://github.com/yichen/gohelix
 - [ ] metrics
 - [ ] constraint
 - [ ] HelixMultiClusterController, HelixStateTransitionHandler, HelixTaskExecutor.onMessage
+

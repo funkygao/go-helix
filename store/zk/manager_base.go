@@ -15,6 +15,10 @@ func (m *Manager) AddPreConnectCallback(cb helix.PreConnectCallback) {
 	m.preConnectCallbacks = append(m.preConnectCallbacks, cb)
 }
 
+func (m *Manager) AddPostConnectCallback(cb helix.PostConnectCallback) {
+	m.postConnectCallbacks = append(m.postConnectCallbacks, cb)
+}
+
 func (m *Manager) Cluster() string {
 	return m.clusterID
 }

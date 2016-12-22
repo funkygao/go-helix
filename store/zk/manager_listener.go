@@ -58,6 +58,8 @@ func (m *Manager) addListener(listener interface{}, path string, changeType heli
 
 	cb := newCallbackHandler(m, path, listener, changeType, watchChild)
 	m.handlers = append(m.handlers, cb)
+
+	log.Trace("%s add listener %s", m.shortID(), cb)
 	return nil
 }
 

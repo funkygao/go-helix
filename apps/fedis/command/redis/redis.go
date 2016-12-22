@@ -35,13 +35,18 @@ func NewNode(zkSvr, cluster, resource, stateModel string, replicas int, host, po
 }
 
 func (r *redisNode) Start() {
+	log.Info("starting redis %s:%s in cluster %s", r.host, r.port, r.cluster)
+
 	// create the redisInstance instance and connect
 	redisInstance, _ := zk.NewZkParticipant(r.cluster, r.host, r.port, r.zkSvr,
 		zk.WithZkSessionTimeout(time.Second*5),
 		zk.WithPprofPort(10001))
 
 	redisInstance.AddPreConnectCallback(func() {
-		log.Info("Will be connecting...")
+		log.Info("Connecting to cluster...")
+	})
+	redisInstance.AddPostConnectCallback(func() {
+		log.Info("Connected to cluster")
 	})
 
 	// register state model before connecting
@@ -76,6 +81,8 @@ func (r *redisNode) Start() {
 
 	must(redisInstance.Connect())
 
+	log.Info("redis connected to cluster %s", r.cluster)
+
 	if err := redisInstance.AddCurrentStateChangeListener(redisInstance.Instance(), redisInstance.SessionID(),
 		func(instance string, currentState []*model.CurrentState, ctx *helix.Context) {
 			log.Info("current state[%s] %+v", instance, currentState)
@@ -87,6 +94,7 @@ func (r *redisNode) Start() {
 	admin := redisInstance.ClusterManagementTool()
 	if err := admin.Rebalance(r.cluster, r.resource, r.replicas); err != nil {
 		log.Error("rebalance: %v", err)
+		return
 	} else {
 		log.Info("rebalance: ok")
 	}
@@ -97,4 +105,8 @@ func (r *redisNode) Start() {
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
+
+	redisInstance.Disconnect()
+	log.Info("bye!")
+	log.Close()
 }

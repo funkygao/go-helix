@@ -2,7 +2,7 @@ build:
 	@go install
 
 a:build
-	fedis redis -node localhost_10001 -log debug
+	fedis redis -node localhost_10001 -log trace
 
 b:build
 	fedis redis -node localhost_10002 -log debug

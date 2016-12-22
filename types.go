@@ -35,6 +35,7 @@ const (
 )
 
 type PreConnectCallback func()
+type PostConnectCallback func()
 
 type InstanceType string
 

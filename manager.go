@@ -31,6 +31,9 @@ type HelixManager interface {
 	// AddPreConnectCallback adds a callback that is invoked before a participant joins the cluster.
 	AddPreConnectCallback(PreConnectCallback)
 
+	// AddPostConnectCallback adds a callback that is invoked after a participant joins the cluster.
+	AddPostConnectCallback(PostConnectCallback)
+
 	// AddExternalViewChangeListener add a listener to external view changes.
 	AddExternalViewChangeListener(ExternalViewChangeListener) error
 

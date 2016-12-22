@@ -53,11 +53,12 @@ type Manager struct {
 	connected sync2.AtomicBool
 	stop      chan struct{}
 
-	clusterID           string
-	it                  helix.InstanceType
-	kb                  keyBuilder
-	pprofPort           int
-	preConnectCallbacks []helix.PreConnectCallback
+	clusterID            string
+	it                   helix.InstanceType
+	kb                   keyBuilder
+	pprofPort            int
+	preConnectCallbacks  []helix.PreConnectCallback
+	postConnectCallbacks []helix.PostConnectCallback
 
 	// participant fields
 	sme        *stateMachineEngine
@@ -104,8 +105,9 @@ func newZkHelixManager(clusterID, host, port, zkSvr string,
 		stop: make(chan struct{}),
 		kb:   newKeyBuilder(clusterID),
 
-		preConnectCallbacks: []helix.PreConnectCallback{},
-		metrics:             newMetricsReporter(),
+		preConnectCallbacks:  []helix.PreConnectCallback{},
+		postConnectCallbacks: []helix.PostConnectCallback{},
+		metrics:              newMetricsReporter(),
 
 		handlers:                []*CallbackHandler{},
 		externalViewResourceMap: map[string]bool{},
@@ -215,6 +217,12 @@ func (m *Manager) Disconnect() {
 
 	close(m.stop)
 	m.wg.Wait()
+
+	switch m.it {
+	case helix.InstanceTypeParticipant:
+		log.Trace("%s removed current states with err=%v", m.shortID(),
+			m.conn.DeleteTree(m.kb.currentStatesForSession(m.instanceID, m.SessionID())))
+	}
 
 	m.conn.Disconnect()
 	m.conn = nil
@@ -335,9 +343,8 @@ func (m *Manager) handleNewSessionAsParticipant() error {
 		}
 		return helix.ErrEnsureParticipantConfig
 	}
-	log.Debug("%s join cluster ok", m.shortID())
 
-	// only participant has pre connection callbacks
+	// only participant has pre-connect callbacks
 	for _, cb := range m.preConnectCallbacks {
 		cb()
 	}
@@ -345,16 +352,19 @@ func (m *Manager) handleNewSessionAsParticipant() error {
 	if err := p.createLiveInstance(); err != nil {
 		return err
 	}
-	log.Debug("%s create live instance ok", m.shortID())
 
 	if err := p.carryOverPreviousCurrentState(); err != nil {
 		return err
 	}
-	log.Debug("%s carry over previous current state ok", m.shortID())
 
 	p.setupMsgHandler()
 
-	log.Trace("handle new session as participant in %s", time.Since(t1))
+	// only participant has post-connect callbacks
+	for _, cb := range m.postConnectCallbacks {
+		cb()
+	}
+
+	log.Trace("%s handle new session as participant in %s", p.shortID(), time.Since(t1))
 
 	return nil
 }
