@@ -34,21 +34,7 @@ func NewNode(zkSvr, cluster, resource, stateModel string, replicas int, host, po
 	}
 }
 
-func (r *redisNode) Start() {
-	log.Info("starting redis %s:%s in cluster %s", r.host, r.port, r.cluster)
-
-	// create the redisInstance instance and connect
-	redisInstance, _ := zk.NewZkParticipant(r.cluster, r.host, r.port, r.zkSvr,
-		zk.WithZkSessionTimeout(time.Second*5),
-		zk.WithPprofPort(10001))
-
-	redisInstance.AddPreConnectCallback(func() {
-		log.Info("Connecting to cluster...")
-	})
-	redisInstance.AddPostConnectCallback(func() {
-		log.Info("Connected to cluster")
-	})
-
+func (r *redisNode) StateModel() *helix.StateModel {
 	// register state model before connecting
 	sm := helix.NewStateModel()
 	must(sm.AddTransitions([]helix.Transition{
@@ -77,7 +63,26 @@ func (r *redisNode) Start() {
 				message.PartitionName(), message.FromState(), message.ToState()))
 		}},
 	}))
-	redisInstance.StateMachineEngine().RegisterStateModel(r.stateModel, sm)
+
+	return sm
+}
+
+func (r *redisNode) Start() {
+	log.Info("starting redis %s:%s in cluster %s", r.host, r.port, r.cluster)
+
+	// create the redisInstance instance and connect
+	redisInstance, _ := zk.NewZkParticipant(r.cluster, r.host, r.port, r.zkSvr,
+		zk.WithZkSessionTimeout(time.Second*5),
+		zk.WithPprofPort(10001))
+
+	redisInstance.AddPreConnectCallback(func() {
+		log.Info("Connecting to cluster...")
+	})
+	redisInstance.AddPostConnectCallback(func() {
+		log.Info("Connected to cluster")
+	})
+
+	redisInstance.StateMachineEngine().RegisterStateModel(r.stateModel, r.StateModel())
 
 	must(redisInstance.Connect())
 

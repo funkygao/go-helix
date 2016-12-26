@@ -65,7 +65,7 @@ func (this *Trace) Run(args []string) (exitCode int) {
 	must(spectator.AddControllerListener(this.controller))
 
 	this.Ui.Warn("2. tracing external view changes...")
-	must(spectator.AddExternalViewChangeListener(this.external))
+	must(spectator.AddExternalViewChangeListener(this.routingTableProvider))
 
 	this.Ui.Warn("3. tracing ideal state changes...")
 	must(spectator.AddIdealStateChangeListener(this.ideal))
@@ -123,7 +123,7 @@ func (this *Trace) live(liveInstances []*model.LiveInstance, ctx *helix.Context)
 	}
 }
 
-func (this *Trace) external(externalViews []*model.ExternalView, ctx *helix.Context) {
+func (this *Trace) routingTableProvider(externalViews []*model.ExternalView, ctx *helix.Context) {
 	seq := this.eventSeq.Add(1)
 	this.Ui.Errorf("[%d] externalViews %+v", seq, externalViews)
 	this.Ui.Output(color.Cyan("[%d] %+v", seq, debug.Callstack(4)))

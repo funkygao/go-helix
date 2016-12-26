@@ -38,6 +38,13 @@ func init() {
 			}, nil
 		},
 
+		"fsm": func() (cli.Command, error) {
+			return &command.Fsm{
+				Ui:  ui,
+				Cmd: cmd,
+			}, nil
+		},
+
 		"redis": func() (cli.Command, error) {
 			return &command.Redis{
 				Ui:  ui,
