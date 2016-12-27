@@ -38,7 +38,7 @@ func (sm *StateModel) AddTransition(fromState string, toState string,
 		}
 	}
 
-	transition := Transition{fromState, toState, handler}
+	transition := Transition{FromState: fromState, ToState: toState, Handler: handler}
 	sm.transitions = append(sm.transitions, transition)
 	return nil
 }
@@ -77,7 +77,7 @@ func (sm *StateModel) exportStateDiagram(outfile string, format string, layout s
 	`
 
 	for _, t := range sm.transitions {
-		link := fmt.Sprintf(`%s -> %s`, t.FromState, t.ToState)
+		link := fmt.Sprintf(`%s -> %s [label="%s -> %s"]`, t.FromState, t.ToState, t.FromState[:1], t.ToState[:1])
 		dot = dot + "\r\n" + link
 	}
 
