@@ -24,26 +24,6 @@ var (
 	_ zkclient.ZkStateListener = &Manager{}
 )
 
-// NewZkParticipant creates a Participant implementation with zk as storage.
-func NewZkParticipant(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
-	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeParticipant, options...)
-}
-
-// NewZkSpectator creates a Spectator implementation with zk as storage.
-func NewZkSpectator(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
-	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeSpectator, options...)
-}
-
-// NewZkStandaloneController creates a Standalone Controller implementation with zk as storage.
-func NewZkStandaloneController(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
-	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeControllerStandalone, options...)
-}
-
-// NewZkDistributedController creates a Distributed Controller implementation with zk as storage.
-func NewZkDistributedController(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
-	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeControllerDistributed, options...)
-}
-
 type Manager struct {
 	sync.RWMutex
 
