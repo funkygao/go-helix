@@ -71,6 +71,7 @@ func (m *zkMessagingService) HandleChildChange(parentPath string, currentChilds 
 
 		// sequentially processing each message
 		if err = m.processMessage(msgID); err != nil {
+			// what if it's an invalid message
 			log.Error("msg[%s] %v", msgID, err)
 		}
 	}
