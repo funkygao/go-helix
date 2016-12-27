@@ -1,5 +1,5 @@
 build:
-	@go install
+	@go install -race
 
 a:build
 	fedis redis -node localhost_10001 -log debug
@@ -9,3 +9,6 @@ b:build
 
 trace:build
 	@fedis trace -log debug
+
+zk:
+	gk zk -z local -c wchp

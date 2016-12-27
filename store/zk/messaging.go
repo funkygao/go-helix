@@ -60,7 +60,7 @@ func (m *zkMessagingService) HandleChildChange(parentPath string, currentChilds 
 		return err
 	}
 
-	log.Debug("%s handle child change: %+v", m.shortID(), msgIDs)
+	log.Debug("%s msgs: %+v", m.shortID(), msgIDs)
 
 	for _, msgID := range msgIDs {
 		if m.receivedMessages.Contains(msgID) {
@@ -71,7 +71,7 @@ func (m *zkMessagingService) HandleChildChange(parentPath string, currentChilds 
 
 		// sequentially processing each message
 		if err = m.processMessage(msgID); err != nil {
-			log.Error("%v", err)
+			log.Error("msg[%s] %v", msgID, err)
 		}
 	}
 
@@ -79,8 +79,6 @@ func (m *zkMessagingService) HandleChildChange(parentPath string, currentChilds 
 }
 
 func (p *zkMessagingService) processMessage(msgID string) error {
-	log.Debug("%s processing msg: %s", p.shortID(), msgID)
-
 	record, err := p.conn.GetRecord(p.kb.message(p.instanceID, msgID))
 	if err != nil {
 		return err

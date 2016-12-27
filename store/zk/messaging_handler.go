@@ -25,7 +25,8 @@ func newTransitionMessageHandler(mgr *Manager, message *model.Message) *transiti
 }
 
 func (h *transitionMessageHandler) HandleMessage(message *model.Message) error {
-	log.Debug("%s message: %s, %s -> %s", h.shortID(), message.ID(),
+	log.Debug("%s msg: %s %s, %s -> %s", h.shortID(), message.ID(),
+		message.PartitionName(),
 		message.FromState(), message.ToState())
 
 	if err := h.preHandleMessage(message); err != nil {
@@ -38,7 +39,7 @@ func (h *transitionMessageHandler) HandleMessage(message *model.Message) error {
 }
 
 func (h *transitionMessageHandler) preHandleMessage(message *model.Message) error {
-	log.Debug("%s pre handle message: %s", h.shortID(), message.ID())
+	log.Debug("%s pre handle msg: %s", h.shortID(), message.ID())
 
 	// set the message execution time
 	nowMilli := time.Now().UnixNano() / 1000000
@@ -49,7 +50,7 @@ func (h *transitionMessageHandler) preHandleMessage(message *model.Message) erro
 }
 
 func (h *transitionMessageHandler) postHandleMessage(message *model.Message) error {
-	log.Debug("%s post handle message: %s", h.shortID(), message.ID())
+	log.Debug("%s post handle msg: %s", h.shortID(), message.ID())
 
 	// sessionID might change when we update the state model
 	// skip if we are handling an expired session
@@ -81,7 +82,7 @@ func (h *transitionMessageHandler) postHandleMessage(message *model.Message) err
 }
 
 func (h *transitionMessageHandler) invoke(message *model.Message) {
-	log.Debug("%s invoke messsage: %s", h.shortID(), message.ID())
+	log.Debug("%s invoke msg: %s", h.shortID(), message.ID())
 
 	// TODO lock
 	transition, present := h.sme.StateModel(message.StateModelDef())

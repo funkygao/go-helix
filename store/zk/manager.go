@@ -231,10 +231,10 @@ func (m *Manager) connectToZookeeper() (err error) {
 
 func (m *Manager) shortID() string {
 	if m.IsConnected() {
-		return fmt.Sprintf("%s[%s/%s@%s]", m.it, m.instanceID, m.conn.SessionID(), m.clusterID)
+		return fmt.Sprintf("[%s/%s@%s]", m.instanceID, m.conn.SessionID(), m.clusterID)
 	}
 
-	return fmt.Sprintf("%s[%s/-@%s]", m.it, m.instanceID, m.clusterID)
+	return fmt.Sprintf("[%s/-@%s]", m.instanceID, m.clusterID)
 }
 
 func (m *Manager) IsConnected() bool {
@@ -246,8 +246,6 @@ func (m *Manager) HandleStateChanged(state zk.State) (err error) {
 		// e,g. EventNodeChildrenChanged
 		return
 	}
-
-	log.Debug("%s new state: %s", m.shortID(), state)
 
 	switch state {
 	case zk.StateConnecting:
