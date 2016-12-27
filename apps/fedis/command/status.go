@@ -3,10 +3,13 @@ package command
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
+	golog "log"
 	"strings"
 
 	"github.com/funkygao/go-helix/store/zk"
 	"github.com/funkygao/gocli"
+	log "github.com/funkygao/log4go"
 )
 
 type Status struct {
@@ -20,6 +23,9 @@ func (this *Status) Run(args []string) (exitCode int) {
 	if err := cmdFlags.Parse(args); err != nil {
 		return 1
 	}
+
+	golog.SetOutput(ioutil.Discard)
+	log.Disable()
 
 	// create the admin instance and connect
 	admin := zk.NewZkHelixAdmin(zkSvr)
