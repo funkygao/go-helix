@@ -136,6 +136,13 @@ const (
 	MessageTypeParticipantError = "PARTICIPANT_ERROR_REPORT"
 )
 
+//          ----------------------------------------------------------
+//          |FULL_AUTO     |  SEMI_AUTO | CUSTOMIZED|  USER_DEFINED  |
+//          ---------------------------------------------------------|
+// LOCATION | HELIX        |  APP       |  APP      |      APP       |
+//          ---------------------------------------------------------|
+//    STATE | HELIX        |  HELIX     |  APP      |      APP       |
+//          ----------------------------------------------------------
 const (
 	RebalancerModeFullAuto    = "FULL_AUTO"
 	RebalancerModeSemiAuto    = "SEMI_AUTO"
