@@ -8,8 +8,9 @@ import (
 func (m *Manager) initHandlers() {
 	log.Trace("%s init handlers", m.shortID())
 
-	m.Lock()
-	defer m.Unlock()
+	// FIXME if manager listener handler do addListener, will dead lock
+	//m.Lock()
+	//defer m.Unlock()
 
 	for _, handler := range m.handlers {
 		handler.Init()
@@ -19,8 +20,8 @@ func (m *Manager) initHandlers() {
 func (m *Manager) resetHandlers() {
 	log.Trace("%s reset handlers", m.shortID())
 
-	m.Lock()
-	defer m.Unlock()
+	//m.Lock()
+	//defer m.Unlock()
 
 	for _, handler := range m.handlers {
 		handler.Reset()

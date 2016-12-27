@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
@@ -15,6 +16,7 @@ var _ helix.HelixAdmin = &Admin{}
 
 type Admin struct {
 	*connection
+	sync.RWMutex
 
 	// TODO kill this
 	helixInstallPath string
