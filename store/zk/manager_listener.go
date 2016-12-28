@@ -6,7 +6,7 @@ import (
 )
 
 func (m *Manager) initHandlers() {
-	log.Trace("%s init handlers", m.shortID())
+	log.Trace("%s init handlers...", m.shortID())
 
 	// FIXME if manager listener handler do addListener, will dead lock
 	//m.Lock()
@@ -15,10 +15,12 @@ func (m *Manager) initHandlers() {
 	for _, handler := range m.handlers {
 		handler.Init()
 	}
+
+	log.Trace("%s init handlers done", m.shortID())
 }
 
 func (m *Manager) resetHandlers() {
-	log.Trace("%s reset handlers", m.shortID())
+	log.Trace("%s reset handlers...", m.shortID())
 
 	//m.Lock()
 	//defer m.Unlock()
@@ -26,6 +28,8 @@ func (m *Manager) resetHandlers() {
 	for _, handler := range m.handlers {
 		handler.Reset()
 	}
+
+	log.Trace("%s reset handlers done", m.shortID())
 }
 
 func (m *Manager) handleListenerErrors() {
