@@ -75,7 +75,6 @@ func newZkHelixManager(clusterID, host, port, zkSvr string,
 	it helix.InstanceType, options ...ManagerOption) (mgr *Manager, err error) {
 	mgr = &Manager{
 		clusterID:  clusterID,
-		pprofPort:  10001, // TODO
 		it:         it,
 		host:       host,
 		port:       port,
@@ -93,6 +92,17 @@ func newZkHelixManager(clusterID, host, port, zkSvr string,
 		externalViewResourceMap: map[string]bool{},
 		idealStateResourceMap:   map[string]bool{},
 		instanceConfigMap:       map[string]bool{},
+	}
+
+	switch mgr.it {
+	case helix.InstanceTypeParticipant:
+		mgr.pprofPort = 10001
+	case helix.InstanceTypeSpectator:
+		mgr.pprofPort = 10002
+	case helix.InstanceTypeControllerDistributed, helix.InstanceTypeControllerStandalone:
+		mgr.pprofPort = 10003
+	default:
+		mgr.pprofPort = 10004
 	}
 
 	if mgr.instanceID == "_" {
@@ -278,7 +288,7 @@ func (m *Manager) HandleNewSession() (err error) {
 	m.stopTimerTasks()
 	m.resetHandlers()
 
-	if ok, err := m.conn.IsClusterSetup(m.clusterID); !ok || err != nil {
+	if ok, e := m.conn.IsClusterSetup(m.clusterID); !ok || e != nil {
 		return helix.ErrClusterNotSetup
 	}
 
