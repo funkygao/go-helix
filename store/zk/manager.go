@@ -210,6 +210,7 @@ func (m *Manager) Disconnect() {
 
 	switch m.it {
 	case helix.InstanceTypeParticipant:
+		// live instance znode auto disappears when zk disconnects
 		log.Trace("%s removed current states with err=%v", m.shortID(),
 			m.conn.DeleteTree(m.kb.currentStatesForSession(m.instanceID, m.SessionID())))
 	}

@@ -53,9 +53,13 @@ func (m *zkMessagingService) Send(msg *model.Message) error {
 }
 
 func (m *zkMessagingService) onMessages(instance string, messages []*model.Message, ctx *helix.Context) {
+	var msgIDs = make([]string, 0, len(messages))
 	for _, msg := range messages {
-		log.Debug("msg[%s] processing...", msg.ID())
+		msgIDs = append(msgIDs, msg.ID())
+	}
+	log.Debug("msgs %+v", msgIDs)
 
+	for _, msg := range messages {
 		if m.receivedMessages.Contains(msg.ID()) {
 			log.Debug("msg[%s] was processed, skipped", msg.ID())
 			continue
@@ -65,8 +69,6 @@ func (m *zkMessagingService) onMessages(instance string, messages []*model.Messa
 
 		if err := m.processMessage(msg); err != nil {
 			log.Error("msg[%s] %v", msg.ID(), err)
-		} else {
-			log.Debug("msg[%s] processed", msg.ID())
 		}
 	}
 

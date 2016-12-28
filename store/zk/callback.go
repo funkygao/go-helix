@@ -294,7 +294,7 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 }
 
 func (cb *CallbackHandler) HandleChildChange(parentPath string, lastChilds []string) error {
-	log.Trace("%s children changed, before %+v", parentPath, lastChilds)
+	log.Debug("%s children changed, before %+v", parentPath, lastChilds)
 
 	if !strings.HasPrefix(parentPath, cb.path) {
 		return nil
@@ -309,7 +309,7 @@ func (cb *CallbackHandler) HandleChildChange(parentPath string, lastChilds []str
 }
 
 func (cb *CallbackHandler) HandleDataChange(dataPath string, data []byte) error {
-	log.Trace("%s %s data changed", cb, dataPath)
+	log.Debug("%s %s data changed", cb, dataPath)
 
 	if !strings.HasPrefix(dataPath, cb.path) {
 		return nil
@@ -323,7 +323,7 @@ func (cb *CallbackHandler) HandleDataChange(dataPath string, data []byte) error 
 }
 
 func (cb *CallbackHandler) HandleDataDeleted(dataPath string) error {
-	log.Trace("%s %s data deleted", cb, dataPath)
+	log.Debug("%s %s data deleted", cb, dataPath)
 
 	if !strings.HasPrefix(dataPath, cb.path) {
 		return nil

@@ -90,6 +90,7 @@ func (p *participant) joinCluster() (bool, error) {
 func (p *participant) setupMsgHandler() {
 	log.Debug("%s setup message handler", p.shortID())
 
+	// FIXME each HasSession,
 	p.messaging.RegisterMessageHandlerFactory(helix.MessageTypeStateTransition, p.sme)
 	p.AddMessageListener(p.instanceID, p.messaging.onMessages)
 
