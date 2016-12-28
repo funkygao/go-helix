@@ -6,13 +6,11 @@ import (
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
 	log "github.com/funkygao/log4go"
-	"github.com/funkygao/zkclient"
 	lru "github.com/hashicorp/golang-lru"
 )
 
 var (
 	_ helix.ClusterMessagingService = &zkMessagingService{}
-	_ zkclient.ZkChildListener      = &zkMessagingService{}
 )
 
 // TODO support other types of message besides STATE_TRANSITION
@@ -54,39 +52,31 @@ func (m *zkMessagingService) Send(msg *model.Message) error {
 	return nil
 }
 
-func (m *zkMessagingService) HandleChildChange(parentPath string, currentChilds []string) error {
-	msgIDs, err := m.conn.Children(parentPath)
-	if err != nil {
-		return err
+func (m *zkMessagingService) onMessages(instance string, messages []*model.Message, ctx *helix.Context) {
+	var msgIDs = make([]string, 0, len(messages))
+	for _, msg := range messages {
+		msgIDs = append(msgIDs, msg.ID())
 	}
+	log.Debug("msgs %+v", msgIDs)
 
-	log.Debug("%s handle child change: %+v", m.shortID(), msgIDs)
+	// TODO sort messages by CreateTimeStamp
 
-	for _, msgID := range msgIDs {
-		if m.receivedMessages.Contains(msgID) {
+	for _, msg := range messages {
+		if m.receivedMessages.Contains(msg.ID()) {
+			log.Debug("msg[%s] was processed, skipped", msg.ID())
 			continue
 		}
 
-		m.receivedMessages.Add(msgID, struct{}{})
+		m.receivedMessages.Add(msg.ID(), struct{}{})
 
-		// sequentially processing each message
-		if err = m.processMessage(msgID); err != nil {
-			log.Error("%v", err)
+		if err := m.processMessage(msg); err != nil {
+			log.Error("msg[%s] %v", msg.ID(), err)
 		}
 	}
 
-	return nil
 }
 
-func (p *zkMessagingService) processMessage(msgID string) error {
-	log.Debug("%s processing msg: %s", p.shortID(), msgID)
-
-	record, err := p.conn.GetRecord(p.kb.message(p.instanceID, msgID))
-	if err != nil {
-		return err
-	}
-
-	message := model.NewMessageFromRecord(record)
+func (p *zkMessagingService) processMessage(message *model.Message) error {
 	factory := p.msgHandlerFactory[message.MessageType()]
 	if factory == nil {
 		return helix.ErrUnkownMessageType

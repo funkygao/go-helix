@@ -13,6 +13,8 @@ import (
 type Init struct {
 	Ui  cli.Ui
 	Cmd string
+
+	rebalanceMode string
 }
 
 func (this *Init) Run(args []string) (exitCode int) {
@@ -24,6 +26,7 @@ func (this *Init) Run(args []string) (exitCode int) {
 	cmdFlags.Usage = func() { this.Ui.Output(this.Help()) }
 	cmdFlags.StringVar(&node, "addNode", "", "")
 	cmdFlags.BoolVar(&reinit, "reinit", false, "")
+	cmdFlags.StringVar(&this.rebalanceMode, "rebalance", helix.RebalancerModeSemiAuto, "")
 	if err := cmdFlags.Parse(args); err != nil {
 		return 1
 	}
@@ -56,7 +59,7 @@ func (this *Init) Run(args []string) (exitCode int) {
 
 	// define the resource and partition
 	resourceOption := helix.DefaultAddResourceOption(partitions, stateModel)
-	resourceOption.RebalancerMode = helix.RebalancerModeFullAuto
+	resourceOption.RebalancerMode = this.rebalanceMode
 	must(admin.AddResource(cluster, resource, resourceOption))
 	this.Ui.Outputf("resource[%s] partitions:%d model:%s added to cluster[%s]", resource,
 		partitions, stateModel, cluster)
@@ -67,7 +70,7 @@ func (this *Init) Run(args []string) (exitCode int) {
 }
 
 func (*Init) Synopsis() string {
-	return "Initialize redis cluster"
+	return "Initialize redis cluster and resources with node auto join enabled"
 }
 
 func (this *Init) Help() string {
@@ -81,6 +84,10 @@ Options:
     -addNode host_port
 
     -reinit
+
+    -rebalance mode
+      [FULL_AUTO|SEMI_AUTO|CUSTOMIZED|USER_DEFINED]
+
 
 `, this.Cmd, this.Synopsis())
 	return strings.TrimSpace(help)

@@ -34,7 +34,7 @@ func (this *Fsm) Run(args []string) (exitCode int) {
 }
 
 func (*Fsm) Synopsis() string {
-	return "Export redis FSM state diagram to file"
+	return "Export redis FSM state diagram to png file"
 }
 
 func (this *Fsm) Help() string {

@@ -6,25 +6,33 @@ import (
 )
 
 func (m *Manager) initHandlers() {
-	log.Trace("%s init handlers", m.shortID())
+	log.Trace("%s init handlers...", m.shortID())
 
-	m.Lock()
-	defer m.Unlock()
-
-	for _, handler := range m.handlers {
+	for _, handler := range m.cloneHandlers() {
 		handler.Init()
 	}
+
+	log.Trace("%s init handlers done", m.shortID())
 }
 
 func (m *Manager) resetHandlers() {
-	log.Trace("%s reset handlers", m.shortID())
+	log.Trace("%s reset handlers...", m.shortID())
 
-	m.Lock()
-	defer m.Unlock()
-
-	for _, handler := range m.handlers {
+	for _, handler := range m.cloneHandlers() {
 		handler.Reset()
 	}
+
+	log.Trace("%s reset handlers done", m.shortID())
+}
+
+func (m *Manager) cloneHandlers() []*CallbackHandler {
+	r := make([]*CallbackHandler, 0)
+	m.Lock()
+	for _, h := range m.handlers {
+		r = append(r, h)
+	}
+	m.Unlock()
+	return r
 }
 
 func (m *Manager) handleListenerErrors() {
@@ -53,11 +61,10 @@ func (m *Manager) addListener(listener interface{}, path string, changeType heli
 		return helix.ErrNotConnected
 	}
 
-	m.Lock()
-	defer m.Unlock()
-
 	cb := newCallbackHandler(m, path, listener, changeType, watchChild)
+	m.Lock()
 	m.handlers = append(m.handlers, cb)
+	m.Unlock()
 
 	log.Trace("%s add listener %s", m.shortID(), cb)
 	return nil

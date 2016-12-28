@@ -39,12 +39,12 @@ func (r *redisNode) StateModel() *helix.StateModel {
 	sm := helix.NewStateModel()
 	must(sm.AddTransitions([]helix.Transition{
 		{"MASTER", "SLAVE", func(message *model.Message, ctx *helix.Context) {
-			log.Info(color.Green("resource[%s/%s] %s->%s", message.Resource(),
+			log.Info(color.Cyan("resource[%s/%s] %s->%s", message.Resource(),
 				message.PartitionName(), message.FromState(), message.ToState()))
 		}},
 
 		{"SLAVE", "MASTER", func(message *model.Message, ctx *helix.Context) {
-			log.Info(color.Cyan("resource[%s/%s] %s->%s", message.Resource(),
+			log.Info(color.Green("resource[%s/%s] %s->%s", message.Resource(),
 				message.PartitionName(), message.FromState(), message.ToState()))
 
 			// catch up previous master, enable writes, etc.
@@ -88,6 +88,7 @@ func (r *redisNode) Start() {
 
 	log.Info("redis connected to cluster %s", r.cluster)
 
+	log.Info("tracing current state change")
 	if err := redisInstance.AddCurrentStateChangeListener(redisInstance.Instance(), redisInstance.SessionID(),
 		func(instance string, currentState []*model.CurrentState, ctx *helix.Context) {
 			log.Info("current state[%s] %+v", instance, currentState)

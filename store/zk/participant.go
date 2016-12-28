@@ -3,6 +3,7 @@ package zk
 import (
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
+	"github.com/funkygao/go-zookeeper/zk"
 	log "github.com/funkygao/log4go"
 )
 
@@ -25,6 +26,9 @@ func (p *participant) createLiveInstance() (err error) {
 	record := model.NewLiveInstanceRecord(p.instanceID, p.conn.SessionID())
 	if err = p.conn.CreateLiveNode(p.kb.liveInstance(p.instanceID), record.Marshal(), p.liveRetry); err == nil {
 		log.Trace("%s created live instance", p.shortID())
+	} else if err == zk.ErrNodeExists {
+		log.Warn("%s live instance still exists", p.shortID())
+		err = nil
 	}
 
 	return
@@ -87,7 +91,9 @@ func (p *participant) setupMsgHandler() {
 	log.Debug("%s setup message handler", p.shortID())
 
 	p.messaging.RegisterMessageHandlerFactory(helix.MessageTypeStateTransition, p.sme)
-	p.conn.SubscribeChildChanges(p.kb.messages(p.instanceID), p.messaging)
+	p.AddMessageListener(p.instanceID, p.messaging.onMessages)
+
+	// TODO scheduled task
 
 	p.messaging.onConnected()
 }

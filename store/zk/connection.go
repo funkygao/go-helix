@@ -108,7 +108,6 @@ func (conn *connection) IsClusterSetup(cluster string) (bool, error) {
 		kb.participantConfigs(),
 		kb.propertyStore(),
 		kb.liveInstances(),
-		kb.liveSpectators(),
 		kb.instances(),
 		kb.externalView(),
 		kb.stateModelDefs(),

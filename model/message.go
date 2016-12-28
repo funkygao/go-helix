@@ -74,10 +74,6 @@ func (m Message) MessageType() string {
 	return m.GetStringField("MSG_TYPE", "")
 }
 
-func (m *Message) SetMessageType(t string) {
-	m.SetStringField("MSG_TYPE", t)
-}
-
 func (m Message) MessageSubType() string {
 	return m.GetStringField("MSG_SUBTYPE", "")
 }
@@ -113,6 +109,10 @@ func (m Message) FromState() string {
 
 func (m Message) ToState() string {
 	return m.GetStringField("TO_STATE", "")
+}
+
+func (m Message) SetToState(state string) {
+	m.SetStringField("TO_STATE", state)
 }
 
 // StateModelDef returns the state model definition name.

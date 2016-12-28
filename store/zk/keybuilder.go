@@ -21,7 +21,7 @@ import (
 // /{cluster}/IDEALSTATES
 // /{cluster}/INSTANCES
 // /{cluster}/LIVEINSTANCES
-// /{cluster}/LIVESPECTATORS
+// /{cluster}/LIVESPECTATORS # not compatible with apache helix
 // /{cluster}/PROPERTYSTORE
 // /{cluster}/STATEMODELDEFS
 // /{cluster}/STATEMODELDEFS/LeaderStandby

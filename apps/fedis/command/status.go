@@ -3,10 +3,13 @@ package command
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
+	golog "log"
 	"strings"
 
 	"github.com/funkygao/go-helix/store/zk"
 	"github.com/funkygao/gocli"
+	log "github.com/funkygao/log4go"
 )
 
 type Status struct {
@@ -21,6 +24,9 @@ func (this *Status) Run(args []string) (exitCode int) {
 		return 1
 	}
 
+	golog.SetOutput(ioutil.Discard)
+	log.Disable()
+
 	// create the admin instance and connect
 	admin := zk.NewZkHelixAdmin(zkSvr)
 	must(admin.Connect())
@@ -32,33 +38,43 @@ func (this *Status) Run(args []string) (exitCode int) {
 	instances, err := admin.Instances(cluster)
 	must(err)
 
+	liveInstances, err := admin.LiveInstances(cluster)
+	must(err)
+
 	resources, err := admin.Resources(cluster)
 	must(err)
 
 	// controller
-	this.Ui.Info(fmt.Sprintf("controller: %s", controller))
-	this.Ui.Output(fmt.Sprintf("    %+v", controlerHistory))
+	this.Ui.Outputf("controller: %s", controller)
+	this.Ui.Outputf("controller history:")
+	this.Ui.Outputf("    %+v", controlerHistory)
 
 	// resource
-	this.Ui.Info(fmt.Sprintf("resources:"))
+	this.Ui.Outputf("resources:")
 	for _, res := range resources {
 		idealState, err := admin.ResourceIdealState(cluster, res)
 		must(err)
-		this.Ui.Output(fmt.Sprintf("    %s#%d replica:%s %s %s", idealState.Resource(),
+		this.Ui.Outputf("    %s#%d replica:%s %s %s", idealState.Resource(),
 			idealState.NumPartitions(),
 			idealState.Replicas(),
 			idealState.RebalanceMode(),
 			idealState.StateModelDefRef(),
-		))
+		)
 	}
 
 	// instance
-	this.Ui.Info(fmt.Sprintf("instances:"))
+	this.Ui.Outputf("instances:")
 	for _, instance := range instances {
 		ic, err := admin.InstanceConfig(cluster, instance)
 		must(err)
 
-		this.Ui.Output(fmt.Sprintf("    %s", ic))
+		this.Ui.Outputf("    %s", ic)
+	}
+
+	// live instances
+	this.Ui.Outputf("live instances:")
+	for _, instance := range liveInstances {
+		this.Ui.Infof("    %s", instance)
 	}
 
 	return

@@ -38,7 +38,7 @@ func (this *Scale) Run(args []string) (exitCode int) {
 }
 
 func (*Scale) Synopsis() string {
-	return "Scale up/down redis instances"
+	return "Scale up/down redis resource partitions"
 }
 
 func (this *Scale) Help() string {

@@ -24,26 +24,6 @@ var (
 	_ zkclient.ZkStateListener = &Manager{}
 )
 
-// NewZkParticipant creates a Participant implementation with zk as storage.
-func NewZkParticipant(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
-	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeParticipant, options...)
-}
-
-// NewZkSpectator creates a Spectator implementation with zk as storage.
-func NewZkSpectator(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
-	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeSpectator, options...)
-}
-
-// NewZkStandaloneController creates a Standalone Controller implementation with zk as storage.
-func NewZkStandaloneController(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
-	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeControllerStandalone, options...)
-}
-
-// NewZkDistributedController creates a Distributed Controller implementation with zk as storage.
-func NewZkDistributedController(clusterID, host, port, zkSvr string, options ...ManagerOption) (mgr *Manager, err error) {
-	return newZkHelixManager(clusterID, host, port, zkSvr, helix.InstanceTypeControllerDistributed, options...)
-}
-
 type Manager struct {
 	sync.RWMutex
 
@@ -95,7 +75,6 @@ func newZkHelixManager(clusterID, host, port, zkSvr string,
 	it helix.InstanceType, options ...ManagerOption) (mgr *Manager, err error) {
 	mgr = &Manager{
 		clusterID:  clusterID,
-		pprofPort:  10001, // TODO
 		it:         it,
 		host:       host,
 		port:       port,
@@ -113,6 +92,17 @@ func newZkHelixManager(clusterID, host, port, zkSvr string,
 		externalViewResourceMap: map[string]bool{},
 		idealStateResourceMap:   map[string]bool{},
 		instanceConfigMap:       map[string]bool{},
+	}
+
+	switch mgr.it {
+	case helix.InstanceTypeParticipant:
+		mgr.pprofPort = 10001
+	case helix.InstanceTypeSpectator:
+		mgr.pprofPort = 10002
+	case helix.InstanceTypeControllerDistributed, helix.InstanceTypeControllerStandalone:
+		mgr.pprofPort = 10003
+	default:
+		mgr.pprofPort = 10004
 	}
 
 	if mgr.instanceID == "_" {
@@ -220,6 +210,7 @@ func (m *Manager) Disconnect() {
 
 	switch m.it {
 	case helix.InstanceTypeParticipant:
+		// live instance znode auto disappears when zk disconnects
 		log.Trace("%s removed current states with err=%v", m.shortID(),
 			m.conn.DeleteTree(m.kb.currentStatesForSession(m.instanceID, m.SessionID())))
 	}
@@ -251,10 +242,10 @@ func (m *Manager) connectToZookeeper() (err error) {
 
 func (m *Manager) shortID() string {
 	if m.IsConnected() {
-		return fmt.Sprintf("%s[%s/%s@%s]", m.it, m.instanceID, m.conn.SessionID(), m.clusterID)
+		return fmt.Sprintf("[%s/%s@%s]", m.instanceID, m.conn.SessionID(), m.clusterID)
 	}
 
-	return fmt.Sprintf("%s[%s/-@%s]", m.it, m.instanceID, m.clusterID)
+	return fmt.Sprintf("[%s/-@%s]", m.instanceID, m.clusterID)
 }
 
 func (m *Manager) IsConnected() bool {
@@ -266,8 +257,6 @@ func (m *Manager) HandleStateChanged(state zk.State) (err error) {
 		// e,g. EventNodeChildrenChanged
 		return
 	}
-
-	log.Debug("%s new state: %s", m.shortID(), state)
 
 	switch state {
 	case zk.StateConnecting:
@@ -300,7 +289,7 @@ func (m *Manager) HandleNewSession() (err error) {
 	m.stopTimerTasks()
 	m.resetHandlers()
 
-	if ok, err := m.conn.IsClusterSetup(m.clusterID); !ok || err != nil {
+	if ok, e := m.conn.IsClusterSetup(m.clusterID); !ok || e != nil {
 		return helix.ErrClusterNotSetup
 	}
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
@@ -15,6 +16,7 @@ var _ helix.HelixAdmin = &Admin{}
 
 type Admin struct {
 	*connection
+	sync.RWMutex
 
 	// TODO kill this
 	helixInstallPath string
@@ -334,6 +336,11 @@ func (adm *Admin) RemoveInstanceTag(cluster, instance, tag string) error {
 func (adm *Admin) Instances(cluster string) ([]string, error) {
 	kb := newKeyBuilder(cluster)
 	return adm.Children(kb.instances())
+}
+
+func (adm *Admin) LiveInstances(cluster string) ([]string, error) {
+	kb := newKeyBuilder(cluster)
+	return adm.Children(kb.liveInstances())
 }
 
 func (adm *Admin) InstanceConfig(cluster, instance string) (*model.InstanceConfig, error) {
