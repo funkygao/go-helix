@@ -45,6 +45,13 @@ func init() {
 			}, nil
 		},
 
+		"router": func() (cli.Command, error) {
+			return &command.Router{
+				Ui:  ui,
+				Cmd: cmd,
+			}, nil
+		},
+
 		"redis": func() (cli.Command, error) {
 			return &command.Redis{
 				Ui:  ui,
