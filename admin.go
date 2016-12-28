@@ -63,6 +63,9 @@ type HelixAdmin interface {
 	// Instances returns a list of instances participating under a cluster.
 	Instances(cluster string) ([]string, error)
 
+	// LiveInstances returns a list of live instances participating under a cluster.
+	LiveInstances(cluster string) ([]string, error)
+
 	// InstancesWithTag returns a list of resources in a cluster with a tag.
 	InstancesWithTag(cluster, tag string) ([]string, error)
 

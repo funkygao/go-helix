@@ -338,6 +338,11 @@ func (adm *Admin) Instances(cluster string) ([]string, error) {
 	return adm.Children(kb.instances())
 }
 
+func (adm *Admin) LiveInstances(cluster string) ([]string, error) {
+	kb := newKeyBuilder(cluster)
+	return adm.Children(kb.liveInstances())
+}
+
 func (adm *Admin) InstanceConfig(cluster, instance string) (*model.InstanceConfig, error) {
 	kb := newKeyBuilder(cluster)
 	kb.participantConfig(instance)
