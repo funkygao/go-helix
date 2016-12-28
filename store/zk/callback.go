@@ -293,8 +293,8 @@ func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
 	}
 }
 
-func (cb *CallbackHandler) HandleChildChange(parentPath string, currentChilds []string) error {
-	log.Trace("%s new children %+v", parentPath, currentChilds)
+func (cb *CallbackHandler) HandleChildChange(parentPath string, lastChilds []string) error {
+	log.Trace("%s children changed, before %+v", parentPath, lastChilds)
 
 	if !strings.HasPrefix(parentPath, cb.path) {
 		return nil
