@@ -41,6 +41,12 @@ func (h *transitionMessageHandler) HandleMessage(message *model.Message) error {
 func (h *transitionMessageHandler) preHandleMessage(message *model.Message) error {
 	log.Debug("msg[%s] pre handle", message.ID())
 
+	if !message.Valid() {
+		return helix.ErrInvalidMessage
+	}
+
+	// set REQUESTED_STATE of current state delta list
+
 	// set the message execution time
 	nowMilli := time.Now().UnixNano() / 1000000
 	startTime := strconv.FormatInt(nowMilli, 10)

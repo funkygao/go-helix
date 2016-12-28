@@ -29,11 +29,7 @@ Originally based on https://github.com/yichen/gohelix
 ### TODO
 
 - [ ] timer tasks
-- [ ] manager base
-- [ ] messaging log
-
 - [ ] chroot bug
-- [ ] curator
 - [ ] super cluster
 - [X] tag
 - [ ] too many WaitUntilConnected

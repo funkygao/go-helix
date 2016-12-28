@@ -59,6 +59,8 @@ func (m *zkMessagingService) onMessages(instance string, messages []*model.Messa
 	}
 	log.Debug("msgs %+v", msgIDs)
 
+	// TODO sort messages by CreateTimeStamp
+
 	for _, msg := range messages {
 		if m.receivedMessages.Contains(msg.ID()) {
 			log.Debug("msg[%s] was processed, skipped", msg.ID())

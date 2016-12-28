@@ -59,6 +59,8 @@ var (
 
 	ErrInvalidArgument = errors.New("Invalid arguments")
 
+	ErrInvalidMessage = errors.New("Invalid message")
+
 	ErrDupOperation = errors.New("Duplicated operation")
 
 	ErrUnkownMessageType = errors.New("Unknown message type")
