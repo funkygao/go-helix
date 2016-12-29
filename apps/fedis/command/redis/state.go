@@ -38,7 +38,3 @@ func (r *redisParticipant) StateModel() *helix.StateModel {
 
 	return sm
 }
-
-func (r *redisParticipant) currentStateHandler(instance string, currentState []*model.CurrentState, ctx *helix.Context) {
-	log.Info("current state[%s] %+v", instance, currentState)
-}

@@ -17,8 +17,8 @@ type redisParticipant struct {
 	replicas             int
 	host, port           string
 
-	m helix.HelixManager
-	r *redislet
+	m     helix.HelixManager
+	redis *redislet
 }
 
 func NewNode(zkSvr, cluster, resource, stateModel string, replicas int, host, port string) *redisParticipant {
@@ -31,7 +31,7 @@ func NewNode(zkSvr, cluster, resource, stateModel string, replicas int, host, po
 		host:       host,
 		port:       port,
 
-		r: newRedislet(port),
+		redis: newRedislet(port),
 	}
 }
 
@@ -42,16 +42,13 @@ func (r *redisParticipant) Start() {
 		zk.WithZkSessionTimeout(time.Second*5), zk.WithPprofPort(10001))
 
 	mgr.StateMachineEngine().RegisterStateModel(r.stateModel, r.StateModel())
+	r.m = mgr
 
 	must(mgr.Connect())
 	log.Info("redis connected to cluster %s", r.cluster)
 
-	r.r.SetManager(mgr)
-
-	log.Info("tracing current state change")
-	if err := mgr.AddCurrentStateChangeListener(mgr.Instance(), mgr.SessionID(), r.currentStateHandler); err != nil {
-		panic(err)
-	}
+	r.redis.SetManager(mgr)
+	r.setupListener()
 
 	// TODO controller itself auto rebalance
 	log.Info("start rebalancing %s/%d ...", r.resource, r.replicas)
