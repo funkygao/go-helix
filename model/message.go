@@ -186,3 +186,17 @@ func (m *Message) SetExecuteStartTimeStamp(val int64) {
 func (m Message) CreateReplyMessage(src *Message) {
 
 }
+
+type Messages []Message
+
+func (ms Messages) Len() int {
+	return len(ms)
+}
+
+func (ms Messages) Swap(i, j int) {
+	ms[i], ms[j] = ms[j], ms[i]
+}
+
+func (ms Messages) Less(i, j int) bool {
+	return ms[i].CreateTimeStamp() < ms[j].CreateTimeStamp()
+}

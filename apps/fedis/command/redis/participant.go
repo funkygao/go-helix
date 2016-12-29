@@ -51,13 +51,15 @@ func (r *redisParticipant) Start() {
 	r.setupListener()
 
 	// TODO controller itself auto rebalance
-	log.Info("start rebalancing %s/%d ...", r.resource, r.replicas)
-	admin := mgr.ClusterManagementTool()
-	if err := admin.Rebalance(r.cluster, r.resource, r.replicas); err != nil {
-		log.Error("rebalance: %v", err)
-		return
-	} else {
-		log.Info("rebalance: ok")
+	if false {
+		log.Info("start rebalancing %s/%d ...", r.resource, r.replicas)
+		admin := mgr.ClusterManagementTool()
+		if err := admin.Rebalance(r.cluster, r.resource, r.replicas); err != nil {
+			log.Error("rebalance: %v", err)
+			return
+		} else {
+			log.Info("rebalance: ok")
+		}
 	}
 
 	log.Info("awaiting Ctrl-C...")

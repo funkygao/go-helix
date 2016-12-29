@@ -254,8 +254,6 @@ func (m *Manager) IsConnected() bool {
 }
 
 func (m *Manager) HandleStateChanged(state zk.State) (err error) {
-	log.Debug("state -> %s", state)
-
 	switch state {
 	case zk.StateConnecting:
 		m.connected.Set(false)
