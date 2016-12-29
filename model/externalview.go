@@ -7,3 +7,19 @@ type ExternalView struct {
 func NewExternalViewFromRecord(r *Record) *ExternalView {
 	return &ExternalView{Record: r}
 }
+
+func (e *ExternalView) IdealStateMode() string {
+	return e.GetStringField("IDEAL_STATE_MODE", "")
+}
+
+func (e *ExternalView) Replicas() int {
+	return e.GetIntField("REPLICAS", 0)
+}
+
+func (e *ExternalView) NumPartitions() int {
+	return e.GetIntField("NUM_PARTITIONS", 0)
+}
+
+func (e *ExternalView) InstanceState(instance, partitionName string) string {
+	return e.MapFields[partitionName][instance]
+}

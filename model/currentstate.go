@@ -8,6 +8,7 @@ func NewCurrentStateFromRecord(r *Record) *CurrentState {
 	return &CurrentState{Record: r}
 }
 
-func (c *CurrentState) SetCurrentState(state string) {
-	c.SetStringField("CURRENT_STATE", state)
+func (c *CurrentState) SetCurrentState(partitionName, state string) {
+	// FIXME if !present in map
+	c.MapFields[partitionName]["CURRENT_STATE"] = state
 }

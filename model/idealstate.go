@@ -71,6 +71,14 @@ func (is *IdealState) Resource() string {
 	return is.ID
 }
 
+func (is *IdealState) IdealStateMode() string {
+	return is.GetStringField("IDEAL_STATE_MODE", "AUTO")
+}
+
+func (is *IdealState) SetIdealStateMode(mode string) {
+	is.SetStringField("IDEAL_STATE_MODE", mode)
+}
+
 func (is *IdealState) SetRebalanceMode(mode string) {
 	is.SetSimpleField("REBALANCE_MODE", mode)
 }
@@ -143,6 +151,10 @@ func (is IdealState) InstanceGroupTag() string {
 
 func (is *IdealState) SetInstanceGroupTag(tag string) {
 	is.SetStringField("INSTANCE_GROUP_TAG", tag)
+}
+
+func (is *IdealState) InstanceState(instance, partitionName string) string {
+	return is.MapFields[partitionName][instance]
 }
 
 func (is IdealState) Valid() bool {
