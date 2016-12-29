@@ -11,8 +11,7 @@ func NewParticipanthealthcheckTask() helix.HelixTimerTask {
 	return &ParticipanthealthcheckTask{}
 }
 
-func (p *ParticipanthealthcheckTask) Start() error {
-	return nil
+func (p *ParticipanthealthcheckTask) Start() {
 }
 
 func (p *ParticipanthealthcheckTask) Stop() {

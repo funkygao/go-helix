@@ -63,11 +63,7 @@ type Manager struct {
 	// context of the specator, accessible from the ExternalViewChangeListener
 	context *helix.Context // TODO
 
-	handlers                []*CallbackHandler
-	cacheLock               sync.RWMutex
-	externalViewResourceMap map[string]bool // key is resource
-	idealStateResourceMap   map[string]bool // key is resource
-	instanceConfigMap       map[string]bool // key is instance
+	handlers []*CallbackHandler
 }
 
 // newZkHelixManager creates a HelixManager implementation with zk being storage.
@@ -88,10 +84,7 @@ func newZkHelixManager(clusterID, host, port, zkSvr string,
 		postConnectCallbacks: []helix.PostConnectCallback{},
 		metrics:              newMetricsReporter(),
 
-		handlers:                []*CallbackHandler{},
-		externalViewResourceMap: map[string]bool{},
-		idealStateResourceMap:   map[string]bool{},
-		instanceConfigMap:       map[string]bool{},
+		handlers: []*CallbackHandler{},
 	}
 
 	switch mgr.it {
@@ -133,7 +126,15 @@ func newZkHelixManager(clusterID, host, port, zkSvr string,
 	switch it {
 	case helix.InstanceTypeParticipant:
 		mgr.sme = newStateMachineEngine(mgr)
-		mgr.timerTasks = []helix.HelixTimerTask{healthcheck.NewParticipanthealthcheckTask()}
+		mgr.timerTasks = []helix.HelixTimerTask{
+			healthcheck.NewParticipanthealthcheckTask(),
+			newHandlersMonitor(mgr),
+		}
+
+	case helix.InstanceTypeSpectator:
+		mgr.timerTasks = []helix.HelixTimerTask{
+			newHandlersMonitor(mgr),
+		}
 
 	case helix.InstanceTypeControllerDistributed:
 		mgr.sme = newStateMachineEngine(mgr)
@@ -143,7 +144,7 @@ func newZkHelixManager(clusterID, host, port, zkSvr string,
 		mgr.controllerTimerTasks = []helix.HelixTimerTask{}
 		err = helix.ErrNotImplemented
 
-	case helix.InstanceTypeAdministrator, helix.InstanceTypeSpectator:
+	case helix.InstanceTypeAdministrator:
 		// do nothing
 
 	default:
@@ -253,10 +254,7 @@ func (m *Manager) IsConnected() bool {
 }
 
 func (m *Manager) HandleStateChanged(state zk.State) (err error) {
-	if state == zk.StateUnknown {
-		// e,g. EventNodeChildrenChanged
-		return
-	}
+	log.Debug("state -> %s", state)
 
 	switch state {
 	case zk.StateConnecting:
@@ -312,13 +310,9 @@ func (m *Manager) HandleNewSession() (err error) {
 	case helix.InstanceTypeAdministrator:
 	}
 
-	if errs := m.startTimerTasks(); len(errs) > 0 {
-		for _, e := range errs {
-			log.Error("%s timer task %v", m.shortID(), e)
-		}
-	}
-
+	m.startTimerTasks()
 	m.initHandlers()
+
 	return
 }
 
@@ -359,7 +353,6 @@ func (m *Manager) handleNewSessionAsParticipant() error {
 }
 
 func (m *Manager) handleNewSessionAsController() error {
-	// DistributedLeaderElection
 	return helix.ErrNotImplemented
 }
 

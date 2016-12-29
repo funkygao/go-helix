@@ -4,7 +4,7 @@ package helix
 type HelixTimerTask interface {
 
 	// Start.
-	Start() error
+	Start()
 
 	// Stop.
 	Stop()

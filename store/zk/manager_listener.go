@@ -66,6 +66,8 @@ func (m *Manager) addListener(listener interface{}, path string, changeType heli
 	m.handlers = append(m.handlers, cb)
 	m.Unlock()
 
+	cb.Init() // FIXME dup init, but without this newly added listener not awaken
+
 	log.Trace("%s add listener %s", m.shortID(), cb)
 	return nil
 }

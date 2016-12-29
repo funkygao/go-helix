@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
@@ -55,7 +56,7 @@ func (this *Trace) Run(args []string) (exitCode int) {
 
 	this.Ui.Infof("tracing cluster %s", cluster)
 
-	spectator, err := zk.NewZkSpectator(cluster, "", "", zkSvr)
+	spectator, err := zk.NewZkSpectator(cluster, "", "", zkSvr, zk.WithZkSessionTimeout(time.Second*5))
 	must(err)
 	must(spectator.Connect())
 
@@ -106,7 +107,9 @@ func (this *Trace) live(liveInstances []*model.LiveInstance, ctx *helix.Context)
 	for _, live := range liveInstances {
 		if ok, present := this.liveInstances[live.Node()]; !present || !ok {
 			this.Ui.Warnf("tracing %s messages...", live.Node())
-			this.spectator.AddMessageListener(live.Node(), this.messages)
+			if err := this.spectator.AddMessageListener(live.Node(), this.messages); err != nil {
+				this.Ui.Errorf("trace message: %v", err)
+			}
 		}
 	}
 

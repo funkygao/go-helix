@@ -4,20 +4,16 @@ import (
 	log "github.com/funkygao/log4go"
 )
 
-func (m *Manager) startTimerTasks() []error {
+func (m *Manager) startTimerTasks() {
 	log.Trace("%s start timer tasks", m.shortID())
 
 	m.Lock()
 	defer m.Unlock()
 
-	var errs []error
 	for _, t := range m.timerTasks {
-		if err := t.Start(); err != nil {
-			errs = append(errs, err)
-		}
+		go t.Start()
 	}
 
-	return errs
 }
 
 func (m *Manager) stopTimerTasks() {
