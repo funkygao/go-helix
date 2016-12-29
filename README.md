@@ -36,5 +36,5 @@ Originally based on https://github.com/yichen/gohelix
 - [ ] too many WaitUntilConnected
 - [ ] metrics
 - [ ] constraint
-- [ ] HelixMultiClusterController, HelixStateTransitionHandler, HelixTaskExecutor.onMessage
+- [ ] HelixMultiClusterController, HelixStateTransitionHandler, HelixTaskExecutor.onMessage, RoutingTableProvider
 
