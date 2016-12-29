@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/funkygao/go-helix"
+	"github.com/funkygao/go-helix/model"
 	"github.com/funkygao/go-helix/store/zk"
 	log "github.com/funkygao/log4go"
 )
@@ -16,6 +17,9 @@ type redisParticipant struct {
 	resource, stateModel string
 	replicas             int
 	host, port           string
+
+	instance       string
+	instanceConfig *model.InstanceConfig
 
 	m     helix.HelixManager
 	redis *redislet
@@ -47,8 +51,12 @@ func (r *redisParticipant) Start() {
 	must(mgr.Connect())
 	log.Info("redis connected to cluster %s", r.cluster)
 
+	r.instance = mgr.Instance()
+
 	r.redis.SetManager(mgr)
 	r.setupListener()
+
+	r.instanceConfig, _ = mgr.ClusterManagementTool().InstanceConfig(r.cluster, r.instance)
 
 	// TODO controller itself auto rebalance
 	if false {

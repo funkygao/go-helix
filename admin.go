@@ -119,14 +119,14 @@ type HelixAdmin interface {
 
 	// SetConfig set the configuration values for the cluster, defined by the config scope.
 	// TODO
-	SetConfig(cluster string, scope HelixConfigScope, properties map[string]string) error
+	SetConfig(cluster string, scope HelixConfigScope, properties map[string]string, ident ...string) error
 
-	//
-	DropConfig(scope HelixConfigScope, keys []string) error
+	// DropConfig will drop properties of keys from a configuration in simple field.
+	DropConfig(scope HelixConfigScope, keys []string, ident ...string) error
 
 	// GetConfig obtains the configuration value of a property, defined by a config scope.
 	// TODO
-	GetConfig(cluster string, scope HelixConfigScope, keys []string) (map[string]interface{}, error)
+	GetConfig(cluster string, scope HelixConfigScope, keys []string, ident ...string) (map[string]interface{}, error)
 
 	AddConstaint()
 	RemoveConstaint()

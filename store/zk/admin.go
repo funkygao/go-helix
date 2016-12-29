@@ -235,18 +235,28 @@ func (adm *Admin) Clusters() ([]string, error) {
 	return clusters, nil
 }
 
-func (adm *Admin) SetConfig(cluster string, scope helix.HelixConfigScope, properties map[string]string) error {
+func (adm *Admin) SetConfig(cluster string, scope helix.HelixConfigScope, properties map[string]string, ident ...string) error {
+	kb := newKeyBuilder(cluster)
 	switch scope {
 	case helix.ConfigScopeCluster:
 		if allow, ok := properties["allowParticipantAutoJoin"]; ok {
-			kb := newKeyBuilder(cluster)
 			if strings.ToLower(allow) == "true" {
 				// false by default
 				adm.UpdateSimpleField(kb.clusterConfig(), "allowParticipantAutoJoin", "true")
 			}
 		}
-	case helix.ConfigScopeConstraint:
+
 	case helix.ConfigScopeParticipant:
+		if len(ident) != 1 {
+			return helix.ErrInvalidArgument
+		}
+
+		for k, v := range properties {
+			// TODO group commit
+			adm.UpdateSimpleField(kb.participantConfig(ident[0]), k, v)
+		}
+
+	case helix.ConfigScopeConstraint:
 	case helix.ConfigScopePartition:
 	case helix.ConfigScopeResource:
 	}
@@ -254,11 +264,11 @@ func (adm *Admin) SetConfig(cluster string, scope helix.HelixConfigScope, proper
 	return nil
 }
 
-func (adm *Admin) DropConfig(scope helix.HelixConfigScope, keys []string) error {
+func (adm *Admin) DropConfig(scope helix.HelixConfigScope, keys []string, ident ...string) error {
 	return helix.ErrNotImplemented
 }
 
-func (adm *Admin) GetConfig(cluster string, scope helix.HelixConfigScope, keys []string) (map[string]interface{}, error) {
+func (adm *Admin) GetConfig(cluster string, scope helix.HelixConfigScope, keys []string, ident ...string) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 	switch scope {
 	case helix.ConfigScopeCluster:

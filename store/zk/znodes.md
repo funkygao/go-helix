@@ -3,7 +3,6 @@
 ### cluster
 
     /{cluster}/CONFIGS/CLUSTER/{cluster}
-    /{cluster}/PROPERTYSTORE
 
 ### controller
 
@@ -23,3 +22,4 @@
     /{cluster}/EXTERNALVIEW/{resource}
     /{cluster}/IDEALSTATES/{resource}
     /{cluster}/INSTANCES/{instance}/CURRENTSTATES/{sessionid}/{resource}
+    /{cluster}/PROPERTYSTORE/{xxx}/{resource}

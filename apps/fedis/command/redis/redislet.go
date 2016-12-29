@@ -2,6 +2,9 @@ package redis
 
 import (
 	"github.com/funkygao/go-helix"
+	"github.com/funkygao/go-helix/model"
+	"github.com/funkygao/golib/color"
+	log "github.com/funkygao/log4go"
 )
 
 // redislet is a single redis instance that can be slave or master.
@@ -25,4 +28,8 @@ func (r *redislet) SetMaster(master string) {
 
 func (r *redislet) SetManager(m helix.HelixManager) {
 	r.m = m
+}
+
+func (r *redislet) Replicator(externalViews []*model.ExternalView, ctx *helix.Context) {
+	log.Info(color.Cyan("%+v", externalViews))
 }

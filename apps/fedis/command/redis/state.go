@@ -29,6 +29,7 @@ func (r *redisParticipant) slave2master(message *model.Message, ctx *helix.Conte
 	log.Info(color.Green("resource[%s/%s] %s->%s", message.Resource(),
 		message.PartitionName(), message.FromState(), message.ToState()))
 
+	// promoted to master
 	// catch up previous master, enable writes, etc.
 }
 

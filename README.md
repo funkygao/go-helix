@@ -28,6 +28,7 @@ Originally based on https://github.com/yichen/gohelix
 
 ### TODO
 
+- [ ] PROPERTYSTORE
 - [ ] timer tasks
 - [ ] chroot bug
 - [ ] super cluster
