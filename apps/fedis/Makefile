@@ -10,7 +10,7 @@ init:build
 	fedis init -reinit -rebalance SEMI_AUTO
 
 rebalance:
-	/opt/app/helix/bin/helix-admin.sh --zkSvr ${ZK}  --rebalance ${CLUSTER} ${RESOURCE} ${REPLICA}
+	/opt/helix/bin/helix-admin.sh --zkSvr ${ZK}  --rebalance ${CLUSTER} ${RESOURCE} ${REPLICA}
 
 a:build
 	fedis redis -node localhost_10001 -log debug
