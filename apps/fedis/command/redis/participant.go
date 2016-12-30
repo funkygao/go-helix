@@ -47,28 +47,17 @@ func (r *redisParticipant) Start() {
 
 	mgr.StateMachineEngine().RegisterStateModel(r.stateModel, r.StateModel())
 	r.m = mgr
+	r.redis.SetContext(r)
 
 	must(mgr.Connect())
 	log.Info("redis connected to cluster %s", r.cluster)
 
 	r.instance = mgr.Instance()
 
-	r.redis.SetManager(mgr)
-	r.setupListener()
+	log.Info("traceing external view to know who is master")
+	r.m.AddExternalViewChangeListener(r.redis.TopologyAware)
 
 	r.instanceConfig, _ = mgr.ClusterManagementTool().InstanceConfig(r.cluster, r.instance)
-
-	// TODO controller itself auto rebalance
-	if false {
-		log.Info("start rebalancing %s/%d ...", r.resource, r.replicas)
-		admin := mgr.ClusterManagementTool()
-		if err := admin.Rebalance(r.cluster, r.resource, r.replicas); err != nil {
-			log.Error("rebalance: %v", err)
-			return
-		} else {
-			log.Info("rebalance: ok")
-		}
-	}
 
 	log.Info("awaiting Ctrl-C...")
 	c := make(chan os.Signal, 2)

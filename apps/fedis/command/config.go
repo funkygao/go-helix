@@ -6,7 +6,7 @@ import (
 
 const (
 	zkSvr            = "localhost:2181"
-	cluster          = "foobar"
+	cluster          = "fedis"
 	stateModel       = helix.StateModelMasterSlave
 	resource         = "redis"
 	partitions       = 3

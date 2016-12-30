@@ -29,6 +29,8 @@ func (m *Manager) Valid() bool {
 	return true
 }
 
+func (m *Manager) PropertyStore() {}
+
 func (m *Manager) AddPreConnectCallback(cb helix.PreConnectCallback) {
 	m.preConnectCallbacks = append(m.preConnectCallbacks, cb)
 }
