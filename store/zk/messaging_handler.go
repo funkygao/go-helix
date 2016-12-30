@@ -82,9 +82,10 @@ func (h *transitionMessageHandler) postHandleMessage(message *model.Message) err
 	h.conn.DeleteTree(h.kb.message(h.instanceID, message.ID()))
 
 	// actually set the current state
+	log.Debug("msg[%s] %s@%s CURRENT_STATE => %s", message.ID(),
+		message.PartitionName(), message.TargetName(), toState)
 	currentStateForResourcePath := h.kb.currentStateForResource(h.instanceID,
 		h.conn.SessionID(), message.Resource())
-	log.Debug("msg[%s] %s[CURRENT_STATE] => %s", message.ID(), currentStateForResourcePath, toState)
 	return h.conn.UpdateMapField(currentStateForResourcePath, partitionName,
 		"CURRENT_STATE", toState)
 }

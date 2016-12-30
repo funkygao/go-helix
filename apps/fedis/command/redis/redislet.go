@@ -14,6 +14,7 @@ import (
 
 // redislet is a single redis instance that can be slave or master.
 // redislet automatically replicate from master if it is slave.
+// TODO sync up to date with master
 type redislet struct {
 	ctx *redisParticipant
 
@@ -52,6 +53,7 @@ func (r *redislet) StartMaster() {
 
 	// bootstrap redis as master
 	// now, I don't care who is master
+	r.callRedis("READWRITE")
 }
 
 func (r *redislet) StopMaster() {
@@ -88,22 +90,23 @@ func (r *redislet) locateMaster(externalViews []*model.ExternalView) {
 }
 
 func (r *redislet) StartReplication() {
-	for {
-		if r.master == nil {
-			log.Warn("no master found")
-			time.Sleep(time.Second)
-			return
-		}
+	r.callRedis("READONLY")
 
-		log.Info("slave bootstrap data and start replication from master %s", r.master.Node())
-		r.callRedis("slave of")
+	log.Trace("start replication from master %+v", r.master)
+
+	if r.master == nil {
+		log.Warn("no master found")
+		return
 	}
+
+	log.Info("slave bootstrap data and start replication from master %s", r.master.Node())
+	r.callRedis("SLAVEOF", r.master.Host(), r.master.Port())
 
 }
 
 func (r *redislet) StopReplication() {
 	log.Info("slave stop replication")
-	r.callRedis("slaveof none")
+	r.callRedis("SLAVEOF", "NO", "ONE")
 }
 
 func (r *redislet) SetContext(p *redisParticipant) {
@@ -138,12 +141,12 @@ func (r *redislet) bootRedis() {
 }
 
 func (r *redislet) callRedis(cmd string, args ...interface{}) {
-	log.Debug("call redis %s", cmd)
-
 	reply, err := r.rc.Do(cmd, args...)
 	if err != nil {
-		panic(err)
+		//panic(err)
+		log.Error("call redis: %s %+v -> %v", cmd, args, err)
+		return
 	}
 
-	log.Debug("%s -> %+v", cmd, reply)
+	log.Debug("call redis: %s %+v -> %+v", cmd, args, reply)
 }

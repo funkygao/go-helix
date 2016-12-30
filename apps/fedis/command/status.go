@@ -44,6 +44,9 @@ func (this *Status) Run(args []string) (exitCode int) {
 	resources, err := admin.Resources(cluster)
 	must(err)
 
+	view, err := admin.ResourceExternalView(cluster, resource)
+	must(err)
+
 	// controller
 	this.Ui.Outputf("controller: %s", controller)
 	this.Ui.Outputf("controller history:")
@@ -61,6 +64,9 @@ func (this *Status) Run(args []string) (exitCode int) {
 			idealState.StateModelDefRef(),
 		)
 	}
+
+	this.Ui.Info("external view:")
+	this.Ui.Outputf("    %+v", view.MapFields)
 
 	// instance
 	this.Ui.Outputf("instances:")
