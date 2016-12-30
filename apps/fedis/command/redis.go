@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	golog "log"
+	"os"
 	"strings"
 
 	"github.com/funkygao/go-helix/apps/fedis/command/redis"
@@ -37,6 +38,8 @@ func (this *Redis) Run(args []string) (exitCode int) {
 
 	golog.SetOutput(ioutil.Discard)
 	setupLogging(log)
+
+	os.Setenv("REDIS", redisServer)
 
 	host := tuples[0]
 	port := tuples[1]

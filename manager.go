@@ -19,6 +19,10 @@ type HelixManager interface {
 	// IsLeader checks if this is a controller and a leader of the cluster.
 	IsLeader() bool
 
+	// PropertyStore returns the cluster properties store that work with Record.
+	// TODO
+	PropertyStore()
+
 	// Instance returns the instance name used to connect to the cluster.
 	Instance() string
 

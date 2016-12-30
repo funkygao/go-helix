@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	golog "log"
+	"sort"
 	"strings"
 
 	"github.com/funkygao/go-helix/store/zk"
@@ -44,6 +45,9 @@ func (this *Status) Run(args []string) (exitCode int) {
 	resources, err := admin.Resources(cluster)
 	must(err)
 
+	view, err := admin.ResourceExternalView(cluster, resource)
+	must(err)
+
 	// controller
 	this.Ui.Outputf("controller: %s", controller)
 	this.Ui.Outputf("controller history:")
@@ -60,6 +64,19 @@ func (this *Status) Run(args []string) (exitCode int) {
 			idealState.RebalanceMode(),
 			idealState.StateModelDefRef(),
 		)
+	}
+
+	this.Ui.Info("external view:")
+	var sortedPartitions []string
+	for p := range view.MapFields {
+		sortedPartitions = append(sortedPartitions, p)
+	}
+	sort.Strings(sortedPartitions)
+	for _, partition := range sortedPartitions {
+		m := view.MapFields[partition]
+		for instance, state := range m {
+			this.Ui.Outputf("    %s %s %s", partition, instance, state)
+		}
 	}
 
 	// instance

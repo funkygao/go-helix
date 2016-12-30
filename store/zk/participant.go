@@ -78,7 +78,7 @@ func (p *participant) joinCluster() (bool, error) {
 		return false, err
 	}
 
-	if err = p.ClusterManagementTool().AddNode(p.clusterID, p.instanceID); err != nil {
+	if err = p.ClusterManagementTool().AddNode(p.clusterID, p.instanceID); err != nil && err != helix.ErrNodeAlreadyExists {
 		return false, err
 	}
 

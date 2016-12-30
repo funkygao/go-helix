@@ -30,6 +30,7 @@ _testmain.go
 *.iml
 *.out
 .DS_Store
+dump.rdb
 
 fsm.png
 schema/

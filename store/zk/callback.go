@@ -7,6 +7,7 @@ import (
 
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
+	"github.com/funkygao/golib/debug"
 	log "github.com/funkygao/log4go"
 	"github.com/funkygao/zkclient"
 )
@@ -131,7 +132,7 @@ func (cb *CallbackHandler) subscribeForChanges(path string, ctx helix.ChangeNoti
 
 // TODO refactor to strip dup code block
 func (cb *CallbackHandler) invoke(ctx helix.ChangeNotification) {
-	log.Debug("%s %s invoking %s", cb.shortID(), cb, ctx)
+	log.Debug("%s %s invoking %s %+v", cb.shortID(), cb, ctx, debug.Callstack(3))
 
 	// TODO
 	//cb.Manager.Lock()

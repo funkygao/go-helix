@@ -64,8 +64,6 @@ func (this *Init) Run(args []string) (exitCode int) {
 	this.Ui.Outputf("resource[%s] partitions:%d model:%s added to cluster[%s]", resource,
 		partitions, stateModel, cluster)
 
-	this.Ui.Warnf("%s/bin/run-helix-controller.sh --zkSvr %s --cluster %s", helixInstallBase, zkSvr, cluster)
-
 	return
 }
 
