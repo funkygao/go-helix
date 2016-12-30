@@ -8,6 +8,7 @@ import (
 	"github.com/funkygao/go-helix"
 	"github.com/funkygao/go-helix/model"
 	"github.com/funkygao/golib/color"
+	"github.com/funkygao/golib/sync2"
 	log "github.com/funkygao/log4go"
 	"github.com/funkygao/redigo/redis"
 )
@@ -23,7 +24,8 @@ type redislet struct {
 	port string
 	rc   redis.Conn
 
-	master *model.InstanceConfig
+	master                 *model.InstanceConfig
+	isReplicationInitiated sync2.AtomicBool
 }
 
 func newRedislet(port string) *redislet {
@@ -46,6 +48,7 @@ func (r *redislet) TopologyAware(externalViews []*model.ExternalView, ctx *helix
 	log.Info(color.Yellow("%+v", externalViews))
 
 	r.locateMaster(externalViews)
+	// TODO start replication if neccessary
 }
 
 func (r *redislet) StartMaster() {
@@ -93,6 +96,13 @@ func (r *redislet) StartReplication() {
 	r.callRedis("READONLY")
 
 	log.Trace("start replication from master %+v", r.master)
+
+	// FIXME race condition between the external view and message
+	// till now, we still have not got who is my master
+	// message -> then, external view updated
+	view, err := r.ctx.m.ClusterManagementTool().ResourceExternalView(r.ctx.cluster, r.ctx.resource)
+	must(err)
+	log.Debug("%+v", view)
 
 	if r.master == nil {
 		log.Warn("no master found")
