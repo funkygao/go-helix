@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	golog "log"
+	"sort"
 	"strings"
 
 	"github.com/funkygao/go-helix/store/zk"
@@ -66,7 +67,17 @@ func (this *Status) Run(args []string) (exitCode int) {
 	}
 
 	this.Ui.Info("external view:")
-	this.Ui.Outputf("    %+v", view.MapFields)
+	var sortedPartitions []string
+	for p := range view.MapFields {
+		sortedPartitions = append(sortedPartitions, p)
+	}
+	sort.Strings(sortedPartitions)
+	for _, partition := range sortedPartitions {
+		m := view.MapFields[partition]
+		for instance, state := range m {
+			this.Ui.Outputf("    %s %s %s", partition, instance, state)
+		}
+	}
 
 	// instance
 	this.Ui.Outputf("instances:")
