@@ -156,7 +156,7 @@ func (adm *Admin) AddCluster(cluster string) error {
 
 func (adm *Admin) DropCluster(cluster string) error {
 	if ok, err := adm.IsClusterSetup(cluster); !ok || err != nil {
-		return helix.ErrClusterNotSetup
+		return nil
 	}
 
 	kb := newKeyBuilder(cluster)
